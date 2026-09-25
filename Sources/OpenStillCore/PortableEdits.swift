@@ -74,7 +74,7 @@ public enum PortableEdits {
         func name(_ old:String?)->String?{old.map{mapping[$0] ?? $0}}
         func mask(_ old:AdjustmentMask)->AdjustmentMask{var m=old;m.asset=name(m.asset);m.components=m.components?.map{var c=$0;c.selection=mask(c.selection);return c};return m}
         e.baseAsset=name(e.baseAsset);e.overlayAsset=name(e.overlayAsset)
-        if var advanced=e.advanced{advanced.lutAsset=name(advanced.lutAsset);advanced.aiBackgroundAsset=name(advanced.aiBackgroundAsset);advanced.profile?.dcpAsset=name(advanced.profile?.dcpAsset);advanced.masks=advanced.masks.mapValues(mask);e.advanced=advanced}
+        if var advanced=e.advanced{advanced.lutAsset=name(advanced.lutAsset);advanced.aiBackgroundAsset=name(advanced.aiBackgroundAsset);if var profile=advanced.profile{profile.dcpAsset=name(profile.dcpAsset);advanced.profile=profile};advanced.masks=advanced.masks.mapValues(mask);e.advanced=advanced}
         return e
     }
     /// Explicit import appends new IDs and preserves every pre-existing version and rating.

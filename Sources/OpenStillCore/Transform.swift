@@ -309,7 +309,7 @@ public enum Upright {
             if off <= tolerance { verticals.append((a, b, line.weight)) }
             else if 90 - off <= tolerance { horizontals.append((a, b, line.weight)) }
         }
-        let freeRotate = true, freeVertical = [.auto, .vertical, .full, .guided].contains(mode), freeHorizontal = [.auto, .full, .guided].contains(mode)
+        let freeVertical = [.auto, .vertical, .full, .guided].contains(mode), freeHorizontal = [.auto, .full, .guided].contains(mode)
         let verticalWeight = 1.0, horizontalWeight = mode == .vertical ? 0.5 : 1.0
         switch mode {
         case .level: guard verticals.count + horizontals.count >= 1 else { return nil }
@@ -337,7 +337,7 @@ public enum Upright {
         let limit = TransformSettings.rotateLimit
         var best = (rot: 0.0, v: 0.0, h: 0.0, c: cost(0, 0, 0))
         // Coarse grid, then a shrinking pattern search.
-        let rotations = freeRotate ? stride(from: -limit, through: limit, by: 1).map { $0 } : [0]
+        let rotations = stride(from: -limit, through: limit, by: 1).map { $0 }
         let verticalsGrid = freeVertical ? stride(from: -1.0, through: 1.0, by: 0.1).map { $0 } : [0]
         let horizontalsGrid = freeHorizontal ? stride(from: -1.0, through: 1.0, by: 0.1).map { $0 } : [0]
         for rot in rotations { for v in verticalsGrid { for hz in horizontalsGrid {
@@ -347,7 +347,7 @@ public enum Upright {
         for _ in 0..<40 {
             var improved = false
             for delta in [(1.0,0.0,0.0),(-1,0,0),(0,1,0),(0,-1,0),(0,0,1),(0,0,-1)] {
-                if delta.0 != 0 && !freeRotate || delta.1 != 0 && !freeVertical || delta.2 != 0 && !freeHorizontal { continue }
+                if delta.1 != 0 && !freeVertical || delta.2 != 0 && !freeHorizontal { continue }
                 let rot = min(limit, max(-limit, best.rot + delta.0*step.rot)), v = min(1, max(-1, best.v + delta.1*step.v)), hz = min(1, max(-1, best.h + delta.2*step.h))
                 let c = cost(rot, v, hz); if c < best.c - 1e-15 { best = (rot, v, hz, c); improved = true }
             }
