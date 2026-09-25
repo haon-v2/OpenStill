@@ -41,10 +41,12 @@ jobs:
       - name: Check the version
         run: |
           set -euo pipefail
-          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]] || { echo "Version must look like 0.8.0"; exit 1; }
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]] || { echo "Version must look like 0.0.1 or 0.8.0"; exit 1; }
           CURRENT="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Resources/Info.plist)"
           BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' Resources/Info.plist)"
-          python3 -c "import sys; n=lambda v: [int(x) for x in v.split('.')]+[0]*(3-len(v.split('.'))); sys.exit(0 if n('$VERSION') > n('$CURRENT') else 'Version $VERSION must be higher than the current $CURRENT')"
+          # Sparkle orders updates by the build number (CFBundleVersion), which always goes up below,
+          # so the visible version may restart or go lower. It just can't repeat an earlier release.
+          if grep -q "<sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>" appcast.xml; then echo "Version $VERSION was already released"; exit 1; fi
           if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then echo "Tag v$VERSION already exists"; exit 1; fi
           echo "BUILD=$((BUILD + 1))" >> "$GITHUB_ENV"
           echo "Releasing $VERSION (build $((BUILD + 1))), replacing $CURRENT (build $BUILD)"
