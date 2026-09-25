@@ -49,6 +49,9 @@ extension AdjustmentMask {
     /// Range coverage samples the tool's incoming image; geometric selections
     /// travel through the same optical and crop transforms as the photograph.
     public func coverage(geometry:EditGeometry,lens:LensSettings,input:CIImage,modern:Bool)throws->CIImage {
+        try coverage(geometry:geometry,lens:OpticalCorrection(lens),input:input,modern:modern)
+    }
+    public func coverage(geometry:EditGeometry,lens:OpticalCorrection,input:CIImage,modern:Bool)throws->CIImage {
         let bounds=geometry.extent
         let black=CIImage(color:.black).cropped(to:bounds)
         var result:CIImage
@@ -72,7 +75,7 @@ extension AdjustmentMask {
             if feather > 0 {result=result.clampedToExtent().applyingFilter("CIGaussianBlur",parameters:[kCIInputRadiusKey:min(bounds.width,bounds.height)*max(0,min(1,feather))*0.012]).cropped(to:bounds)}
             for stroke in strokes {
                 var brush=AdjustmentMask();brush.feather=0;var add=stroke;add.subtract=false;brush.strokes=[add]
-                let painted=geometry.apply(try LensCorrections.apply(brush.image(size:geometry.sourceSize),settings:modern ? lens:LensSettings(),mask:true))
+                let painted=geometry.apply(try LensCorrections.apply(brush.image(size:geometry.sourceSize),settings:modern ? lens:OpticalCorrection(),mask:true))
                 let color=CIImage(color:stroke.subtract ? .black:.white).cropped(to:bounds)
                 result=color.applyingFilter("CIBlendWithMask",parameters:[kCIInputBackgroundImageKey:result,kCIInputMaskImageKey:painted])
             }

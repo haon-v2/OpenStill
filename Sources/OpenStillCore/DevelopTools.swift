@@ -345,6 +345,7 @@ public enum ClippingOverlay {
         before.rotation = edits.rotation; before.flip = edits.flip; before.crop = edits.crop
         if edits.straighten != 0 { before.straighten = edits.straighten }
         if edits.lens.hasEffect { before.lens = edits.lens }
+        if edits.transform.hasEffect { before.transform = edits.transform }
         return before
     }
 }

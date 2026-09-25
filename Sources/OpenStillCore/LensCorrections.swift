@@ -27,6 +27,25 @@ public struct LensSettings: Codable, Equatable {
     var flags:Int32 { (distortion ? 8:0) | (chromaticAberration ? 1:0) | (opticalVignette ? 2:0) }
     public var hasEffect:Bool { enabled && (profileID != nil || manualDistortion != 0 || manualChromatic != 0 || manualVignette != 0) }
 }
+/// Everything the optical warp does: lens corrections, then perspective in the display orientation.
+public struct OpticalCorrection: Codable, Equatable {
+    public var lens:LensSettings
+    public var transform:TransformSettings?
+    public var turn:Int, flip:Bool
+    public init(lens:LensSettings = LensSettings(),transform:TransformSettings? = nil,turn:Int = 0,flip:Bool = false) {
+        self.lens=lens;self.transform=transform;self.turn=turn;self.flip=flip
+    }
+    public init(_ lens:LensSettings) { self.init(lens:lens) }
+    public var hasEffect:Bool { lens.hasEffect || transform?.hasEffect == true }
+    var orientation:DisplayOrientation { DisplayOrientation(turn:turn,flip:flip) }
+    /// Key for cached maps; orientation only matters when there is a perspective.
+    var cacheKey:String {
+        let encoder=JSONEncoder();encoder.outputFormatting = .sortedKeys
+        let lensKey=lens.hasEffect ? String(decoding:(try? encoder.encode(lens.sanitized)) ?? Data(),as:UTF8.self) : "-"
+        guard let transform=transform?.sanitized,transform.hasEffect else { return lensKey }
+        return lensKey+"|"+String(decoding:(try? encoder.encode(transform)) ?? Data(),as:UTF8.self)+"|\(orientation.turn)|\(flip)"
+    }
+}
 extension PhotoEdits {
     public var lens:LensSettings {
         get { advanced?.lens ?? LensSettings() }
@@ -72,10 +91,47 @@ public final class LensLibrary {
         if matches.count == 1, exif["FocalLength"] != nil { s.profileID=matches[0].id }
         return s.sanitized
     }
-    fileprivate func maps(_ settings:LensSettings,size:CGSize) throws -> LensMaps {
-        let settings=settings.sanitized
+    fileprivate func maps(_ optics:OpticalCorrection,size:CGSize) throws -> LensMaps {
         let width=max(2,Int(size.width.rounded())),height=max(2,Int(size.height.rounded()))
-        let gw=min(513,width),gh=min(513,height), count=gw*gh*4
+        let gw=min(513,width),gh=min(513,height)
+        let lens=optics.lens.hasEffect ? try lensGrid(optics.lens,width:width,height:height,gw:gw,gh:gh) : nil
+        guard let perspective=Perspective(optics.transform,sourceSize:size,orientation:optics.orientation) else {
+            return LensMaps(data:lens ?? Self.identityGrid(width:width,height:height,gw:gw,gh:gh),width:gw,height:gh,size:size)
+        }
+        // Each output grid point looks up the lens-corrected point it shows, then samples the lens grid there.
+        // Outside the photo the gains' alpha is 0, so uncovered areas render transparent.
+        let count=gw*gh*4
+        var data=[Float](repeating:0,count:count*4)
+        let lookup=lens.map { LensMaps(data:$0,width:gw,height:gh,size:size,images:false) }
+        for y in 0..<gh { for x in 0..<gw {
+            let off=(y*gw+x)*4
+            let q=CGPoint(x:(Double(x)/Double(gw-1)*Double(width-1)+0.5)/Double(width),y:(Double(y)/Double(gh-1)*Double(height-1)+0.5)/Double(height))
+            guard let p=perspective.input(q) else { continue }
+            let halfX=0.5/Double(width),halfY=0.5/Double(height)
+            let inside=p.x >= -halfX && p.x <= 1+halfX && p.y >= -halfY && p.y <= 1+halfY
+            if let lookup {
+                for plane in 0..<4 { let v=lookup.interpolate(p,plane:plane);for c in 0..<4 { data[plane*count+off+c]=Float(v[c]) } }
+            } else {
+                for c in 0..<3 { data[c*count+off]=Float(p.x);data[c*count+off+1]=Float(p.y);data[c*count+off+3]=1 }
+                for c in 0..<3 { data[3*count+off+c]=1 }
+            }
+            data[3*count+off+3]=inside ? 1:0
+        } }
+        return LensMaps(data:data,width:gw,height:gh,size:size)
+    }
+    static func identityGrid(width:Int,height:Int,gw:Int,gh:Int)->[Float] {
+        let count=gw*gh*4
+        var data=[Float](repeating:0,count:count*4)
+        for y in 0..<gh { for x in 0..<gw {
+            let i=(y*gw+x)*4
+            for c in 0..<3 { data[c*count+i]=Float((Double(x)/Double(gw-1)*Double(width-1)+0.5)/Double(width));data[c*count+i+1]=Float((Double(y)/Double(gh-1)*Double(height-1)+0.5)/Double(height));data[c*count+i+3]=1 }
+            for c in 0..<4 { data[3*count+i+c]=1 }
+        } }
+        return data
+    }
+    private func lensGrid(_ settings:LensSettings,width:Int,height:Int,gw:Int,gh:Int) throws -> [Float] {
+        let settings=settings.sanitized
+        let count=gw*gh*4
         var data=[Float](repeating:0,count:count*4)
         if let profile=profile(id:settings.profileID) {
             lock.lock()
@@ -83,13 +139,7 @@ public final class LensLibrary {
             lock.unlock()
             guard result >= 0 else { throw LensError.unavailable }
         } else if settings.profileID != nil { throw LensError.unavailable }
-        else {
-            for y in 0..<gh { for x in 0..<gw {
-                let i=(y*gw+x)*4
-                for c in 0..<3 { data[c*count+i]=Float((Double(x)/Double(gw-1)*Double(width-1)+0.5)/Double(width));data[c*count+i+1]=Float((Double(y)/Double(gh-1)*Double(height-1)+0.5)/Double(height));data[c*count+i+3]=1 }
-                for c in 0..<4 { data[3*count+i+c]=1 }
-            } }
-        }
+        else { data=Self.identityGrid(width:width,height:height,gw:gw,gh:gh) }
         // Manual radial controls supplement any available profile. Coordinates stay
         // in the oriented source, shared by retouching and selection overlays.
         for y in 0..<gh { for x in 0..<gw {
@@ -103,8 +153,9 @@ public final class LensLibrary {
             let px=Double(x)/Double(gw-1)-0.5,py=Double(y)/Double(gh-1)-0.5
             let gain=Float(pow(2,settings.manualVignette*(px*px+py*py)*4))
             for c in 0..<3 { data[3*count+off+c] *= gain }
+            data[3*count+off+3]=1 // coverage: the whole frame shows the photo
         } }
-        return LensMaps(data:data,width:gw,height:gh,size:size)
+        return data
     }
 }
 public enum LensError:LocalizedError {
@@ -113,66 +164,85 @@ public enum LensError:LocalizedError {
 }
 private final class LensMaps {
     let images:[CIImage],data:[Float],width:Int,height:Int,size:CGSize
-    init(data:[Float],width:Int,height:Int,size:CGSize) {
+    init(data:[Float],width:Int,height:Int,size:CGSize,images makeImages:Bool = true) {
         self.data=data;self.width=width;self.height=height;self.size=size
         let count=width*height*4
-        images=(0..<4).map { plane in
+        images=makeImages ? (0..<4).map { plane in
             let bytes=data.withUnsafeBufferPointer { Data(buffer:UnsafeBufferPointer(start:$0.baseAddress!+plane*count,count:count)) }
             return CIImage(bitmapData:bytes,bytesPerRow:width*16,size:CGSize(width:width,height:height),format:.RGBAf,colorSpace:nil)
                 .transformed(by:CGAffineTransform(a:1,b:0,c:0,d:-1,tx:0,ty:CGFloat(height)))
-        }
+        } : []
     }
-    func sourcePoint(_ point:CGPoint)->CGPoint {
-        let x=min(Double(width-1),max(0,(point.x*size.width-0.5)/(size.width-1)*Double(width-1)))
-        let y=min(Double(height-1),max(0,(point.y*size.height-0.5)/(size.height-1)*Double(height-1)))
+    /// Bilinear value of one plane (red, green, blue map or gains) at a source-normalized point, clamped to the grid.
+    func interpolate(_ point:CGPoint,plane:Int)->[Double] {
+        let x=min(Double(width-1),max(0,(point.x*size.width-0.5)/max(1,size.width-1)*Double(width-1)))
+        let y=min(Double(height-1),max(0,(point.y*size.height-0.5)/max(1,size.height-1)*Double(height-1)))
         let ix=min(width-2,Int(x)),iy=min(height-2,Int(y)),fx=x-Double(ix),fy=y-Double(iy)
-        func component(_ c:Int)->Double {
-            func value(_ dx:Int,_ dy:Int)->Double { Double(data[width*height*4+((iy+dy)*width+ix+dx)*4+c]) }
+        return (0..<4).map { c in
+            func value(_ dx:Int,_ dy:Int)->Double { Double(data[plane*width*height*4+((iy+dy)*width+ix+dx)*4+c]) }
             return (value(0,0)*(1-fx)+value(1,0)*fx)*(1-fy)+(value(0,1)*(1-fx)+value(1,1)*fx)*fy
         }
-        return CGPoint(x:component(0),y:component(1))
     }
+    func sourcePoint(_ point:CGPoint)->CGPoint { let v=interpolate(point,plane:1);return CGPoint(x:v[0],y:v[1]) }
 }
 public enum LensCorrections {
     private static let cache:NSCache<NSString,LensMaps> = { let c=NSCache<NSString,LensMaps>();c.countLimit=5;return c }()
-    private static func maps(_ settings:LensSettings,size:CGSize)throws->LensMaps {
-        let encoder=JSONEncoder();encoder.outputFormatting = .sortedKeys
-        let key=String(decoding:try encoder.encode(settings.sanitized),as:UTF8.self)+"|\(size.width)|\(size.height)"
+    private static func maps(_ optics:OpticalCorrection,size:CGSize)throws->LensMaps {
+        let key=optics.cacheKey+"|\(size.width)|\(size.height)"
         if let maps=cache.object(forKey:key as NSString) { return maps }
-        let maps=try LensLibrary.shared.maps(settings,size:size);cache.setObject(maps,forKey:key as NSString);return maps
+        let maps=try LensLibrary.shared.maps(optics,size:size);cache.setObject(maps,forKey:key as NSString);return maps
     }
     private static let warp=CIKernel(source:"""
     kernel vec4 opticalCorrection(sampler image,sampler redMap,sampler greenMap,sampler blueMap,sampler gains,vec2 size,vec2 grid,float mask) {
         vec2 p=(destCoord()-vec2(0.5))/(size-vec2(1.0))*(grid-vec2(1.0))+vec2(0.5);
         vec2 g=sample(greenMap,samplerTransform(greenMap,p)).xy*size;
-        if(mask>0.5) return sample(image,samplerTransform(image,g));
+        vec4 gain=sample(gains,samplerTransform(gains,p));
+        if(mask>0.5) return sample(image,samplerTransform(image,g))*gain.a;
         vec2 r=sample(redMap,samplerTransform(redMap,p)).xy*size;
         vec2 b=sample(blueMap,samplerTransform(blueMap,p)).xy*size;
         vec4 green=sample(image,samplerTransform(image,g));
         vec3 rgb=vec3(sample(image,samplerTransform(image,r)).r,green.g,sample(image,samplerTransform(image,b)).b);
-        return vec4(rgb*sample(gains,samplerTransform(gains,p)).rgb,green.a);
+        return vec4(rgb*gain.rgb,green.a)*gain.a;
     }
     """)
-    public static func apply(_ image:CIImage,settings:LensSettings,mask:Bool = false)throws->CIImage {
+    public static func apply(_ image:CIImage,settings:LensSettings,mask:Bool = false)throws->CIImage { try apply(image,settings:OpticalCorrection(settings),mask:mask) }
+    public static func apply(_ image:CIImage,settings:OpticalCorrection,mask:Bool = false)throws->CIImage {
         guard settings.hasEffect else { return image }
         let bounds=image.extent, maps=try maps(settings,size:bounds.size)
         guard let output=warp?.apply(extent:bounds,roiCallback:{ index,_ in index == 0 ? bounds : maps.images[0].extent },arguments:[image.clampedToExtent()]+maps.images+[CIVector(x:bounds.width,y:bounds.height),CIVector(x:Double(maps.width),y:Double(maps.height)),mask ? 1.0:0.0]) else { throw EditError.render }
         return output.cropped(to:bounds)
     }
-    public static func correctedPoint(_ source:CGPoint,size:CGSize,settings:LensSettings)->CGPoint {
+    public static func correctedPoint(_ source:CGPoint,size:CGSize,settings:LensSettings)->CGPoint { correctedPoint(source,size:size,settings:OpticalCorrection(settings)) }
+    /// Where a source point appears after the optics: inverts the same smooth map used by image sampling (Newton's method).
+    public static func correctedPoint(_ source:CGPoint,size:CGSize,settings:OpticalCorrection)->CGPoint {
         guard settings.hasEffect else{return source}
-        var p=source
-        // Invert the same smooth map used by image sampling for source markers.
-        for _ in 0..<12 {
+        // Start from the exact perspective image of the point; only the lens part then needs solving.
+        var p=Perspective(settings.transform,sourceSize:size,orientation:settings.orientation)?.output(source) ?? source
+        if !p.x.isFinite || !p.y.isFinite { p=source }
+        let h=1e-4
+        for _ in 0..<30 {
             let value=sourcePoint(p,size:size,settings:settings)
             let dx=source.x-value.x,dy=source.y-value.y
-            if hypot(dx,dy)<0.00001{break}
-            p.x += dx;p.y += dy
+            if hypot(dx,dy)<0.000001{break}
+            let ax=sourcePoint(CGPoint(x:p.x+h,y:p.y),size:size,settings:settings),ay=sourcePoint(CGPoint(x:p.x,y:p.y+h),size:size,settings:settings)
+            let j00=(ax.x-value.x)/h,j10=(ax.y-value.y)/h,j01=(ay.x-value.x)/h,j11=(ay.y-value.y)/h
+            let det=j00*j11-j01*j10
+            if abs(det)>1e-9 { p.x += (j11*dx-j01*dy)/det; p.y += (-j10*dx+j00*dy)/det }
+            else { p.x += dx; p.y += dy }
         }
         return p
     }
-    public static func sourcePoint(_ point:CGPoint,size:CGSize,settings:LensSettings)->CGPoint {
-        guard settings.hasEffect, let maps=try? maps(settings,size:size) else { return point }
-        return maps.sourcePoint(point)
+    public static func sourcePoint(_ point:CGPoint,size:CGSize,settings:LensSettings)->CGPoint { sourcePoint(point,size:size,settings:OpticalCorrection(settings)) }
+    public static func sourcePoint(_ point:CGPoint,size:CGSize,settings:OpticalCorrection)->CGPoint {
+        guard settings.hasEffect else { return point }
+        // Perspective is exact; only the lens part is looked up in the grid.
+        var q=point
+        if let perspective=Perspective(settings.transform,sourceSize:size,orientation:settings.orientation) {
+            guard let p=perspective.input(point) else { return point }
+            q=p
+        }
+        guard settings.lens.hasEffect else { return q }
+        guard let maps=try? maps(OpticalCorrection(settings.lens),size:size) else { return q }
+        return maps.sourcePoint(q)
     }
 }

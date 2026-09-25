@@ -123,13 +123,13 @@ extension ViewerController {
             // Preserve brush radius in source pixels through crop/straighten/rotation.
             let scale = hypot(geometry.transform.a,geometry.transform.b)
             let radius = maskRadius*min(geometry.extent.width,geometry.extent.height)/(max(0.001,scale)*min(geometry.sourceSize.width,geometry.sourceSize.height))
-            var stroke = MaskStroke(points:points.map { MaskPoint(LensCorrections.sourcePoint(geometry.sourcePoint($0),size:geometry.sourceSize,settings:currentEdits.lens)) },radius:radius,subtract:maskSubtract != mask.inverted)
+            var stroke = MaskStroke(points:points.map { MaskPoint(LensCorrections.sourcePoint(geometry.sourcePoint($0),size:geometry.sourceSize,settings:currentEdits.optics)) },radius:radius,subtract:maskSubtract != mask.inverted)
             stroke.softness = maskSoftness;stroke.strength = maskStrength
             if mask.strokes.isEmpty && mask.kind == "brush" { mask.feather = 0 }
             mask.strokes.append(stroke)
         } else {
             guard hypot(last.x-first.x,last.y-first.y) > 0.005 else { info.status("Drag a larger mask on the photo."); return }
-            mask.strokes = []; mask.start = MaskPoint(LensCorrections.sourcePoint(geometry.sourcePoint(first),size:geometry.sourceSize,settings:currentEdits.lens)); mask.end = MaskPoint(LensCorrections.sourcePoint(geometry.sourcePoint(last),size:geometry.sourceSize,settings:currentEdits.lens))
+            mask.strokes = []; mask.start = MaskPoint(LensCorrections.sourcePoint(geometry.sourcePoint(first),size:geometry.sourceSize,settings:currentEdits.optics)); mask.end = MaskPoint(LensCorrections.sourcePoint(geometry.sourcePoint(last),size:geometry.sourceSize,settings:currentEdits.optics))
         }
         var edits = currentEdits; setEditingMask(mask,for:key,in:&edits)
         changeEdits(edits,title:key+" · "+kind.capitalized+" mask",commit:true)
@@ -147,7 +147,7 @@ extension ViewerController {
                 let size = CGSize(width:(sourceSize.width*scale).rounded(),height:(sourceSize.height*scale).rounded())
                 let geometry = EditGeometry(size:size,edits:edits)
                 let input=try ModernRenderer.render(source:source,recipe:recipe,maximumDimension:1200,stopBeforeTool:key)
-                let selection=try mask.coverage(geometry:geometry,lens:edits.lens,input:input,modern:recipe.renderer == .linear2020)
+                let selection=try mask.coverage(geometry:geometry,lens:edits.optics,input:input,modern:recipe.renderer == .linear2020)
                 let overlay = CIImage(color:CIColor(red:1,green:0.08,blue:0.08,alpha:0.42)).cropped(to:geometry.extent)
                     .applyingFilter("CIBlendWithMask",parameters:[kCIInputBackgroundImageKey:CIImage(color:.clear).cropped(to:geometry.extent),kCIInputMaskImageKey:selection])
                 return CIContext().createCGImage(overlay,from:geometry.extent)
@@ -160,7 +160,7 @@ extension ViewerController {
         let edits = currentEdits, geometry = EditGeometry(size:editSourceSize(),edits:currentEdits)
         let selection = maskSession.beginSelection()
         let componentID=info.selectedMaskComponent(key:key)
-        let point = LensCorrections.sourcePoint(geometry.sourcePoint(displayed),size:geometry.sourceSize,settings:edits.lens), token = UUID(); editToken = token; editWork?.cancel(); aiPreparing = true
+        let point = LensCorrections.sourcePoint(geometry.sourcePoint(displayed),size:geometry.sourceSize,settings:edits.optics), token = UUID(); editToken = token; editWork?.cancel(); aiPreparing = true
         info.status("Selecting the object on this Mac…",busy:true)
         editQueue.async { [weak self] in
             let result = Result { () -> URL in

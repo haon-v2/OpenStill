@@ -47,6 +47,7 @@ final class EditorPanel: GlassChrome {
     private let histogram = HistogramPanel()
     private let curves = ToneCurvePanel()
     private let lens = LensPanel()
+    private let transformPanel = TransformPanel()
     private let retouch = RetouchPanel()
     var retouchSettingsChanged:((RetouchSession)->Void)?
     private var lutMask: MaskPanel?
@@ -105,6 +106,7 @@ final class EditorPanel: GlassChrome {
             self.action("Rotate clockwise", "rotate", to: content)
             self.action("Flip horizontally", "flip", to: content)
             self.slider("Straighten", path: \.straighten, range: -20...20, in: content)
+            self.action("Auto straighten from lines", "autoStraighten", to: content)
             self.action("AI align horizon", "horizon", to: content)
             self.action("Reset crop & rotation", "resetCrop", to: content)
         }
@@ -120,6 +122,21 @@ final class EditorPanel: GlassChrome {
             self.slider("Green amount", path: \.defringeGreen, range: 0...1, in: content)
             self.slider("Green hue from (°)", path: \.defringeGreenLow, range: 30...200, in: content)
             self.slider("Green hue to (°)", path: \.defringeGreenHigh, range: 30...200, in: content)
+        }
+        tool("Transform", symbol: "perspective", in: tools) { content in
+            self.fullWidth(self.transformPanel, in: content)
+            self.transformPanel.command = { [weak self] in self?.command?($0) }
+            self.addTitle("MANUAL", to: content)
+            self.slider("Vertical", path: \.transformVertical, range: -1...1, in: content)
+            self.slider("Horizontal", path: \.transformHorizontal, range: -1...1, in: content)
+            self.slider("Rotate (°)", path: \.transformRotate, range: -15...15, in: content)
+            self.slider("Aspect", path: \.transformAspect, range: -1...1, in: content)
+            self.slider("Scale", path: \.transformScale, range: 0.5...1.5, in: content)
+            self.slider("X offset", path: \.transformOffsetX, range: -1...1, in: content)
+            self.slider("Y offset", path: \.transformOffsetY, range: -1...1, in: content)
+            self.toggle("Constrain crop", path: \.transformConstrain, in: content)
+            self.help("Constrain crop enlarges the photo so no empty edges show. Turned off, empty edges export as white in JPEG and transparent in PNG and TIFF.", to: content)
+            self.action("Reset transform", "resetTransform", to: content)
         }
         addTitle("IMAGE QUALITY", to: tools)
         tool("Noise removal  AI", symbol: "waveform.path", in: tools) { content in
@@ -290,7 +307,7 @@ final class EditorPanel: GlassChrome {
         let contentStack = NSStackView(); contentStack.orientation = .vertical; contentStack.alignment = .leading; contentStack.spacing = 12
         contentStack.edgeInsets = NSEdgeInsets(top: 12, left: 12, bottom: 16, right: 12)
         fullWidth(contentStack,in:stack)
-        if title == "Crop & rotate" || title == "Lens corrections" { content(contentStack) }
+        if title == "Crop & rotate" || title == "Lens corrections" || title == "Transform" { content(contentStack) }
         else {
             let key = title.replacingOccurrences(of:"  AI",with:"")
             let tabs = NSSegmentedControl(labels:["Adjustments","Masking"],trackingMode:.selectOne,target:self,action:#selector(workspaceChanged(_:)))
@@ -422,6 +439,7 @@ final class EditorPanel: GlassChrome {
         sunrays.update(edits.sunSettings,enabled:enabled && !busy)
         curves.update(edits.curves,enabled:enabled && !busy)
         lens.update(edits.lens,available:enabled && !busy)
+        transformPanel.update(edits.transform,enabled:enabled && !busy)
         retouch.update(edits.retouch)
         for (slider, label, path) in sliders { slider.doubleValue = edits[keyPath: path]; label.stringValue = Self.number(edits[keyPath: path]); slider.isEnabled = enabled && !busy }
         for (button, path) in toggles { button.state = edits[keyPath: path] ? .on : .off; button.isEnabled = enabled && !busy }
@@ -450,6 +468,7 @@ final class EditorPanel: GlassChrome {
         glow.setEnabled(hasPhoto && !busy)
         grading.setEnabled(hasPhoto && !busy)
         sunrays.setEnabled(hasPhoto && !busy)
+        transformPanel.setEnabled(hasPhoto && !busy)
         for (slider, _, _) in sliders { slider.isEnabled = hasPhoto && !busy }
         for (button, _) in toggles { button.isEnabled = hasPhoto && !busy }
         for button in editButtons { button.isEnabled = button.identifier?.rawValue == "cancelAI" ? busy : ((hasPhoto && !busy) || (!busy && button.identifier?.rawValue == "setupAI")) }

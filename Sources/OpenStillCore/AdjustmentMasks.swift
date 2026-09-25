@@ -109,6 +109,7 @@ public struct AdvancedEdits: Codable, Equatable {
     public var colorGrading: ColorGrading?
     public var grain: GrainSettings?
     public var defringe: DefringeSettings?
+    public var transform: TransformSettings?
     public init() {}
 }
 
