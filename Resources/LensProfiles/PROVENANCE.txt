@@ -1,0 +1,5 @@
+Lensfun database, revision bbd4332a9ec566fd9aa548c9e0d8ced238c56261
+https://github.com/lensfun/lensfun
+License: Creative Commons Attribution-ShareAlike 3.0. Copyright Lensfun contributors.
+Converted by OpenStill to schema 1 using the transformations in upstream tools/update_database/xml_converter.py From2To1: remove unsupported ACM calibrations, move distortion real-focal to real-focal-length. Camera and lens names, other calibration values unchanged.
+Source archive SHA256: fd0b47fbd71945da0ca89d62a3dacf9a8573c2a718301ec093dfab3b6d9a5331
