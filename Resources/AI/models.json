@@ -1,0 +1,40 @@
+{
+  "sky": [
+    {
+      "name": "skyseg.onnx",
+      "url": "https://huggingface.co/JianyuanWang/skyseg/resolve/3ba8c6df1d9ba9ff26f637c7ba9568ac11a9aa7f/skyseg.onnx",
+      "sha256": "ab9c34c64c3d821220a2886a4a06da4642ffa14d5b30e8d5339056a089aa1d39",
+      "size": 175997079
+    }
+  ],
+  "erase": [
+    {
+      "name": "inpainting_lama_2025jan.onnx",
+      "url": "https://huggingface.co/opencv/inpainting_lama/resolve/aee6d22f0a13e5e35af1c9a1c3afd62841fc6f3f/inpainting_lama_2025jan.onnx",
+      "sha256": "7df918ac3921d3daf0aae1d219776cf0dc4e4935f035af81841b40adcf74fdf2",
+      "size": 92591623
+    }
+  ],
+  "denoise": [
+    {
+      "name": "scunet_color_real_psnr.onnx",
+      "url": "https://huggingface.co/Heliosoph/scunet-onnx/resolve/6d11417ee2fbcc73783c502a238ac115097754fe/scunet_color_real_psnr.onnx",
+      "sha256": "231be201ab413dbc999d7951caa9844846b93a12a40a41e037d6b5888ed4e88c",
+      "size": 3798678
+    },
+    {
+      "name": "scunet_color_real_psnr.onnx.data",
+      "url": "https://huggingface.co/Heliosoph/scunet-onnx/resolve/6d11417ee2fbcc73783c502a238ac115097754fe/scunet_color_real_psnr.onnx.data",
+      "sha256": "98825ea1210b641c71e5f052f582c70c49fd44b35387ebe2c034268c17df3feb",
+      "size": 73138176
+    }
+  ],
+  "detail": [
+    {
+      "name": "realesr-general-x4v3.onnx",
+      "url": "https://huggingface.co/Heliosoph/realesrgan-onnx/resolve/488e5dda07333179f229a6205d92135eea4c25e9/realesr-general-x4v3.onnx",
+      "sha256": "09b757accd747d7e423c1d352b3e8f23e77cc5742d04bae958d4eb8082b76fa4",
+      "size": 4871181
+    }
+  ]
+}
