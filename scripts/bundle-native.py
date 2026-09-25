@@ -15,6 +15,8 @@ while queue:
  for row in dependencies:
   reference=row.strip().split(' (')[0]
   if reference.startswith(('/System/','/usr/lib/')):continue
+  # Frameworks (Sparkle) are copied and signed by build-app.sh.
+  if binary==executable and reference.startswith('@rpath/') and '.framework/' in reference:continue
   name=pathlib.Path(reference).name
   source=(prefix/'lib'/name) if reference.startswith('@rpath/') else pathlib.Path(reference)
   if binary!=executable and name==binary.name:continue

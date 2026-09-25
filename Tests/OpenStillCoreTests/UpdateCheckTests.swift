@@ -33,4 +33,15 @@ import Testing
         #expect(releases.count == 1 && releases[0].prerelease && releases[0].title == "OpenStill v.0.1")
         #expect(throws: UpdateError.unreadable) { try UpdateCheck.parse(Data("{}".utf8)) }
     }
+    @Test func sparkleNeedsFeedAndPublicKey() {
+        let feed = "https://raw.githubusercontent.com/haon-v2/OpenStill/main/appcast.xml"
+        let key = Data(repeating: 7, count: 32).base64EncodedString()
+        #expect(UpdateCheck.sparkleConfigured(info: ["SUFeedURL": feed, "SUPublicEDKey": key]))
+        #expect(!UpdateCheck.sparkleConfigured(info: ["SUFeedURL": feed]))
+        #expect(!UpdateCheck.sparkleConfigured(info: ["SUFeedURL": feed, "SUPublicEDKey": ""]))
+        #expect(!UpdateCheck.sparkleConfigured(info: ["SUFeedURL": feed, "SUPublicEDKey": Data(count: 16).base64EncodedString()]))
+        #expect(!UpdateCheck.sparkleConfigured(info: ["SUFeedURL": "http://example.com/appcast.xml", "SUPublicEDKey": key]))
+        #expect(!UpdateCheck.sparkleConfigured(info: ["SUPublicEDKey": key]))
+        #expect(!UpdateCheck.sparkleConfigured(info: nil))
+    }
 }
