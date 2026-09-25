@@ -14,6 +14,7 @@
     <key>NSPrincipalClass</key><string>NSApplication</string>
     <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>SUFeedURL</key><string>https://raw.githubusercontent.com/haon-v2/OpenStill/main/appcast.xml</string>
+    <key>SUPublicEDKey</key><string>eovHlM2DVFa6ULdwVoUBWU5w/cIksr18Vk6253NZURs=</string>
     <key>SUEnableAutomaticChecks</key><true/>
     <key>SUScheduledCheckInterval</key><integer>86400</integer>
     <key>NSHumanReadableCopyright</key><string>Copyright © 2026 OpenStill contributors. MIT License.</string>
