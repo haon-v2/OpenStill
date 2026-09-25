@@ -103,6 +103,12 @@ public struct AdvancedEdits: Codable, Equatable {
     public var sunLength = 0.4
     public var aiBackgroundAsset: String?
     public var aiFeatureKey: String?
+    public var clarity: Double?
+    public var texture: Double?
+    public var dehaze: Double?
+    public var colorGrading: ColorGrading?
+    public var grain: GrainSettings?
+    public var defringe: DefringeSettings?
     public init() {}
 }
 

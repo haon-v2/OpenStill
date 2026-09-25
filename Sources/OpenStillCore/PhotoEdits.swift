@@ -57,6 +57,12 @@ public struct PhotoEdits: Codable, Equatable {
         if e.advanced != nil {
             if let sun = e.advanced!.sunSettings { e.advanced!.sunSettings = sun.sanitized }
             if let glow = e.advanced!.glow { e.advanced!.glow = glow.sanitized }
+            if let value = e.advanced!.clarity { e.advanced!.clarity = clamp(value,-1,1) }
+            if let value = e.advanced!.texture { e.advanced!.texture = clamp(value,-1,1) }
+            if let value = e.advanced!.dehaze { e.advanced!.dehaze = clamp(value,-1,1) }
+            if let grading = e.advanced!.colorGrading { e.advanced!.colorGrading = grading.sanitized }
+            if let grain = e.advanced!.grain { e.advanced!.grain = grain.sanitized }
+            if let defringe = e.advanced!.defringe { e.advanced!.defringe = defringe.sanitized }
             e.monochrome = clamp(e.monochrome,0,1); e.blacks = clamp(e.blacks,-1,1); e.whites = clamp(e.whites,-1,1)
             e.straighten = clamp(e.straighten,-20,20); e.lutAmount = clamp(e.lutAmount,0,1); e.sunLength = clamp(e.sunLength,0,1)
             e.advanced!.colors = Array((e.advanced!.colors + [ColorBand](repeating:ColorBand(),count:8)).prefix(8))
@@ -206,7 +212,9 @@ public enum PhotoEditor {
                 filter.setValue(image,forKey:kCIInputImageKey); if let output = filter.outputImage { image = output.cropped(to:originalExtent) }
             }
         }
-        image = try masked(before,image,"Enhance"); before = image
+        image = try masked(before,image,"Enhance")
+        if e.defringe.hasEffect { image = try DevelopTools.defringe(image,settings:e.defringe) }
+        before = image
         if stopBeforeTool == "Develop" { return image }
         if modern, e.neutralBalance != NeutralBalance() { image = ToneTools.balance(image,settings:e.neutralBalance) }
         if e.exposure != 0 { image = image.applyingFilter("CIExposureAdjust",parameters:[kCIInputEVKey:e.exposure]) }
@@ -214,6 +222,8 @@ public enum PhotoEditor {
         if e.highlights != 1 || e.shadows != 0 { image = image.applyingFilter("CIHighlightShadowAdjust",parameters:["inputHighlightAmount":e.highlights,"inputShadowAmount":e.shadows]) }
         if e.contrast != 1 { image = image.applyingFilter("CIColorControls",parameters:[kCIInputContrastKey:e.contrast]) }
         image = try masked(before,image,"Develop"); before = image
+        if stopBeforeTool == "Dehaze" { return image }
+        if e.dehaze != 0 { image = try masked(before,try DevelopTools.dehaze(image,amount:e.dehaze),"Dehaze"); before = image }
         if stopBeforeTool == "Curves" { return image }
         if modern, !e.curves.isIdentity { image = try ToneTools.applyCurves(image,settings:e.curves); image = try masked(before,image,"Curves"); before = image }
         if stopBeforeTool == "Color" { return image }
@@ -221,6 +231,8 @@ public enum PhotoEditor {
         if e.vibrance != 0 { image = image.applyingFilter("CIVibrance",parameters:[kCIInputAmountKey:e.vibrance]) }
         if let bands = e.advanced?.colors, bands.contains(where: { $0.hue != 0 || $0.saturation != 0 || ($0.lightness ?? 0) != 0 }) { image = ColorMixer.apply(image,bands:bands) }
         image = try masked(before,image,"Color"); before = image
+        if stopBeforeTool == "Color grading" { return image }
+        if !e.colorGrading.isIdentity { image = try masked(before,try DevelopTools.colorGrade(image,settings:e.colorGrading),"Color grading"); before = image }
         if stopBeforeTool == "Black & white" { return image }
         if e.monochrome > 0 { image = image.applyingFilter("CIColorControls",parameters:[kCIInputSaturationKey:1-e.monochrome]) }
         if e.blacks != 0 || e.whites != 0 {
@@ -233,6 +245,10 @@ public enum PhotoEditor {
         if stopBeforeTool == "Structure" { return image }
         if e.structure > 0 { image = image.clampedToExtent().applyingFilter("CIUnsharpMask",parameters:[kCIInputRadiusKey:max(1,Double(sourceSize.width)/200),kCIInputIntensityKey:e.structure*0.8]).cropped(to:originalExtent) }
         image = try masked(before,image,"Structure"); before = image
+        if stopBeforeTool == "Clarity" { return image }
+        if e.clarity != 0 { image = try masked(before,try DevelopTools.clarity(image,amount:e.clarity),"Clarity"); before = image }
+        if stopBeforeTool == "Texture" { return image }
+        if e.texture != 0 { image = try masked(before,try DevelopTools.texture(image,amount:e.texture),"Texture"); before = image }
         if stopBeforeTool == "Details" { return image }
         if e.sharpness > 0 { image = image.applyingFilter("CISharpenLuminance",parameters:[kCIInputSharpnessKey:e.sharpness]) }
         image = try masked(before,image,"Details"); before = image
@@ -278,7 +294,9 @@ public enum PhotoEditor {
             let graded = lut.apply(image)
             image = before.applyingFilter("CIDissolveTransition",parameters:[kCIInputTargetImageKey:graded,kCIInputTimeKey:e.lutAmount])
         }
-        image = try masked(before,image,"LUT")
+        image = try masked(before,image,"LUT"); before = image
+        if stopBeforeTool == "Grain" { return image }
+        if e.grain.amount > 0 { image = try masked(before,try DevelopTools.grain(image,settings:e.grain),"Grain") }
         if e.opacity < 1 { image = unadjusted.applyingFilter("CIDissolveTransition",parameters:[kCIInputTargetImageKey:image,kCIInputTimeKey:e.opacity]) }
         if let overlay = e.overlayAsset {
             before = image

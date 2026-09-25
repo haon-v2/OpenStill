@@ -2,12 +2,12 @@ import Foundation
 import CoreImage
 
 public enum AdjustmentGroup:String,Codable,CaseIterable {
-    case develop,curves,color,monochrome,details,glow,vignette,sunrays,lut,enhance,lens,geometry,retouch
+    case develop,curves,color,monochrome,details,glow,vignette,sunrays,lut,enhance,lens,geometry,retouch,presence,grading,grain
     public var title:String {
-        switch self {case .develop:return "Develop";case .curves:return "Curves";case .color:return "Color";case .monochrome:return "Black & white";case .details:return "Details & noise";case .glow:return "Glow";case .vignette:return "Vignette";case .sunrays:return "Sunrays";case .lut:return "LUT";case .enhance:return "Enhance";case .lens:return "Lens corrections";case .geometry:return "Crop & rotation";case .retouch:return "Healing & cloning"}
+        switch self {case .develop:return "Develop";case .curves:return "Curves";case .color:return "Color";case .monochrome:return "Black & white";case .details:return "Details & noise";case .glow:return "Glow";case .vignette:return "Vignette";case .sunrays:return "Sunrays";case .lut:return "LUT";case .enhance:return "Enhance";case .lens:return "Lens corrections";case .geometry:return "Crop & rotation";case .retouch:return "Healing & cloning";case .presence:return "Clarity, texture & dehaze";case .grading:return "Color grading";case .grain:return "Grain"}
     }
     var maskKeys:[String] {
-        switch self {case .details:return ["Details","Structure","Denoise"];case .retouch:return ["Retouch"];case .lens,.geometry:return [];default:return [title]}
+        switch self {case .details:return ["Details","Structure","Denoise"];case .retouch:return ["Retouch"];case .presence:return ["Clarity","Texture","Dehaze"];case .lens,.geometry:return [];default:return [title]}
     }
     public static let defaults=Set(allCases.filter{![.lens,.geometry,.retouch].contains($0)})
 }
@@ -62,9 +62,12 @@ public enum BatchEdits {
             case .sunrays:result.advanced?.sunSettings=source.advanced?.sunSettings;result.sunrays=source.sunrays;result.sunX=source.sunX;result.sunY=source.sunY;result.sunLength=source.sunLength
             case .lut:result.advanced?.lutAsset=source.advanced?.lutAsset;result.advanced?.lutName=source.advanced?.lutName;result.advanced?.lutID=source.advanced?.lutID;result.lutAmount=source.lutAmount
             case .enhance:result.autoEnhance=source.autoEnhance
-            case .lens:result.lens=source.lens
+            case .lens:result.lens=source.lens;result.defringe=source.defringe
             case .geometry:result.crop=source.crop;result.rotation=source.rotation;result.flip=source.flip;result.straighten=source.straighten
             case .retouch:result.retouch=source.retouch.map{var stroke=$0;stroke.id=UUID();return stroke}
+            case .presence:result.clarity=source.clarity;result.texture=source.texture;result.dehaze=source.dehaze
+            case .grading:result.colorGrading=source.colorGrading
+            case .grain:result.grain=source.grain
             }
             if options.masks {for key in group.maskKeys{result.setMask(source.advanced?.masks[key]?.independentCopy(),for:key)}}
         }

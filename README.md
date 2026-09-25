@@ -103,7 +103,14 @@ OpenStill uses native Liquid Glass on macOS 26, with a system toolbar, floating 
 
 The Lightroom-desktop-inspired workspace has a slim local-library rail on the left, the photograph or library grid in the center, and an editing rail on the right. **Library / Edit** switches views in the same window. Library includes current/recent folders, filename search, ratings, pick/reject filters, comparison and batch actions. Double-click a photo to edit it; its filtered selection becomes the bottom filmstrip. The right rail opens **Edit**, **Crop**, **Retouch**, the current tool’s **Mask**, **Presets**, **History**, and **Info**. Use the toolbar’s inspector button for more image space; ⌘I opens camera and lens information. ⌥⌘G opens Library and ⌥⌘E returns to Edit. Click a tool name to expand its controls; scroll to reach the remaining tools.
 
-- Develop: exposure, contrast, highlights, shadows, temperature, and tint.
+- Develop: exposure, contrast, highlights, shadows, whites, blacks, temperature, and tint. **Auto** reads the photo's tonal range and sets exposure, contrast, highlights, shadows, whites, blacks and vibrance as one undoable step you can keep refining. (Whites and Blacks are shared with Black & white and follow its mask.)
+- Dehaze: positive removes atmospheric haze using a dark-channel estimate; negative adds haze.
+- Clarity: broad midtone contrast (negative softens). Texture: medium-sized detail such as skin, foliage or fabric (negative smooths).
+- Color grading: Shadows, Midtones, Highlights and Global wheels. Drag in a wheel to set hue and strength, set each range's luminance, and use Blending and Balance to control how the ranges overlap. Double-click a wheel to reset it.
+- Grain: film-like grain with Amount, Size and Roughness. Grain size scales with the photo, so previews and full-size exports match.
+- Defringe (in Lens corrections): removes purple and green fringes along high-contrast edges, with adjustable hue ranges. Evenly colored purple or green areas are left alone.
+- Clipping and comparison: click the histogram, press **J**, or choose **View → Show / Hide Clipping** to show clipped highlights in red and clipped shadows in blue. Press **Y** (or **View → Before / After Split**) for a side-by-side split with a draggable divider; press **\\** to toggle the full before view.
+- Dehaze, Clarity, Texture, Color grading, Grain and Defringe are OpenStill's own algorithms. They are designed to feel familiar to Lightroom users but are not pixel-identical to Adobe's.
 - Enhance: automatic tonal/color correction. Structure, sharpening, and noise reduction.
 - Color: global saturation/vibrance plus eight visible swatches for red, orange, yellow, green, aqua, blue, purple, and magenta. Each color remembers its Saturation or HSL view. HSL provides Hue, Saturation, and Lightness with shade-gradient tracks and a live color indicator; switching views keeps your adjustments. Reset this color clears only the selected band.
 - Black & white: monochrome strength plus separate Blacks and Whites tonal sliders.

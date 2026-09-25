@@ -25,6 +25,9 @@ extension ViewerController {
         canvas.rangeChosen = { [weak self] point in self?.sampleMaskRange(at:point) }
         canvas.whiteBalanceChosen = { [weak self] point in self?.chooseWhiteBalance(at:point) }
         canvas.objectChosen = { [weak self] point in self?.selectMaskObject(at:point) }
+        canvas.toggleClipping = { [weak self] in self?.editingCommand("toggleClipping") }
+        canvas.toggleSplit = { [weak self] in self?.editingCommand("compareSplit") }
+        canvas.toggleCompare = { [weak self] in self?.editingCommand("compare") }
         canvas.cropReport = { [weak self] selection, photo in self?.info.showCrop(selection:selection,photo:photo) }
         canvas.sunPlaced = { [weak self] point, final in
             guard let self else { return }; var edits = self.currentEdits
@@ -43,6 +46,7 @@ extension ViewerController {
         localAI.cancel(); aiPreparing = false; maskSession.end(); maskVisible = false; maskToken = UUID()
         info.resetMaskInteractions()
         editWork?.cancel(); editToken = UUID(); comparing = false; canvas.clearTool();retouchSession.reset();canvas.retouchSource=nil
+        canvas.beforeImage = nil; canvas.clippingOverlay = nil
         do { photoRecord = try EditStorage.record(source) }
         catch { photoRecord = nil; info.status("Couldn’t open saved versions: " + error.localizedDescription) }
         editDocument = photoRecord?.active.document ?? EditStorage.load(source); currentEdits = editDocument.current
@@ -93,7 +97,7 @@ extension ViewerController {
         if comparing { canvas.maskOverlay = nil }
         else { refreshMaskOverlay() }
         if comparing || currentEdits.isOriginal {
-            canvas.replaceRenderedImage(original); updateHistogram(original)
+            canvas.replaceRenderedImage(original); updateHistogram(original); refreshCompareExtras(original, interactive:false)
             info.status(comparing ? "Showing original. Click Compare again to return to your edit." : "Edits are saved on this Mac. Originals stay untouched.")
             return
         }
@@ -116,6 +120,7 @@ extension ViewerController {
                 switch result {
                 case .success(let image):
                     self.canvas.replaceRenderedImage(image,pixelSize:interactive ? logicalSize:nil); self.updateHistogram(image)
+                    self.refreshCompareExtras(image, interactive:interactive)
                     self.refreshMaskOverlay()
                     self.info.status(interactive ? "Interactive preview · Full resolution on release":"Edited · \(image.width) × \(image.height) px · Original preserved")
                 case .failure(let error): self.info.status(error.localizedDescription)
@@ -174,7 +179,10 @@ extension ViewerController {
         case "resetWhiteBalance": edits.temperature = 6500; edits.tint = 0; edits.neutralBalance = NeutralBalance(); edits.advanced?.rawWhiteBalance = nil; changeEdits(edits,title:"Reset white balance",commit:true)
         case "undo": editDocument.undo(); restoreHistory()
         case "redo": editDocument.redo(); restoreHistory()
-        case "compare": comparing.toggle(); renderEdits()
+        case "compare": comparing.toggle(); if comparing { splitCompare = false }; renderEdits()
+        case "compareSplit": toggleSplitCompare()
+        case "toggleClipping": showClipping.toggle(); info.setClippingOverlay(showClipping); renderEdits()
+        case "autoTone": autoTone()
         case "reset": changeEdits(PhotoEdits(), title: "Reset all edits", commit: true); canvas.clearTool()
         case "crop":
             // Start from the current full crop; the new rectangle is composed with the existing crop on Apply.
@@ -232,10 +240,11 @@ extension ViewerController {
     private func applyPreset(_ name: String) {
         var e = currentEdits
         e.highlights = 1; e.shadows = 0; e.exposure = 0; e.contrast = 1; e.saturation = 1; e.vibrance = 0; e.temperature = 6500; e.tint = 0; e.monochrome = 0; e.blacks = 0; e.whites = 0; e.advanced!.colors = [ColorBand](repeating:ColorBand(),count:8); e.autoEnhance = false
+        e.clarity = 0; e.texture = 0; e.dehaze = 0; e.colorGrading = ColorGrading()
         switch name {
         case "Warm light": e.temperature = 7800; e.vibrance = 0.15; e.contrast = 1.05
         case "Cool shadows": e.temperature = 5200; e.shadows = 0.2; e.contrast = 1.05
-        case "Vivid": e.vibrance = 0.35; e.saturation = 1.12; e.contrast = 1.12
+        case "Vivid": e.vibrance = 0.35; e.saturation = 1.12; e.contrast = 1.12; e.clarity = 0.15
         case "Soft portrait": e.contrast = 0.9; e.shadows = 0.2; e.saturation = 0.95; e.temperature = 6900
         case "Monochrome": e.monochrome = 1; e.contrast = 1.2
         default: break

@@ -76,7 +76,11 @@ final class ToneCurvePanel: NSStackView {
 final class HistogramPanel: NSView {
     var histogram:PhotoHistogram? { didSet { needsDisplay = true } }
     var sensor:Double? { didSet { needsDisplay = true } }
-    override init(frame:NSRect) { super.init(frame:frame); heightAnchor.constraint(equalToConstant:112).isActive = true; setAccessibilityElement(true); setAccessibilityRole(.image); setAccessibilityLabel("RGB and luminance histogram with output and sensor clipping") }
+    var clippingShown = false { didSet { needsDisplay = true } }
+    var clicked:(()->Void)?
+    override func mouseDown(with event:NSEvent) { clicked?() }
+    override func accessibilityPerformPress() -> Bool { clicked?(); return clicked != nil }
+    override init(frame:NSRect) { super.init(frame:frame); heightAnchor.constraint(equalToConstant:112).isActive = true; setAccessibilityElement(true); setAccessibilityRole(.button); setAccessibilityLabel("RGB and luminance histogram with output and sensor clipping. Press to show clipped pixels on the photo") }
     required init?(coder:NSCoder) { fatalError() }
     override func draw(_ dirtyRect:NSRect) {
         let area = CGRect(x:0,y:38,width:bounds.width,height:bounds.height-38)
@@ -90,7 +94,7 @@ final class HistogramPanel: NSView {
             }
             color.withAlphaComponent(0.65).setStroke(); path.lineWidth = 1; path.stroke()
         }
-        let output = String(format:"sRGB output: shadows %.1f%% · highlights %.1f%%",histogram.shadowClipped*100,histogram.highlightClipped*100)
+        let output = String(format:"sRGB output: shadows %.1f%% · highlights %.1f%%",histogram.shadowClipped*100,histogram.highlightClipped*100) + (clippingShown ? " · overlay on (J)" : " · click or J to show")
         let raw = sensor.map { String(format:"RAW sensor saturation: %.2f%%",$0*100) } ?? "RAW sensor: available in RAW mode"
         let attrs:[NSAttributedString.Key:Any] = [.font:NSFont.systemFont(ofSize:9),.foregroundColor:NSColor.secondaryLabelColor]
         (output as NSString).draw(at:CGPoint(x:0,y:20),withAttributes:attrs); (raw as NSString).draw(at:CGPoint(x:0,y:5),withAttributes:attrs)

@@ -90,6 +90,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         add(view, "Fit to Window", #selector(ViewerController.fitPhoto), "0", target: viewer)
         add(view, "Actual Pixels (100%)", #selector(ViewerController.nativePhoto), "1", target: viewer)
         add(view, "Show / Hide Photo Info", #selector(ViewerController.toggleInfo), "i", target: viewer)
+        add(view, "Show / Hide Clipping (J)", #selector(ViewerController.toggleClippingOverlay), target: viewer)
+        add(view, "Before / After Split (Y)", #selector(ViewerController.toggleBeforeAfterSplit), target: viewer)
         view.addItem(.separator())
         add(view, "Previous Photo", #selector(ViewerController.previousPhoto), String(UnicodeScalar(NSLeftArrowFunctionKey)!), target: viewer, modifiers: [])
         add(view, "Next Photo", #selector(ViewerController.nextPhoto), String(UnicodeScalar(NSRightArrowFunctionKey)!), target: viewer, modifiers: [])
