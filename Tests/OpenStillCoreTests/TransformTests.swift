@@ -40,7 +40,7 @@ import Testing
     @Test func settingsAreSanitizedAndOldEditsDecode() throws {
         var t = TransformSettings(); t.vertical = .nan; t.horizontal = 4; t.rotate = -90; t.scale = .infinity; t.offsetX = -3
         t.upright = UprightSolution(mode: .full, rotate: 40, vertical: .nan, horizontal: 2)
-        t.guides = [GuideLine(CGPoint(x: 0, y: 0), CGPoint(x: .nan, y: 1))] + (0..<6).map { _ in GuideLine(CGPoint(x: 0.1, y: 0.1), CGPoint(x: 0.1, y: 0.9)) }
+        t.guides = [GuideLine(CGPoint(x: 0, y: 0), CGPoint(x: CGFloat.nan, y: 1))] + (0..<6).map { _ in GuideLine(CGPoint(x: 0.1, y: 0.1), CGPoint(x: 0.1, y: 0.9)) }
         let s = t.sanitized
         #expect(s.vertical == 0 && s.horizontal == 1 && s.rotate == -15 && s.scale == 1 && s.offsetX == -1)
         #expect(s.upright == UprightSolution(mode: .full, rotate: 15, vertical: 0, horizontal: 1))
@@ -180,6 +180,6 @@ import Testing
         #expect(!AdjustmentGroup.defaults.contains(.transform))
         options.groups = [.develop]
         #expect(try BatchEdits.merging(e, into: PhotoEdits(), options: options, geometryCompatible: true).transform == TransformSettings())
-        #expect(DevelopTools.geometryOnly(e).transform == e.transform)
+        #expect(ClippingOverlay.geometryOnly(e).transform == e.transform)
     }
 }
