@@ -24,29 +24,9 @@ SIGNATURE="$("$SIGN_UPDATE" "$ZIP")"
 # The build is for this Mac's architecture only; keep Intel Macs from being offered an Apple silicon build.
 ARCHS="$(lipo -archs dist/OpenStill.app/Contents/MacOS/OpenStill)"
 
-VERSION="$VERSION" BUILD="$BUILD" MINIMUM="$MINIMUM" SIGNATURE="$SIGNATURE" ARCHS="$ARCHS" python3 - <<'EOF'
-import os, email.utils
-version, build = os.environ["VERSION"], os.environ["BUILD"]
-tag = f"https://github.com/haon-v2/OpenStill/releases/download/v{version}"
-hardware = "" if "x86_64" in os.environ["ARCHS"].split() else "\n            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>"
-item = f"""        <item>
-            <title>OpenStill {version}</title>
-            <pubDate>{email.utils.formatdate(usegmt=True)}</pubDate>
-            <sparkle:version>{build}</sparkle:version>
-            <sparkle:shortVersionString>{version}</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>{os.environ["MINIMUM"]}</sparkle:minimumSystemVersion>{hardware}
-            <sparkle:fullReleaseNotesLink>https://github.com/haon-v2/OpenStill/releases/tag/v{version}</sparkle:fullReleaseNotesLink>
-            <enclosure url="{tag}/OpenStill-{version}.zip" {os.environ["SIGNATURE"]} type="application/octet-stream"/>
-        </item>
-"""
-text = open("appcast.xml").read()
-marker = "    </channel>"
-assert marker in text, "appcast.xml has no </channel>"
-open("appcast.xml", "w").write(text.replace(marker, item + marker, 1))
-EOF
+VERSION="$VERSION" BUILD="$BUILD" MINIMUM="$MINIMUM" SIGNATURE="$SIGNATURE" ARCHS="$ARCHS" python3 scripts/appcast-add.py
 
 cat <<EOF
-Added OpenStill $VERSION (build $BUILD) to appcast.xml.
 Next:
   1. Create the GitHub release v$VERSION and attach $ZIP.
   2. Commit appcast.xml and push it to main. Apps pick up the update from there.

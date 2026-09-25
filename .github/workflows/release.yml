@@ -1,0 +1,141 @@
+# Publishes a new OpenStill version that installed copies update to through Sparkle.
+# Run it from Actions → Release → Run workflow and enter the new version (e.g. 0.8.0).
+# Needs the repository secret SPARKLE_PRIVATE_KEY (README → Updates). "Dry run" builds and signs
+# with a throwaway key and publishes nothing.
+name: Release
+
+on:
+  push:  # TEMPORARY: dry run on this branch; removed before merging
+    branches: [claude/gifted-lovelace-pbg8wv]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "New version, e.g. 0.8.0"
+        required: true
+      dry_run:
+        description: "Dry run: build and sign with a throwaway key, publish nothing"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: macos-26
+    timeout-minutes: 120
+    env:
+      VERSION: ${{ inputs.version || '0.7.3' }}
+      DRY_RUN: ${{ github.event_name == 'push' || inputs.dry_run }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Only main can be released
+        if: env.DRY_RUN != 'true' && github.ref != 'refs/heads/main'
+        run: '{ echo "Run the Release workflow on main."; exit 1; }'
+
+      - name: Check the version
+        run: |
+          set -euo pipefail
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]] || { echo "Version must look like 0.8.0"; exit 1; }
+          CURRENT="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Resources/Info.plist)"
+          BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' Resources/Info.plist)"
+          python3 -c "import sys; n=lambda v: [int(x) for x in v.split('.')]+[0]*(3-len(v.split('.'))); sys.exit(0 if n('$VERSION') > n('$CURRENT') else 'Version $VERSION must be higher than the current $CURRENT')"
+          if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then echo "Tag v$VERSION already exists"; exit 1; fi
+          echo "BUILD=$((BUILD + 1))" >> "$GITHUB_ENV"
+          echo "Releasing $VERSION (build $((BUILD + 1))), replacing $CURRENT (build $BUILD)"
+
+      - name: Check the signing key
+        if: env.DRY_RUN != 'true'
+        env:
+          KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: '[ -n "$KEY" ] || { echo "Add the SPARKLE_PRIVATE_KEY repository secret first (README → Updates)."; exit 1; }'
+
+      - name: Set the version
+        run: |
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" Resources/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD" Resources/Info.plist
+
+      - name: Build tools
+        run: brew install meson ninja pkg-config cmake || true
+
+      - name: Native dependencies
+        run: bash scripts/build-native.sh > native.log 2>&1 || { tail -80 native.log; exit 1; }
+
+      - name: Tests
+        run: |
+          set +e
+          bash scripts/test.sh > test.log 2>&1
+          status=$?
+          grep -E "✘|error:|recorded an issue|Test run with" test.log | head -60
+          exit $status
+
+      - name: Build the app
+        run: |
+          set +e
+          bash scripts/build-app.sh > build.log 2>&1
+          status=$?
+          grep -E "error:|Built " build.log | head -40
+          [ $status -eq 0 ] || tail -60 build.log
+          exit $status
+
+      - name: Zip and sign
+        env:
+          KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          SIGN_UPDATE="$(find .build/artifacts -type f -name sign_update -path '*/bin/*' | head -1)"
+          ZIP="dist/OpenStill-$VERSION.zip"
+          ditto -c -k --sequesterRsrc --keepParent dist/OpenStill.app "$ZIP"
+          KEYFILE="$RUNNER_TEMP/sparkle.key"; umask 077
+          if [ "$DRY_RUN" = "true" ]; then
+            # Throwaway Ed25519 key: base64 of the 32-byte seed, the format generate_keys -x exports.
+            OPENSSL="$(brew --prefix openssl@3 2>/dev/null)/bin/openssl"; [ -x "$OPENSSL" ] || OPENSSL=openssl
+            "$OPENSSL" genpkey -algorithm ed25519 -outform DER | tail -c 32 | base64 > "$KEYFILE"
+          else
+            printf '%s' "$KEY" > "$KEYFILE"
+          fi
+          SIGNATURE="$("$SIGN_UPDATE" --ed-key-file "$KEYFILE" "$ZIP")"
+          rm -f "$KEYFILE"
+          echo "Signature: $SIGNATURE"
+          ARCHS="$(lipo -archs dist/OpenStill.app/Contents/MacOS/OpenStill)"
+          MINIMUM="$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' Resources/Info.plist)"
+          VERSION="$VERSION" BUILD="$BUILD" MINIMUM="$MINIMUM" SIGNATURE="$SIGNATURE" ARCHS="$ARCHS" python3 scripts/appcast-add.py
+          echo "ZIP=$ZIP" >> "$GITHUB_ENV"
+          git diff --stat
+
+      - name: Remove any leftover key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/sparkle.key"
+
+      - name: Publish
+        if: env.DRY_RUN != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # 1. Version bump, so the tag points at the code that was built.
+          git add Resources/Info.plist
+          git commit -m "Release OpenStill $VERSION (build $BUILD)"
+          git push origin HEAD:main
+          # 2. The release and its zip must exist before the appcast points to them.
+          gh release create "v$VERSION" "$ZIP" --target "$(git rev-parse HEAD)" --title "OpenStill $VERSION" --generate-notes
+          # 3. Installed copies pick the update up from appcast.xml on main.
+          git add appcast.xml
+          git commit -m "Add OpenStill $VERSION to the update feed"
+          git push origin HEAD:main
+          echo "Published https://github.com/$GITHUB_REPOSITORY/releases/tag/v$VERSION"
+
+      - name: Dry-run summary
+        if: env.DRY_RUN == 'true'
+        run: |
+          echo "Dry run: nothing was published. appcast.xml would gain:"
+          git diff appcast.xml
