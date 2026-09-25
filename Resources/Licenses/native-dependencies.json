@@ -1,0 +1,32 @@
+[
+  {
+    "name": "glib",
+    "version": "2.88.3",
+    "url": "https://download.gnome.org/sources/glib/2.88/glib-2.88.3.tar.xz",
+    "sha256": "ab24d24e698dfa1e408b7bcdb508f4aafc906185a8b8ce72fdf79bbbdc9b383b"
+  },
+  {
+    "name": "pcre2",
+    "version": "10.48",
+    "url": "https://github.com/PCRE2Project/pcre2/releases/download/pcre2-10.48/pcre2-10.48.tar.bz2",
+    "sha256": "b6c68fdf6f3ac31388b50aa89ff0fc49c00c987c16e7b5146491d12003f2c8ed"
+  },
+  {
+    "name": "lensfun",
+    "version": "0.3.4",
+    "url": "https://github.com/lensfun/lensfun/archive/refs/tags/v0.3.4.tar.gz",
+    "sha256": "dafb39c08ef24a0e2abd00d05d7341b1bf1f0c38bfcd5a4c69cf5f0ecb6db112"
+  },
+  {
+    "name": "little-cms2",
+    "version": "2.19.1",
+    "url": "https://downloads.sourceforge.net/project/lcms/lcms/2.19.1/lcms2-2.19.1.tar.gz",
+    "sha256": "bfc54f7bab59fbc921012014a8032e4cba4abd46db47d46b76416a8c0b2815c8"
+  },
+  {
+    "name": "proxy-libintl",
+    "version": "0.5",
+    "url": "https://github.com/frida/proxy-libintl/archive/refs/tags/0.5.tar.gz",
+    "sha256": "f7a1cbd7579baaf575c66f9d99fb6295e9b0684a28b095967cfda17857595303"
+  }
+]

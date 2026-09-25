@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key><string>OpenStill</string>
+    <key>CFBundleDisplayName</key><string>OpenStill</string>
+    <key>CFBundleExecutable</key><string>OpenStill</string>
+    <key>CFBundleIdentifier</key><string>org.openstill.viewer</string>
+    <key>CFBundlePackageType</key><string>APPL</string>
+    <key>CFBundleShortVersionString</key><string>0.7.2</string>
+    <key>CFBundleVersion</key><string>16</string>
+    <key>LSMinimumSystemVersion</key><string>13.0</string>
+    <key>NSHighResolutionCapable</key><true/>
+    <key>NSPrincipalClass</key><string>NSApplication</string>
+    <key>CFBundleIconFile</key><string>AppIcon</string>
+    <key>NSHumanReadableCopyright</key><string>Copyright © 2026 OpenStill contributors. MIT License.</string>
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeName</key><string>Photograph</string>
+            <key>CFBundleTypeRole</key><string>Viewer</string>
+            <key>LSHandlerRank</key><string>Alternate</string>
+            <key>LSItemContentTypes</key>
+            <array><string>public.image</string></array>
+        </dict>
+        <dict>
+            <key>CFBundleTypeName</key><string>Photo Folder</string>
+            <key>CFBundleTypeRole</key><string>Viewer</string>
+            <key>LSHandlerRank</key><string>Alternate</string>
+            <key>LSItemContentTypes</key><array><string>public.folder</string></array>
+        </dict>
+        <dict>
+            <key>CFBundleTypeName</key><string>OpenStill portable edits</string>
+            <key>CFBundleTypeRole</key><string>Editor</string>
+            <key>LSItemContentTypes</key><array><string>org.openstill.edit-package</string></array>
+            <key>LSTypeIsPackage</key><true/>
+        </dict>
+    </array>
+    <key>UTExportedTypeDeclarations</key>
+    <array><dict>
+        <key>UTTypeIdentifier</key><string>org.openstill.edit-package</string>
+        <key>UTTypeDescription</key><string>OpenStill portable edits</string>
+        <key>UTTypeConformsTo</key><array><string>com.apple.package</string><string>public.directory</string></array>
+        <key>UTTypeTagSpecification</key><dict>
+            <key>public.filename-extension</key><array><string>openstilledits</string></array>
+        </dict>
+    </dict></array>
+</dict>
+</plist>
