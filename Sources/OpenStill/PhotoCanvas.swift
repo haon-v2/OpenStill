@@ -3,7 +3,7 @@ import OpenStillCore
 
 final class PhotoCanvas: NSView {
     enum Tool: Hashable { case browse, crop, erase, sun, whiteBalance, maskBrush, maskLinear, maskRadial, maskObject, maskRange, retouchSource, retouch }
-    var tool: Tool = .browse { didSet { needsDisplay = true; updateAccessibility() } }
+    var tool: Tool = .browse { didSet { needsDisplay = true; updateAccessibility(); reportCrop() } }
     var sunPlaced: ((CGPoint, Bool) -> Void)?
     var sunPosition = CGPoint(x:0.7,y:0.8) { didSet { needsDisplay = true; updateAccessibility() } }
     private var draggingSun = false
@@ -34,12 +34,22 @@ final class PhotoCanvas: NSView {
     private var cropStart: CGPoint?
     private var cropAspect: Double?
     private var cropMoveOrigin: CGRect?
-    func beginCrop(aspect:Double?) {
-        clearTool(); native = false; tool = .crop; cropAspect = aspect
-        if let aspect {cropSelection = CropGeometry.centered(in:logicalPixels ?? image.map{CGSize(width:$0.width,height:$0.height)} ?? .zero,aspect:aspect)}
+    /// Full-resolution pixel size of the image being cropped; the preview can be smaller.
+    private var cropPixels: CGSize?
+    /// Reports the crop frame's pixel size (nil before one is drawn) and the pixel size being cropped (nil outside the crop tool).
+    var cropReport: ((CGSize?, CGSize?) -> Void)?
+    func beginCrop(aspect:Double?, pixels:CGSize? = nil) {
+        clearTool(); native = false; cropAspect = aspect
+        cropPixels = pixels ?? logicalPixels ?? image.map{CGSize(width:$0.width,height:$0.height)}
+        tool = .crop
+        if let aspect {cropSelection = CropGeometry.centered(in:cropPixels ?? .zero,aspect:aspect)}
         needsDisplay = true
     }
-    private(set) var cropSelection: CGRect?
+    private(set) var cropSelection: CGRect? { didSet { reportCrop() } }
+    private func reportCrop() {
+        guard tool == .crop, let pixels = cropPixels else { cropReport?(nil,nil); return }
+        cropReport?(cropSelection.map { let size = CropGeometry.pixelSize(of:$0,in:pixels); return CGSize(width:size.width,height:size.height) }, pixels)
+    }
     private var brushPaths: [[CGPoint]] = []
     var brushWidth: CGFloat = 0.035
     func clearTool() { draggingSun = false; tool = .browse; maskOverlay = nil; maskPath = []; cropStart = nil; cropMoveOrigin = nil; cropSelection = nil; brushPaths = []; needsDisplay = true }
@@ -248,6 +258,7 @@ final class PhotoCanvas: NSView {
                     context.move(to: CGPoint(x: selection.minX+selection.width*fraction, y: selection.minY)); context.addLine(to: CGPoint(x: selection.minX+selection.width*fraction,y:selection.maxY))
                     context.move(to: CGPoint(x:selection.minX,y:selection.minY+selection.height*fraction)); context.addLine(to: CGPoint(x:selection.maxX,y:selection.minY+selection.height*fraction)); context.strokePath()
                 }
+                if let pixels = cropPixels { drawCropLabel(crop, pixels:pixels, frame:selection) }
             }
             if tool == .erase {
                 context.saveGState(); context.translateBy(x: rect.minX, y: rect.minY); context.scaleBy(x: rect.width, y: rect.height)
@@ -292,6 +303,20 @@ final class PhotoCanvas: NSView {
             border.lineWidth = 3
             border.stroke()
         }
+    }
+
+    /// Aspect ratio and pixel size badge, inside the top edge of the frame (above it when the frame is short).
+    private func drawCropLabel(_ crop:CGRect, pixels:CGSize, frame:CGRect) {
+        let size = CropGeometry.pixelSize(of:crop,in:pixels)
+        let text = (CropGeometry.ratioLabel(width:Double(size.width),height:Double(size.height)) + "  ·  \(size.width) × \(size.height)") as NSString
+        let attributes: [NSAttributedString.Key: Any] = [.font:NSFont.monospacedDigitSystemFont(ofSize:11,weight:.semibold),.foregroundColor:NSColor.white]
+        let textSize = text.size(withAttributes:attributes)
+        var badge = CGRect(x:frame.midX-textSize.width/2-7,y:frame.maxY-textSize.height-12,width:textSize.width+14,height:textSize.height+6)
+        if frame.height < badge.height*2+12 { badge.origin.y = frame.maxY+6 }
+        badge.origin.x = min(bounds.maxX-badge.width-4,max(bounds.minX+4,badge.minX))
+        badge.origin.y = min(bounds.maxY-badge.height-4,max(bounds.minY+4,badge.minY))
+        NSColor.black.withAlphaComponent(0.65).setFill(); NSBezierPath(roundedRect:badge,xRadius:5,yRadius:5).fill()
+        text.draw(at:CGPoint(x:badge.minX+7,y:badge.minY+3),withAttributes:attributes)
     }
 
     override func viewDidChangeBackingProperties() { needsDisplay = true }

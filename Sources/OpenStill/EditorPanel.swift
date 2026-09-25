@@ -39,6 +39,7 @@ final class EditorPanel: GlassChrome {
     private let mixer = ColorMixerPanel()
     private let cropPresets = CropPresetPanel()
     func cropAspect(for size:CGSize) -> Double? { cropPresets.aspect(for:size) }
+    func showCrop(selection:CGSize?,photo:CGSize?) { cropPresets.showCrop(selection:selection,photo:photo) }
     private let glow = GlowPanel()
     private let sunrays = SunraysPanel()
     private let versions = VersionPanel()

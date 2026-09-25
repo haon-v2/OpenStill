@@ -4,40 +4,83 @@ import OpenStillCore
 final class CropPresetPanel: NSStackView {
     var changed: (() -> Void)?
     private let preset = NSPopUpButton(frame:.zero,pullsDown:false)
-    private let orientationPicker = NSSegmentedControl(labels:["Landscape","Portrait"],trackingMode:.selectOne,target:nil,action:nil)
-    private let ratios: [Double?] = [nil,nil,1,1.5,4.0/3,1.25,16.0/9,21.0/9]
+    private let swap = NSButton(title:"Swap horizontal ↔ vertical",target:nil,action:nil)
+    private let readout = NSTextField(wrappingLabelWithString:"")
+    private let warning = NSTextField(wrappingLabelWithString:"")
+    private enum Choice { case freeform, original, preset(CropPreset) }
+    private var choices: [Choice] = []
     override init(frame:NSRect) {
         super.init(frame:frame)
         orientation = .vertical; alignment = .leading; spacing = 10
         let label = NSTextField(labelWithString:"Crop preset"); label.font = .systemFont(ofSize:11,weight:.medium)
-        preset.addItems(withTitles:["Freeform","Original proportions","Square · 1:1","Photo · 3:2","Standard · 4:3","Print · 5:4","Widescreen · 16:9","Cinema · 21:9"])
         preset.font = .systemFont(ofSize:11); preset.target = self; preset.action = #selector(selectPreset)
         preset.setAccessibilityLabel("Crop preset")
-        orientationPicker.selectedSegment = 0; orientationPicker.controlSize = .small
-        orientationPicker.target = self; orientationPicker.action = #selector(selectOrientation)
-        orientationPicker.setAccessibilityLabel("Crop orientation")
-        let hint = NSTextField(wrappingLabelWithString:"Choose portrait or landscape, then drag the frame to compose. Drag a corner to resize. Cropping keeps source detail; choose output pixel dimensions in Export.")
+        buildMenu()
+        swap.bezelStyle = .rounded; swap.controlSize = .small; swap.font = .systemFont(ofSize:11)
+        swap.target = self; swap.action = #selector(swapOrientation)
+        swap.setAccessibilityLabel("Switch between the horizontal and vertical version of this preset")
+        readout.font = .monospacedDigitSystemFont(ofSize:11,weight:.medium); readout.setAccessibilityLabel("Crop size and aspect ratio")
+        warning.font = .systemFont(ofSize:11); warning.textColor = .systemOrange; warning.isHidden = true
+        let hint = NSTextField(wrappingLabelWithString:"Drag the frame to compose. Drag a corner to resize. Cropping keeps source detail; choose output pixel dimensions in Export.")
         hint.font = .systemFont(ofSize:11); hint.textColor = .secondaryLabelColor
-        for view in [label,preset,orientationPicker,hint] {
+        for view in [label,preset,swap,readout,warning,hint] {
             view.translatesAutoresizingMaskIntoConstraints = false; addArrangedSubview(view); view.widthAnchor.constraint(equalTo:widthAnchor).isActive = true
         }
+        showCrop(selection:nil,photo:nil)
         setEnabled(false)
     }
     required init?(coder:NSCoder) {fatalError("init(coder:) has not been implemented")}
+    private func buildMenu() {
+        let menu = NSMenu(); menu.autoenablesItems = false
+        func add(_ title:String,_ choice:Choice) { menu.addItem(withTitle:title,action:nil,keyEquivalent:""); choices.append(choice) }
+        func header(_ title:String) {
+            menu.addItem(.separator()); choices.append(.freeform)
+            let item = NSMenuItem(title:title,action:nil,keyEquivalent:""); item.isEnabled = false
+            item.attributedTitle = NSAttributedString(string:title.uppercased(),attributes:[.font:NSFont.systemFont(ofSize:10,weight:.semibold),.foregroundColor:NSColor.secondaryLabelColor])
+            menu.addItem(item); choices.append(.freeform)
+        }
+        add("Freeform",.freeform)
+        add("Original proportions",.original)
+        header("Square"); for p in CropPreset.square { add(p.title,.preset(p)) }
+        header("Horizontal"); for p in CropPreset.horizontal { add(p.title,.preset(p)) }
+        header("Vertical"); for p in CropPreset.vertical { add(p.title,.preset(p)) }
+        preset.menu = menu
+    }
+    private var selectedPreset: CropPreset? {
+        guard choices.indices.contains(preset.indexOfSelectedItem), case .preset(let p) = choices[preset.indexOfSelectedItem] else {return nil}
+        return p
+    }
     func aspect(for size:CGSize) -> Double? {
-        let index = preset.indexOfSelectedItem
-        guard ratios.indices.contains(index),index != 0 else {return nil}
-        if index == 1 {return size.width/max(1,size.height)}
-        guard let ratio = ratios[index] else {return nil}
-        return orientationPicker.selectedSegment == 1 ? 1/ratio:ratio
+        guard choices.indices.contains(preset.indexOfSelectedItem) else {return nil}
+        switch choices[preset.indexOfSelectedItem] {
+        case .freeform: return nil
+        case .original: return size.width/max(1,size.height)
+        case .preset(let p): return p.aspect
+        }
     }
-    private func updateTitles() {
-        let portrait = orientationPicker.selectedSegment == 1
-        let labels = portrait ? ["Photo · 2:3","Standard · 3:4","Print · 4:5","Widescreen · 9:16","Cinema · 9:21"] : ["Photo · 3:2","Standard · 4:3","Print · 5:4","Widescreen · 16:9","Cinema · 21:9"]
-        for (i,label) in labels.enumerated() {preset.item(at:i+3)?.title = label}
-        orientationPicker.isEnabled = preset.isEnabled && preset.indexOfSelectedItem > 2
+    /// Shows the live crop size, or the photo being cropped before a frame is drawn.
+    func showCrop(selection:CGSize?,photo:CGSize?) {
+        warning.isHidden = true
+        if let selection {
+            let w = Int(selection.width.rounded()), h = Int(selection.height.rounded())
+            readout.stringValue = "Crop  " + CropGeometry.sizeLabel(width:w,height:h)
+            if let p = selectedPreset, !p.isFilled(byWidth:w,height:h) {
+                warning.stringValue = "Smaller than \(p.width) × \(p.height). Exporting at that size will enlarge the photo."
+                warning.isHidden = false
+            }
+        } else if let photo {
+            readout.stringValue = "Photo  " + CropGeometry.sizeLabel(width:Int(photo.width.rounded()),height:Int(photo.height.rounded()))
+        } else {
+            readout.stringValue = "Choose a preset or Draw crop to see the size and aspect ratio."
+        }
+        readout.toolTip = readout.stringValue
     }
-    @objc private func selectPreset() {updateTitles(); changed?()}
-    @objc private func selectOrientation() {updateTitles(); changed?()}
-    func setEnabled(_ enabled:Bool) {preset.isEnabled = enabled; updateTitles()}
+    private func updateSwap() { swap.isEnabled = preset.isEnabled && selectedPreset?.rotated != nil }
+    @objc private func selectPreset() {updateSwap(); changed?()}
+    @objc private func swapOrientation() {
+        guard let target = selectedPreset?.rotated,
+              let index = choices.firstIndex(where:{ if case .preset(let p) = $0 { return p == target }; return false }) else {return}
+        preset.selectItem(at:index); updateSwap(); changed?()
+    }
+    func setEnabled(_ enabled:Bool) {preset.isEnabled = enabled; updateSwap()}
 }
