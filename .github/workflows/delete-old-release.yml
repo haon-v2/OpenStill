@@ -4,7 +4,6 @@ name: Delete v.0.1 release
 on:
   push:
     branches: [claude/gifted-lovelace-pbg8wv]
-    paths: [.github/workflows/delete-old-release.yml]
 
 permissions:
   contents: write
@@ -17,6 +16,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release delete OpenStill --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
+          gh release delete OpenStill --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes || echo "Release already deleted"
           echo "Remaining releases:"; gh release list --repo "$GITHUB_REPOSITORY"
           echo "Remaining tags:"; gh api "repos/$GITHUB_REPOSITORY/tags" --jq '.[].name'
