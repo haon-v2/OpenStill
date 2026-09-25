@@ -72,7 +72,7 @@ public enum UpdateCheck {
             if let error { completion(.failure(error)); return }
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
             guard status == 200, let data else { completion(.failure(UpdateError.http(status))); return }
-            completion(Result { try parse(data) })
+            completion(Result { try UpdateCheck.parse(data) })
         }.resume()
     }
 }
