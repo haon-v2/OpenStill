@@ -208,15 +208,24 @@ Until `SUPublicEDKey` is set in `Resources/Info.plist`, and in builds run with `
 
 ### Publishing an update
 
-One-time setup: build once so Sparkle's tools are downloaded, then run `.build/artifacts/sparkle/Sparkle/bin/generate_keys`. It stores the private key in your login keychain and prints the public key. Add that key to `Resources/Info.plist` as `SUPublicEDKey` (a `<string>`). Keep the private key safe: every future update must be signed with it, and apps already installed will reject updates signed with any other key.
+**Automatic (recommended):** on GitHub, open **Actions → Release → Run workflow**, keep the branch on `main`, and enter the new version (for example `0.8.0`). The workflow:
+- runs the tests and raises the version and build number in `Resources/Info.plist`;
+- builds the app, zips it and signs it for Sparkle;
+- creates the `v<version>` release with the zip;
+- adds the release to `appcast.xml` on `main`.
 
-For each release:
-1. Raise `CFBundleShortVersionString` and `CFBundleVersion` in `Resources/Info.plist`. Sparkle compares `CFBundleVersion`, so it must go up every time.
-2. Run `bash scripts/release.sh`. It builds the app, writes `dist/OpenStill-<version>.zip`, signs it and adds an entry to `appcast.xml`.
-3. Create the GitHub release `v<version>` and attach the zip.
-4. Commit `appcast.xml` and push it to `main`. Installed apps see the update from then on.
+Installed copies see the update on their next check. Tick **Dry run** to build and sign with a throwaway key without publishing anything.
 
-The build is for your Mac's architecture only. An Apple silicon build is marked as arm64-only in the feed, so Intel Macs aren't offered it.
+The workflow signs with the repository secret `SPARKLE_PRIVATE_KEY`. One-time setup, on the Mac whose keychain holds the key (see below):
+1. In the repository folder, export the private key to a file: `"$(find .build/artifacts -type f -name generate_keys | head -1)" -x ~/Desktop/sparkle-private-key`.
+2. On GitHub, open **Settings → Secrets and variables → Actions → New repository secret**, name it `SPARKLE_PRIVATE_KEY`, and paste the file's contents.
+3. Delete the file: `rm ~/Desktop/sparkle-private-key`. Keep your own backup somewhere safe, such as a password manager.
+
+**By hand:** raise `CFBundleShortVersionString` and `CFBundleVersion` in `Resources/Info.plist` (Sparkle compares `CFBundleVersion`, so it must always go up). Run `bash scripts/release.sh`, which builds, zips, signs with the key in your keychain and adds the entry to `appcast.xml`. Then create the GitHub release `v<version>`, attach the zip, and push `appcast.xml` and `Info.plist` to `main`.
+
+**Signing key:** created once with `generate_keys` (in `.build/artifacts/sparkle/Sparkle/bin/` after a build). It stores the private key in your login keychain and prints the public key, which goes in `Resources/Info.plist` as `SUPublicEDKey`. Every update must be signed with that same private key, because installed apps reject anything else.
+
+Builds are made for Apple silicon (the GitHub runner and current Macs). An Apple silicon build is marked as arm64-only in the feed, so Intel Macs aren't offered it.
 
 ## Coverage
 
