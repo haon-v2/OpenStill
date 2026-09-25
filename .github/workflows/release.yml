@@ -5,8 +5,6 @@
 name: Release
 
 on:
-  push:  # TEMPORARY: dry run on this branch; removed before merging
-    branches: [claude/gifted-lovelace-pbg8wv]
   workflow_dispatch:
     inputs:
       version:
@@ -29,8 +27,8 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 120
     env:
-      VERSION: ${{ inputs.version || '0.7.3' }}
-      DRY_RUN: ${{ github.event_name == 'push' || inputs.dry_run }}
+      VERSION: ${{ inputs.version }}
+      DRY_RUN: ${{ inputs.dry_run }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -59,8 +57,9 @@ jobs:
 
       - name: Set the version
         run: |
-          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" Resources/Info.plist
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD" Resources/Info.plist
+          # Edit the two values in place so the release commit changes only these lines.
+          python3 scripts/set-version.py "$VERSION" "$BUILD"
+          git diff Resources/Info.plist
 
       - name: Build tools
         run: brew install meson ninja pkg-config cmake || true
