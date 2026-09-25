@@ -12,12 +12,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Toolchain
-        run: sw_vers; xcodebuild -version; swift --version
+        run: |
+          sw_vers
+          xcodebuild -version
+          swift --version
       - name: Build tools
         run: brew install meson ninja pkg-config cmake || true
       - name: Native dependencies
-        run: bash scripts/build-native.sh > native.log 2>&1 || (tail -80 native.log; exit 1)
+        run: |
+          bash scripts/build-native.sh > native.log 2>&1 || { tail -80 native.log; exit 1; }
       - name: Build app
-        run: PKG_CONFIG_PATH="$PWD/.build/native/lib/pkgconfig" swift build 2>&1 | grep -E 'error|warning: .*(CropPreset|UpdateC|PhotoCanvas|EditorPanel|EditingController|AppDelegate)|Compiling|Build complete' | grep -v '^\[.*Compiling' ; exit ${PIPESTATUS[0]}
+        run: |
+          set +e
+          PKG_CONFIG_PATH="$PWD/.build/native/lib/pkgconfig" swift build > build.log 2>&1
+          status=$?
+          grep -E "error:|Build complete" build.log
+          grep -E "warning:" build.log | grep -E "CropPreset|UpdateC|PhotoCanvas|EditorPanel|EditingController|AppDelegate"
+          exit $status
       - name: Tests
-        run: bash scripts/test.sh 2>&1 | tail -150; exit ${PIPESTATUS[0]}
+        run: |
+          set +e
+          bash scripts/test.sh > test.log 2>&1
+          status=$?
+          grep -E "✘|error:|failed|passed after|Test run with" test.log | tail -120
+          exit $status
