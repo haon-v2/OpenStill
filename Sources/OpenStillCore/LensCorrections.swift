@@ -94,7 +94,7 @@ public final class LensLibrary {
     fileprivate func maps(_ optics:OpticalCorrection,size:CGSize) throws -> LensMaps {
         let width=max(2,Int(size.width.rounded())),height=max(2,Int(size.height.rounded()))
         let gw=min(513,width),gh=min(513,height)
-        let lens=optics.lens.hasEffect ? try lensGrid(optics.lens,width:width,height:height,gw:gw,gh:gh) : nil
+        let lens:[Float]? = try optics.lens.hasEffect ? lensGrid(optics.lens,width:width,height:height,gw:gw,gh:gh) : nil
         guard let perspective=Perspective(optics.transform,sourceSize:size,orientation:optics.orientation) else {
             return LensMaps(data:lens ?? Self.identityGrid(width:width,height:height,gw:gw,gh:gh),width:gw,height:gh,size:size)
         }

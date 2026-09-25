@@ -32,7 +32,7 @@ final class ProfilePanel: NSStackView {
         }
         let demosaicRow = NSStackView(views: [NSTextField(labelWithString: "Demosaic"), demosaic]); demosaicRow.distribution = .fill
         rawRows = [rawTitle, demosaicRow, noise, colorNoise, impulse, rawHelp]
-        for view in [looks, importButton, detail] + rawRows { addArrangedSubview(view); view.widthAnchor.constraint(equalTo: widthAnchor).isActive = true }
+        for view in ([looks, importButton, detail] as [NSView]) + rawRows { addArrangedSubview(view); view.widthAnchor.constraint(equalTo: widthAnchor).isActive = true }
         update(PhotoEdits(), raw: false, enabled: false)
     }
     required init?(coder: NSCoder) { fatalError() }
@@ -60,7 +60,7 @@ final class ProfilePanel: NSStackView {
     func setEnabled(_ enabled: Bool) { for control in [looks, importButton, demosaic, noise, colorNoise, impulse] as [NSControl] { control.isEnabled = enabled } }
     @objc private func chooseLook() {
         guard let id = looks.selectedItem?.representedObject as? String, id != "dcp" else { return }
-        command?("profile:" + id.dropFirst("look:".count))
+        command?("profile:" + String(id.dropFirst("look:".count)))
     }
     @objc private func importDCP() { command?("importDCP") }
     @objc private func rawChanged() {

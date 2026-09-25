@@ -29,7 +29,8 @@ import Testing
         entries.sort { $0.tag < $1.tag }
         var out: [UInt8] = [0x49, 0x49, 0x52, 0x43] + le32(8)
         let ifdSize = 2 + entries.count*12 + 4
-        var extra: [UInt8] = [], extraOffset = 8 + ifdSize
+        var extra: [UInt8] = []
+        let extraOffset = 8 + ifdSize
         out += [UInt8(entries.count & 0xff), UInt8(entries.count >> 8)]
         for e in entries {
             out += [UInt8(e.tag & 0xff), UInt8(e.tag >> 8), UInt8(e.type & 0xff), UInt8(e.type >> 8)] + le32(e.count)
@@ -75,7 +76,8 @@ import Testing
         #expect(chroma(try render(.vivid, color)) > chroma([color.0, color.1, color.2]) * 1.1)
         #expect(chroma(try render(.neutral, color)) < chroma([color.0, color.1, color.2]))
         // Neutral lowers contrast: shadows come up, highlights come down.
-        #expect(try render(.neutral, (0.02, 0.02, 0.02))[1] > 0.02 && try render(.neutral, (0.7, 0.7, 0.7))[1] < 0.7)
+        let shadow = try render(.neutral, (0.02, 0.02, 0.02)), light = try render(.neutral, (0.7, 0.7, 0.7))
+        #expect(shadow[1] > 0.02 && light[1] < 0.7)
         let half = try render(.vivid, color, amount: 0.5), full = try render(.vivid, color)
         #expect(chroma(half) > chroma([color.0, color.1, color.2]) && chroma(half) < chroma(full))
         // Black stays black and the LUT keeps light up to its headroom.

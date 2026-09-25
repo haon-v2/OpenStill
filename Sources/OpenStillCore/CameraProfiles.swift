@@ -384,14 +384,14 @@ public enum CameraProfiles {
         var result = image
         let extent = image.extent
         if calibration.hasEffect {
-            guard let out = calibrate?.apply(extent: extent, arguments: [result] + vectors(calibration.matrix) + [calibration.sanitized.shadowsTint]) else { throw EditError.render }
+            guard let out = calibrate?.apply(extent: extent, arguments: ([result] as [Any]) + vectors(calibration.matrix) + [calibration.sanitized.shadowsTint]) else { throw EditError.render }
             result = out
         }
         let profile = profile.sanitized
         if profile.hasEffect, let data = try cube(profile) {
-            guard let encoded = encode?.apply(extent: extent, arguments: [result] + vectors(toProPhoto) + [headroom]) else { throw EditError.render }
+            guard let encoded = encode?.apply(extent: extent, arguments: ([result] as [Any]) + vectors(toProPhoto) + [headroom]) else { throw EditError.render }
             let profiled = encoded.applyingFilter("CIColorCube", parameters: ["inputCubeDimension": dimension, "inputCubeData": data])
-            guard let decoded = decode?.apply(extent: extent, arguments: [profiled, result] + vectors(fromProPhoto) + [headroom, profile.amount]) else { throw EditError.render }
+            guard let decoded = decode?.apply(extent: extent, arguments: ([profiled, result] as [Any]) + vectors(fromProPhoto) + [headroom, profile.amount]) else { throw EditError.render }
             result = decoded
         }
         return result.cropped(to: extent)
