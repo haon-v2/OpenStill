@@ -1,0 +1,9 @@
+{
+  "name": "LibRaw",
+  "version": "0.22.2",
+  "source": "https://www.libraw.org/data/LibRaw-0.22.2.tar.gz",
+  "sha256": "de86b035655accff8d4010f1a221fdf50d353cb7b1422ba26f14a0db92612cfa",
+  "selectedLicense": "CDDL-1.0",
+  "sourceChanges": "None. OpenStill compiles the upstream Makefile.am source list with USE_ZLIB and a separate native bridge.",
+  "redistribution": "The complete corresponding upstream source archive, copyright and both offered license texts are included beside this record."
+}
