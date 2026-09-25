@@ -4,6 +4,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var window: NSWindow!
     private let viewer = ViewerController()
     private let updates = UpdateController()
+    private lazy var settings = SettingsWindowController(updates: updates)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         createWindow()
@@ -57,6 +58,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let app = menu("OpenStill")
         add(app, "About OpenStill", #selector(showAbout), target: self)
+        app.addItem(.separator())
+        add(app, "Settings…", #selector(showSettings), ",", target: self)
         add(app, "Check for Updates…", #selector(UpdateController.checkForUpdates(_:)), target: updates)
         add(app, "Check for Updates Automatically", #selector(UpdateController.toggleAutomaticChecks(_:)), target: updates)
         app.addItem(.separator())
@@ -102,6 +105,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         add(windowMenu, "Zoom", #selector(NSWindow.performZoom(_:)))
         NSApp.windowsMenu = windowMenu
     }
+    @objc private func showSettings() { settings.showWindow(nil); settings.window?.center(); settings.window?.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true) }
     @objc private func showAbout() {
         NSApp.orderFrontStandardAboutPanel(options: [
             .applicationName: "OpenStill", .applicationVersion: Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "",

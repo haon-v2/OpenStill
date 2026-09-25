@@ -28,6 +28,13 @@ final class UpdateController: NSObject, NSMenuItemValidation {
         }
     }
 
+    /// Called after a GitHub check finishes, so an open Settings window can refresh.
+    var changed: (() -> Void)?
+    var usesSparkle: Bool { sparkle != nil }
+    var automaticChecks: Bool { get { automatic } set { automatic = newValue } }
+    var lastChecked: Date? { sparkle?.updater.lastUpdateCheckDate ?? defaults.object(forKey: Self.lastCheckKey) as? Date }
+    var isChecking: Bool { sparkle.map { !$0.updater.canCheckForUpdates } ?? checking }
+
     private var automatic: Bool {
         get { sparkle?.updater.automaticallyChecksForUpdates ?? defaults.object(forKey: Self.automaticKey) as? Bool ?? true }
         set {
@@ -62,6 +69,7 @@ final class UpdateController: NSObject, NSMenuItemValidation {
                 guard let self else { return }
                 self.checking = false
                 self.defaults.set(Date(), forKey: Self.lastCheckKey)
+                self.changed?()
                 self.finish(result, userInitiated: userInitiated)
             }
         }

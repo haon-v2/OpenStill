@@ -202,7 +202,7 @@ The Python runtime and models are stored in `~/Library/Application Support/OpenS
 
 ## Updates
 
-**OpenStill → Check for Updates…** uses [Sparkle](https://sparkle-project.org) to read the update feed, [`appcast.xml`](appcast.xml) on `main`. When a newer version is listed, OpenStill shows its notes and can download, verify, install and relaunch it for you. You can also skip that version or be reminded later. **Check for Updates Automatically** (on by default) checks once a day. Edits and the library live in Application Support and are kept. The check sends no information about your photos. Sparkle sends only the request for the feed.
+**OpenStill → Check for Updates…** uses [Sparkle](https://sparkle-project.org) to read the update feed, [`appcast.xml`](appcast.xml) on `main`. When a newer version is listed, OpenStill shows its notes and can download, verify, install and relaunch it for you. You can also skip that version or be reminded later. **Check for Updates Automatically** (on by default) checks once a day. **OpenStill → Settings… (⌘,)** shows the installed version, how updates are delivered, when OpenStill last checked, and has the same automatic-check switch, **Check Now** and a link to all releases. Edits and the library live in Application Support and are kept. The check sends no information about your photos. Sparkle sends only the request for the feed.
 
 Until `SUPublicEDKey` is set in `Resources/Info.plist`, and in builds run with `swift run`, the app falls back to the older check. That check compares the installed version with the public [GitHub releases](https://github.com/haon-v2/OpenStill/releases) and opens the release page, and you replace OpenStill in Applications yourself.
 
