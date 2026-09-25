@@ -98,3 +98,9 @@ Automated fixtures are generated and contain no user photographs. The real S9 fi
 - Native inspection on macOS 26.6.2 / Apple silicon: source placement creates workspace margins; successive drags place the source both beyond the image and back inside without reopening the tool. Escape exits placement. History contains exactly one entry per drag; undo selects the preceding placement. Tested with a separate 24MP JPEG fixture; original bytes are unchanged. Existing test fixture and camera metadata limitations remain as recorded above.
 - Softened overly sharp ray lobes after visual review. Existing saved Sunrays render paths remain intact until the new controls are used; no history migration or original-file rewrite occurs.
 - Release 0.7.2 (build 16) built and installed with a valid ad-hoc deep signature. No network image processing or additional assets are required.
+
+## Develop essentials — September 25, 2026
+
+- Added Dehaze, Clarity, Texture, Color grading, Grain, Defringe, Whites/Blacks in Develop, Auto tone, a clipping overlay (J) and a before/after split view (Y). These are OpenStill's own algorithms; no Adobe pixel matching is claimed.
+- 138 automated tests in 24 suites pass on a GitHub `macos-26` runner (`bash scripts/test.sh`), including 13 new DevelopTools tests: zero-amount identity, sanitizing, edge contrast for Clarity, medium-detail amplitude for Texture, contrast recovery and added haze for Dehaze (legacy and modern renderers), tonal-range tinting for Color grading, deterministic Grain with an unchanged mean, fringe removal that leaves evenly colored areas alone, Auto tone proposals, clipping overlay colors, before-frame geometry, JSON compatibility with older edits, history and batch copying.
+- Not yet verified by hand in the native app on a Mac: the Color grading wheel interaction, the split-view divider drag and the J/Y/\ shortcuts.
