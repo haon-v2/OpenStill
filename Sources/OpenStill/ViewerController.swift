@@ -54,6 +54,9 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
     let editQueue = DispatchQueue(label: "OpenStill.render", qos: .userInitiated)
     let localAI = LocalAI()
     var comparing = false
+    var splitCompare = false
+    var showClipping = false
+    var compareToken = UUID()
     var aiPreparing = false
     var maskSession = MaskEditingSession()
     var retouchSession = RetouchSession()

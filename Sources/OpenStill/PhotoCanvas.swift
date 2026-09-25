@@ -15,6 +15,15 @@ final class PhotoCanvas: NSView {
     var whiteBalanceChosen: ((CGPoint) -> Void)?
     var objectChosen: ((CGPoint) -> Void)?
     var maskOverlay: CGImage? { didSet { needsDisplay = true } }
+    /// Red/blue clipping warning drawn over the photo.
+    var clippingOverlay: CGImage? { didSet { needsDisplay = true } }
+    /// When set, the left side of the divider shows this "before" render of the same frame.
+    var beforeImage: CGImage? { didSet { needsDisplay = true } }
+    var splitPosition: CGFloat = 0.5 { didSet { needsDisplay = true } }
+    private var draggingSplit = false
+    var toggleClipping: (() -> Void)?
+    var toggleSplit: (() -> Void)?
+    var toggleCompare: (() -> Void)?
     var maskRadius: CGFloat = 0.025
     var maskSubtract = false
     var maskSoftness = 0.3
@@ -193,6 +202,12 @@ final class PhotoCanvas: NSView {
                               width: size.width, height: size.height)
             context.interpolationQuality = native && logicalPixels == nil ? .none : .high
             context.draw(image, in: rect)
+            if let beforeImage {
+                let divider = rect.minX + rect.width*splitPosition
+                context.saveGState(); context.clip(to: CGRect(x: rect.minX, y: rect.minY, width: divider-rect.minX, height: rect.height))
+                context.draw(beforeImage, in: rect); context.restoreGState()
+            }
+            if let clippingOverlay { context.saveGState(); context.interpolationQuality = .none; context.draw(clippingOverlay, in: rect); context.restoreGState() }
             if let maskOverlay, !(tool == .maskLinear && maskPath.count > 1) { context.draw(maskOverlay, in: rect) }
             if let first = maskPath.first, let last = maskPath.last {
                 let a = CGPoint(x:rect.minX+first.x*rect.width,y:rect.minY+first.y*rect.height)
@@ -273,6 +288,17 @@ final class PhotoCanvas: NSView {
             }
             context.restoreGState()
         }
+        if beforeImage != nil, image != nil {
+            let rect = imageRect, x = rect.minX + rect.width*splitPosition
+            let line = NSBezierPath(); line.move(to: CGPoint(x: x, y: max(bounds.minY, rect.minY))); line.line(to: CGPoint(x: x, y: min(bounds.maxY, rect.maxY)))
+            NSColor.white.setStroke(); line.lineWidth = 1.5; line.stroke()
+            let knob = NSBezierPath(ovalIn: CGRect(x: x-9, y: bounds.midY-9, width: 18, height: 18))
+            NSColor.black.withAlphaComponent(0.65).setFill(); knob.fill(); NSColor.white.setStroke(); knob.stroke()
+            let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 11, weight: .semibold), .foregroundColor: NSColor.white, .backgroundColor: NSColor.black.withAlphaComponent(0.55)]
+            let top = min(bounds.maxY, rect.maxY) - 24
+            (" Before " as NSString).draw(at: CGPoint(x: max(bounds.minX+8, x-64), y: top), withAttributes: attrs)
+            (" After " as NSString).draw(at: CGPoint(x: min(bounds.maxX-52, x+8), y: top), withAttributes: attrs)
+        }
         if tool == .sun, image != nil {
             let rect = imageRect
             NSColor.white.withAlphaComponent(0.25).setStroke()
@@ -325,6 +351,10 @@ final class PhotoCanvas: NSView {
     override func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self)
         if tool == .sun, image != nil { draggingSun = true; moveSun(event,final:false); return }
+        if beforeImage != nil, tool == .browse, image != nil {
+            let x = convert(event.locationInWindow, from: nil).x, rect = imageRect
+            if abs(x - (rect.minX + rect.width*splitPosition)) < 10 { draggingSplit = true; return }
+        }
         if tool != .browse && !imageRect.contains(convert(event.locationInWindow,from:nil)) { return }
         if tool != .browse, let point = normalizedPoint(event) {
             switch tool {
@@ -355,6 +385,9 @@ final class PhotoCanvas: NSView {
     }
     override func mouseDragged(with event: NSEvent) {
         if tool == .sun, draggingSun { moveSun(event,final:false); return }
+        if draggingSplit {
+            let rect = imageRect; splitPosition = min(0.98, max(0.02, (convert(event.locationInWindow, from: nil).x - rect.minX)/max(1, rect.width))); return
+        }
         brushPointer = convert(event.locationInWindow,from:nil)
         if tool != .browse, let point = normalizedPoint(event) {
             if tool == .crop, let start = cropStart {
@@ -374,6 +407,7 @@ final class PhotoCanvas: NSView {
         needsDisplay = true;viewportChanged?()
     }
     override func mouseUp(with event: NSEvent) {
+        if draggingSplit { draggingSplit = false; return }
         if tool == .crop {cropStart = nil; cropMoveOrigin = nil; return}
         if tool == .sun, draggingSun { draggingSun = false; moveSun(event,final:true); return }
         if !maskPath.isEmpty {
@@ -417,6 +451,10 @@ final class PhotoCanvas: NSView {
             sunPlaced?(sunPosition,true); return
         }
         if tool == .maskBrush, let key = event.charactersIgnoringModifiers, ["[","]"].contains(key) { resizeMaskBrush?(key == "[" ? -1 : 1);return }
+        if event.modifierFlags.intersection([.command, .control, .option]).isEmpty, let key = event.charactersIgnoringModifiers?.lowercased() {
+            let action: (() -> Void)? = switch key { case "j": toggleClipping; case "y": toggleSplit; case "\\": toggleCompare; default: nil }
+            if let action { action(); return }
+        }
         switch event.keyCode {
         case 51, 117:
             if !event.isARepeat { requestTrash?() }

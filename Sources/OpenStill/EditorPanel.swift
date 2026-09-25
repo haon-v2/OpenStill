@@ -41,6 +41,7 @@ final class EditorPanel: GlassChrome {
     func cropAspect(for size:CGSize) -> Double? { cropPresets.aspect(for:size) }
     func showCrop(selection:CGSize?,photo:CGSize?) { cropPresets.showCrop(selection:selection,photo:photo) }
     private let glow = GlowPanel()
+    private let grading = ColorGradingPanel()
     private let sunrays = SunraysPanel()
     private let versions = VersionPanel()
     private let histogram = HistogramPanel()
@@ -81,6 +82,7 @@ final class EditorPanel: GlassChrome {
         ])
         let tools = installScroll(toolsScroll)
         fullWidth(histogram,in:tools)
+        histogram.clicked = { [weak self] in self?.command?("toggleClipping") }
         addTitle("PHOTO & VERSIONS", to: tools)
         fullWidth(versions, in:tools)
         versions.command = { [weak self] in self?.command?($0) }
@@ -110,6 +112,14 @@ final class EditorPanel: GlassChrome {
             self.fullWidth(self.lens,in:content)
             self.lens.changed = { [weak self] settings,final in guard let self else{return};self.states.lens=settings;self.editChanged?(self.states,"Lens corrections",final) }
             self.lens.match = { [weak self] in self?.command?("matchLens") }
+            self.addTitle("DEFRINGE", to: content)
+            self.help("Removes purple and green color fringes along high-contrast edges.", to: content)
+            self.slider("Purple amount", path: \.defringePurple, range: 0...1, in: content)
+            self.slider("Purple hue from (°)", path: \.defringePurpleLow, range: 180...360, in: content)
+            self.slider("Purple hue to (°)", path: \.defringePurpleHigh, range: 180...360, in: content)
+            self.slider("Green amount", path: \.defringeGreen, range: 0...1, in: content)
+            self.slider("Green hue from (°)", path: \.defringeGreenLow, range: 30...200, in: content)
+            self.slider("Green hue to (°)", path: \.defringeGreenHigh, range: 30...200, in: content)
         }
         addTitle("IMAGE QUALITY", to: tools)
         tool("Noise removal  AI", symbol: "waveform.path", in: tools) { content in
@@ -122,14 +132,22 @@ final class EditorPanel: GlassChrome {
         }
         addTitle("ESSENTIALS", to: tools)
         tool("Develop", symbol: "sun.max", in: tools, expanded: false) { content in
+            self.action("Auto", "autoTone", to:content)
             self.action("White balance eyedropper", "whiteBalance", to:content)
             self.action("Reset white balance", "resetWhiteBalance", to:content)
             self.slider("Exposure", path: \.exposure, range: -4...4, in: content)
             self.slider("Contrast", path: \.contrast, range: 0.5...1.5, in: content)
             self.slider("Highlights", path: \.highlights, range: 0...1, in: content)
             self.slider("Shadows", path: \.shadows, range: 0...1, in: content)
+            self.slider("Whites", path: \.whites, range: -1...1, in: content)
+            self.slider("Blacks", path: \.blacks, range: -1...1, in: content)
+            self.help("Whites and Blacks are shared with the Black & white tool and use its mask.", to: content)
             self.slider("Temperature", path: \.temperature, range: 2500...10000, in: content)
             self.slider("Tint", path: \.tint, range: -100...100, in: content)
+        }
+        tool("Dehaze", symbol: "aqi.medium", in: tools) { content in
+            self.slider("Dehaze", path: \.dehaze, range: -1...1, in: content)
+            self.help("Positive removes atmospheric haze; negative adds it.", to: content)
         }
         tool("Curves", symbol:"point.topleft.down.curvedto.point.bottomright.up", in:tools) { content in
             self.fullWidth(self.curves,in:content)
@@ -151,6 +169,14 @@ final class EditorPanel: GlassChrome {
             self.action("Remove selected area", "ai:erase", to: content)
         }
         tool("Structure", symbol: "circle.hexagongrid", in: tools) { self.slider("Structure", path: \.structure, range: 0...1, in: $0) }
+        tool("Clarity", symbol: "circle.lefthalf.filled", in: tools) { content in
+            self.slider("Clarity", path: \.clarity, range: -1...1, in: content)
+            self.help("Midtone contrast over broad areas. Negative softens.", to: content)
+        }
+        tool("Texture", symbol: "square.grid.3x3.middle.filled", in: tools) { content in
+            self.slider("Texture", path: \.texture, range: -1...1, in: content)
+            self.help("Medium-sized detail such as skin, bark or fabric. Negative smooths it.", to: content)
+        }
         tool("Color", symbol: "paintpalette", in: tools) {
             self.slider("Saturation", path: \.saturation, range: 0...2, in: $0)
             self.slider("Vibrance", path: \.vibrance, range: -1...1, in: $0)
@@ -160,6 +186,19 @@ final class EditorPanel: GlassChrome {
                 guard let self else { return };self.states.ensureAdvanced();self.states.advanced!.colors[index] = band
                 self.editChanged?(self.states,title,final)
             }
+        }
+        tool("Color grading", symbol: "circle.circle", in: tools) { content in
+            self.fullWidth(self.grading, in: content)
+            self.grading.changed = { [weak self] index, wheel, title, final in
+                guard let self else { return }
+                var settings = self.states.colorGrading
+                switch index { case 0: settings.shadows = wheel; case 1: settings.midtones = wheel; case 2: settings.highlights = wheel; default: settings.global = wheel }
+                self.states.colorGrading = settings
+                self.editChanged?(self.states, title, final)
+            }
+            self.slider("Blending", path: \.gradeBlending, range: 0...1, in: content)
+            self.slider("Balance", path: \.gradeBalance, range: -1...1, in: content)
+            self.help("Drag in a wheel to tint that tonal range. Double-click a wheel to reset it.", to: content)
         }
         tool("Black & white", symbol: "circle", in: tools) {
             self.slider("Monochrome strength", path: \.monochrome, range: 0...1, in: $0)
@@ -177,6 +216,11 @@ final class EditorPanel: GlassChrome {
                 self.states.glow = settings
                 self.editChanged?(self.states, title, final)
             }
+        }
+        tool("Grain", symbol: "circle.dotted", in: tools) { content in
+            self.slider("Amount", path: \.grainAmount, range: 0...1, in: content)
+            self.slider("Size", path: \.grainSize, range: 0...1, in: content)
+            self.slider("Roughness", path: \.grainRoughness, range: 0...1, in: content)
         }
         addTitle("LANDSCAPE", to: tools)
         tool("Sky replacement  AI", symbol: "cloud", in: tools) { content in
@@ -293,6 +337,7 @@ final class EditorPanel: GlassChrome {
     func libraryLUT(id:String) -> LUTItem? { lutBrowser.item(id:id) }
     func importedLUT(filename:String) -> LUTItem? { lutBrowser.imported(filename:filename) }
     func updateHistogram(_ value:PhotoHistogram?, sensor:Double?) { histogram.histogram = value; histogram.sensor = sensor }
+    func setClippingOverlay(_ on:Bool) { histogram.clippingShown = on }
     func updateVersions(_ record:PhotoRecord?, raw:Bool) { versions.update(record, raw:raw) }
     func setLUTPhoto(_ image:CGImage?,edits:PhotoEdits, source:CIImage? = nil, url:URL? = nil, recipe:RenderRecipe? = nil) { lutBrowser.setPhoto(image,edits:edits, source:source, url:url, recipe:recipe) }
     private func slider(_ title: String, path: WritableKeyPath<PhotoEdits, Double>, range: ClosedRange<Double>, in stack: NSStackView) {
@@ -373,6 +418,7 @@ final class EditorPanel: GlassChrome {
         mixer.update(edits.advanced?.colors,enabled:enabled && !busy)
         cropPresets.setEnabled(enabled && !busy)
         glow.update(edits.glow,enabled:enabled && !busy)
+        grading.update(edits.colorGrading,enabled:enabled && !busy)
         sunrays.update(edits.sunSettings,enabled:enabled && !busy)
         curves.update(edits.curves,enabled:enabled && !busy)
         lens.update(edits.lens,available:enabled && !busy)
@@ -383,7 +429,8 @@ final class EditorPanel: GlassChrome {
         historyStack.arrangedSubviews.forEach { historyStack.removeArrangedSubview($0); $0.removeFromSuperview() }
         addTitle("EDIT HISTORY", to: historyStack)
         action("Undo", "undo", to: historyStack); action("Redo", "redo", to: historyStack)
-        action("Compare with original", "compare", to: historyStack)
+        action("Compare with original (\\)", "compare", to: historyStack)
+        action("Before / after split (Y)", "compareSplit", to: historyStack)
         action("Reset all edits", "reset", to: historyStack)
         if let document {
             for (index, step) in document.steps.enumerated().reversed() {
@@ -401,6 +448,7 @@ final class EditorPanel: GlassChrome {
         mixer.setEnabled(hasPhoto && !busy)
         cropPresets.setEnabled(hasPhoto && !busy)
         glow.setEnabled(hasPhoto && !busy)
+        grading.setEnabled(hasPhoto && !busy)
         sunrays.setEnabled(hasPhoto && !busy)
         for (slider, _, _) in sliders { slider.isEnabled = hasPhoto && !busy }
         for (button, _) in toggles { button.isEnabled = hasPhoto && !busy }
