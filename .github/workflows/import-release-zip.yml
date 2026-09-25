@@ -1,0 +1,70 @@
+# One-time import: unpacks OpenStill.zip from the "OpenStill" release into
+# this branch so the source is under version control. The workflow removes
+# itself in the import commit.
+name: Import OpenStill.zip
+
+on:
+  push:
+    branches: [claude/gifted-lovelace-pbg8wv]
+    paths: [.github/workflows/import-release-zip.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: Download release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download OpenStill --repo "$GITHUB_REPOSITORY" \
+            --pattern OpenStill.zip --dir "$RUNNER_TEMP"
+          ls -la "$RUNNER_TEMP/OpenStill.zip"
+
+      - name: Unpack
+        run: |
+          mkdir -p "$RUNNER_TEMP/unz"
+          unzip -q "$RUNNER_TEMP/OpenStill.zip" -d "$RUNNER_TEMP/unz"
+          rm -rf "$RUNNER_TEMP/unz/__MACOSX"
+          # If the zip wraps everything in one top-level folder, use its contents.
+          src="$RUNNER_TEMP/unz"
+          entries=$(ls -A "$src")
+          if [ "$(echo "$entries" | wc -l)" = 1 ] && [ -d "$src/$entries" ]; then
+            src="$src/$entries"
+          fi
+          echo "SRC=$src" >> "$GITHUB_ENV"
+          echo "== top level =="; ls -la "$src"
+          echo "== size by top-level entry =="; du -sh "$src"/* "$src"/.[!.]* 2>/dev/null | sort -h
+          echo "== files over 20MB =="; find "$src" -type f -size +20M -exec ls -la {} \;
+
+      - name: Copy source into repo
+        run: |
+          # Drop the empty placeholder file so a folder of the same name can't clash.
+          if [ -f OpenStill ] && [ -z "$(tr -d '[:space:]' < OpenStill)" ]; then
+            git rm -q OpenStill
+          fi
+          rsync -a \
+            --exclude .git --exclude node_modules --exclude .DS_Store \
+            --exclude __pycache__ --exclude .venv --exclude venv \
+            --exclude .next --exclude .cache --exclude .gradle --exclude DerivedData \
+            --max-size=50m \
+            "$SRC"/ ./
+          git rm -q --cached .github/workflows/import-release-zip.yml
+          rm .github/workflows/import-release-zip.yml
+          echo "== skipped (over 50MB) =="; find "$SRC" -type f -size +50M -not -path '*/node_modules/*'
+          echo "== imported =="; git add -A && git status --short | head -300
+          git status --short | wc -l
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "Import OpenStill source from release zip" \
+            -m "Unpacked OpenStill.zip from the OpenStill release, excluding dependency folders, caches and files over 50MB."
+          git push origin HEAD:${{ github.ref_name }}
