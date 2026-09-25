@@ -83,3 +83,7 @@ bundled. Exact URLs, sizes, SHA-256 checksums and both license texts are in
 The model chooses constrained layout parameters. OpenStill supplies all vector
 shapes and renders the photographer's exact text locally using macOS fonts; no
 font files are redistributed. Model output cannot execute code or arbitrary SVG.
+
+## Sparkle
+
+In-app updates use [Sparkle](https://github.com/sparkle-project/Sparkle) 2 (MIT-style license, with bundled components under their own permissive licenses). The full text is in `Resources/Licenses/Sparkle/LICENSE`. The built app bundles `Sparkle.framework` without its XPC services.

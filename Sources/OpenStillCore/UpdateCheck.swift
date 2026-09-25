@@ -61,6 +61,13 @@ public enum UpdateCheck {
             .filter { isNewer($0.1, than: installed) }
             .max { isNewer($1.1, than: $0.1) }?.0
     }
+    /// Sparkle installs updates in-app only when the bundle names a feed and the EdDSA public key release zips are signed with
+    /// (32 bytes, base64). Without both, the app keeps the GitHub release check.
+    public static func sparkleConfigured(info: [String: Any]?) -> Bool {
+        guard let feed = info?["SUFeedURL"] as? String, let url = URL(string: feed), url.scheme == "https",
+              let key = info?["SUPublicEDKey"] as? String, let bytes = Data(base64Encoded: key) else { return false }
+        return bytes.count == 32
+    }
     public static func parse(_ data: Data) throws -> [AppRelease] {
         do { return try JSONDecoder().decode([AppRelease].self, from: data) } catch { throw UpdateError.unreadable }
     }

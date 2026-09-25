@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <channel>
+        <title>OpenStill</title>
+        <link>https://github.com/haon-v2/OpenStill/releases</link>
+        <description>OpenStill updates. scripts/release.sh adds an item for each release.</description>
+        <language>en</language>
+    </channel>
+</rss>

@@ -1,0 +1,62 @@
+# Temporary: builds the app with Sparkle and runs the test suite on macOS for this branch.
+name: macOS build check
+
+on:
+  push:
+    branches: [claude/project-thread-094q2u]
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        run: |
+          sw_vers
+          xcodebuild -version
+          swift --version
+      - name: Build tools
+        run: brew install meson ninja pkg-config cmake || true
+      - name: Native dependencies
+        run: |
+          bash scripts/build-native.sh > native.log 2>&1 || { tail -80 native.log; exit 1; }
+      - name: Build app bundle
+        run: |
+          set +e
+          bash scripts/build-app.sh > build.log 2>&1
+          status=$?
+          grep -E "error:|Build complete|Built |Unbundled|requires macOS" build.log
+          grep -E "warning:" build.log | grep -E "UpdateC|AppDelegate|Sparkle" || true
+          [ $status -eq 0 ] || tail -60 build.log
+          exit $status
+      - name: Inspect bundle
+        run: |
+          cat Package.resolved
+          APP=dist/OpenStill.app
+          otool -L $APP/Contents/MacOS/OpenStill | grep -i sparkle
+          otool -l $APP/Contents/MacOS/OpenStill | grep -A2 LC_RPATH | grep path
+          ls $APP/Contents/Frameworks/Sparkle.framework/Versions/B
+          codesign --verify --deep --strict --verbose=2 $APP
+          ls .build/artifacts/sparkle/Sparkle/bin || find .build/artifacts -name sign_update
+      - name: Launch without a key (GitHub fallback)
+        run: |
+          dist/OpenStill.app/Contents/MacOS/OpenStill > launch1.log 2>&1 & pid=$!
+          sleep 15
+          if kill -0 $pid; then echo "running"; kill $pid; else cat launch1.log; exit 1; fi
+      - name: Launch with a throwaway key (Sparkle)
+        run: |
+          cp -R dist/OpenStill.app /tmp/Keyed.app
+          /usr/libexec/PlistBuddy -c "Add :SUPublicEDKey string $(head -c 32 /dev/urandom | base64)" /tmp/Keyed.app/Contents/Info.plist
+          codesign --force --sign - /tmp/Keyed.app
+          /tmp/Keyed.app/Contents/MacOS/OpenStill > launch2.log 2>&1 & pid=$!
+          sleep 20
+          cat launch2.log
+          if kill -0 $pid; then echo "running"; kill $pid; else exit 1; fi
+      - name: Tests
+        run: |
+          set +e
+          bash scripts/test.sh > test.log 2>&1
+          status=$?
+          grep -E "✘|error:|failed|passed after|Test run with" test.log | tail -120
+          exit $status
