@@ -3,11 +3,13 @@ import AppKit
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var window: NSWindow!
     private let viewer = ViewerController()
+    private let updates = UpdateController()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         createWindow()
         buildMenu()
         NSApp.activate(ignoringOtherApps: true)
+        updates.checkAtLaunch()
         let files = CommandLine.arguments.dropFirst().filter { !$0.hasPrefix("-") }.map { URL(fileURLWithPath: $0) }
         if !files.isEmpty { application(NSApp, open: files) }
     }
@@ -55,6 +57,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let app = menu("OpenStill")
         add(app, "About OpenStill", #selector(showAbout), target: self)
+        add(app, "Check for Updates…", #selector(UpdateController.checkForUpdates(_:)), target: updates)
+        add(app, "Check for Updates Automatically", #selector(UpdateController.toggleAutomaticChecks(_:)), target: updates)
         app.addItem(.separator())
         add(app, "Hide OpenStill", #selector(NSApplication.hide(_:)), "h")
         add(app, "Hide Others", #selector(NSApplication.hideOtherApplications(_:)), "h", modifiers: [.command, .option])
