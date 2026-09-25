@@ -17,9 +17,10 @@ jobs:
       - name: Build
         run: |
           set +e
+          export PKG_CONFIG_PATH="$PWD/.build/native/lib/pkgconfig"
           swift build > build.log 2>&1
           status=$?
-          grep -E "error:|warning: (unused|var|initialization|will never)" build.log | sort -u | head -80
+          grep -E "error:|warning: (unused|var|initialization|will never|immutable)" build.log | sort -u | head -80
           tail -5 build.log
           exit $status
       - name: Tests

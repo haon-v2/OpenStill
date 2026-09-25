@@ -11,16 +11,21 @@ public struct RawSettings: Codable, Equatable, Hashable {
     public var highlightRecovery = 2
     public var temperature: Double?
     public var tint: Double?
+    /// Demosaic and LibRaw noise choices; nil keeps LibRaw's defaults.
+    public var options: RawOptions?
     public init() {}
     public var cacheKey:String {
         let s = sanitized
-        return "\(s.whiteBalance ?? [])|\(s.highlightRecovery)|\(s.temperature ?? 6500)|\(s.tint ?? 0)"
+        var key = "\(s.whiteBalance ?? [])|\(s.highlightRecovery)|\(s.temperature ?? 6500)|\(s.tint ?? 0)"
+        if let o = s.options { key += "|\(o.demosaic.rawValue)|\(o.noise)|\(o.colorNoise)|\(o.impulseNoise)" }
+        return key
     }
     public var sanitized: RawSettings {
         var s = self
         s.highlightRecovery = min(9, max(0, highlightRecovery))
         s.temperature = (temperature ?? 6500).isFinite ? min(10000,max(2500,temperature ?? 6500)) : 6500
         s.tint = (tint ?? 0).isFinite ? min(100,max(-100,tint ?? 0)) : 0
+        if let options { let clean = options.sanitized; s.options = clean.isDefault ? nil : clean }
         if let wb = whiteBalance, wb.count != 4 || wb.contains(where: { !$0.isFinite || $0 <= 0 || $0 > 32 }) { s.whiteBalance = nil }
         return s
     }
@@ -58,6 +63,7 @@ public struct RenderRecipe: Codable {
             self.raw.temperature = edits.temperature; self.raw.tint = edits.tint
             self.raw.highlightRecovery = edits.advanced?.rawRecovery ?? raw.highlightRecovery
             if let wb = edits.advanced?.rawWhiteBalance { self.raw.whiteBalance = wb }
+            self.raw.options = edits.advanced?.rawOptions
         }
     }
 }

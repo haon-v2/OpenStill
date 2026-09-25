@@ -28,7 +28,7 @@ int os_raw_probe(const char *path, OSRawImage *out, char *error, size_t capacity
     out->width = raw.imgdata.sizes.width; out->height = raw.imgdata.sizes.height;
     return 0;
 }
-int os_raw_decode(const char *path, const float *wb, int highlights, double temperature, double tint, int half_size, OSRawImage *out, char *error, size_t capacity) {
+int os_raw_decode(const char *path, const float *wb, int highlights, double temperature, double tint, int half_size, const OSRawOptions *options, OSRawImage *out, char *error, size_t capacity) {
     if (!path || !out) return fail(LIBRAW_UNSPECIFIED_ERROR, error, capacity);
     memset(out, 0, sizeof(*out));
     std::unique_ptr<LibRaw> owned(new (std::nothrow) LibRaw());
@@ -42,6 +42,12 @@ int os_raw_decode(const char *path, const float *wb, int highlights, double temp
     p.output_bps = 16; p.output_color = 8; p.gamm[0] = p.gamm[1] = 1;
     p.use_camera_wb = 1; p.use_camera_matrix = 1; p.no_auto_bright = 1;
     p.highlight = std::clamp(highlights, 0, 9);
+    if (options) {
+        if (options->demosaic >= 0) p.user_qual = options->demosaic;
+        p.threshold = std::clamp(options->noise_threshold, 0.0f, 1000.0f);
+        p.med_passes = std::clamp(options->median_passes, 0, 10);
+        p.fbdd_noiserd = std::clamp(options->fbdd, 0, 2);
+    }
     if (wb || temperature != 6500 || tint != 0) {
         p.use_camera_wb = 0;
         for (int i=0; i<4; ++i) p.user_mul[i] = wb ? wb[i] : raw.imgdata.color.cam_mul[i];

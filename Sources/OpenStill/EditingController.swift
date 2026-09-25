@@ -62,7 +62,7 @@ extension ViewerController {
             sun.centerX = converted.centerX; sun.centerY = converted.centerY; edits.sunSettings = sun
         }
         guard currentSource != nil, renderedPhoto != nil, !localAI.isRunning, !aiPreparing else { return }
-        if photoRecord?.active.renderer == .legacy && (!edits.curves.isIdentity || edits.neutralBalance != NeutralBalance() || edits.optics.hasEffect || !edits.retouch.isEmpty || edits.advanced?.masks.values.contains(where:{$0.components != nil || $0.range != nil}) == true) {
+        if photoRecord?.active.renderer == .legacy && (!edits.curves.isIdentity || edits.neutralBalance != NeutralBalance() || edits.optics.hasEffect || edits.profile.hasEffect || edits.calibration.hasEffect || !edits.retouch.isEmpty || edits.advanced?.masks.values.contains(where:{$0.components != nil || $0.range != nil}) == true) {
             photoRecord?.upgrade(); editDocument = photoRecord!.active.document
         }
         currentEdits = edits; comparing = false
@@ -229,6 +229,7 @@ extension ViewerController {
         case "loadPreset": loadPreset()
         default:
             if name.hasPrefix("preset:") { applyPreset(String(name.dropFirst(7))) }
+            if name.hasPrefix("profile:") || name.hasPrefix("rawOptions:") || name == "importDCP" { profileCommand(name) }
             if name.hasPrefix("upright:") || ["resetTransform","clearGuides","autoStraighten"].contains(name) { transformCommand(name) }
             if name == "ai:sky" { chooseImage(title: "Choose replacement sky") { [weak self] sky in self?.runAI("sky", sky: sky) } }
             else if name.hasPrefix("ai:") { runAI(String(name.dropFirst(3))) }

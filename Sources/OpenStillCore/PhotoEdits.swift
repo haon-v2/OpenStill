@@ -63,6 +63,9 @@ public struct PhotoEdits: Codable, Equatable {
             if let grading = e.advanced!.colorGrading { e.advanced!.colorGrading = grading.sanitized }
             if let grain = e.advanced!.grain { e.advanced!.grain = grain.sanitized }
             if let defringe = e.advanced!.defringe { e.advanced!.defringe = defringe.sanitized }
+            if let profile = e.advanced!.profile { let clean = profile.sanitized; e.advanced!.profile = clean == ProfileSettings() ? nil : clean }
+            if let calibration = e.advanced!.calibration { let clean = calibration.sanitized; e.advanced!.calibration = clean.hasEffect ? clean : nil }
+            if let options = e.advanced!.rawOptions { let clean = options.sanitized; e.advanced!.rawOptions = clean.isDefault ? nil : clean }
             if let transform = e.advanced!.transform { let clean = transform.sanitized; e.advanced!.transform = clean == TransformSettings() ? nil : clean }
             e.monochrome = clamp(e.monochrome,0,1); e.blacks = clamp(e.blacks,-1,1); e.whites = clamp(e.whites,-1,1)
             e.straighten = clamp(e.straighten,-20,20); e.lutAmount = clamp(e.lutAmount,0,1); e.sunLength = clamp(e.sunLength,0,1)
@@ -206,6 +209,10 @@ public enum PhotoEditor {
         }
         if stopBeforeTool == "Retouch" {return image}
         if let retouchImage {image=try masked(image,retouchImage,"Retouch")}
+        if stopBeforeTool == "Profile" { return image }
+        if modern && (e.profile.hasEffect || e.calibration.hasEffect) {
+            image = try CameraProfiles.apply(image,profile:e.profile,calibration:e.calibration).cropped(to:originalExtent)
+        }
         var before = image
         if stopBeforeTool == "Enhance" { return image }
         if e.autoEnhance {
