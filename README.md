@@ -195,7 +195,21 @@ The Python runtime and models are stored in `~/Library/Application Support/OpenS
 
 ## Updates
 
-**OpenStill → Check for Updates…** asks GitHub for the public release list of [haon-v2/OpenStill](https://github.com/haon-v2/OpenStill/releases) and compares it with the installed version (pre-releases included). When a newer release exists you can open its page, skip that version, or be reminded later. Download the new build from the release page and replace OpenStill in Applications; edits and the library live in Application Support and are kept. **Check for Updates Automatically** (on by default) repeats this at most once a day at launch and only speaks up when there is something new. The check sends no information about you or your photos.
+**OpenStill → Check for Updates…** uses [Sparkle](https://sparkle-project.org) to read the update feed, [`appcast.xml`](appcast.xml) on `main`. When a newer version is listed, OpenStill shows its notes and can download, verify, install and relaunch it for you. You can also skip that version or be reminded later. **Check for Updates Automatically** (on by default) checks once a day. Edits and the library live in Application Support and are kept. The check sends no information about your photos. Sparkle sends only the request for the feed.
+
+Until `SUPublicEDKey` is set in `Resources/Info.plist`, and in builds run with `swift run`, the app falls back to the older check. That check compares the installed version with the public [GitHub releases](https://github.com/haon-v2/OpenStill/releases) and opens the release page, and you replace OpenStill in Applications yourself.
+
+### Publishing an update
+
+One-time setup: build once so Sparkle's tools are downloaded, then run `.build/artifacts/sparkle/Sparkle/bin/generate_keys`. It stores the private key in your login keychain and prints the public key. Add that key to `Resources/Info.plist` as `SUPublicEDKey` (a `<string>`). Keep the private key safe: every future update must be signed with it, and apps already installed will reject updates signed with any other key.
+
+For each release:
+1. Raise `CFBundleShortVersionString` and `CFBundleVersion` in `Resources/Info.plist`. Sparkle compares `CFBundleVersion`, so it must go up every time.
+2. Run `bash scripts/release.sh`. It builds the app, writes `dist/OpenStill-<version>.zip`, signs it and adds an entry to `appcast.xml`.
+3. Create the GitHub release `v<version>` and attach the zip.
+4. Commit `appcast.xml` and push it to `main`. Installed apps see the update from then on.
+
+The build is for your Mac's architecture only. An Apple silicon build is marked as arm64-only in the feed, so Intel Macs aren't offered it.
 
 ## Coverage
 

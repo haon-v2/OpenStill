@@ -1,31 +1,56 @@
 import AppKit
 import OpenStillCore
+import Sparkle
 
-/// "Check for Updates…" and the once-a-day automatic check against OpenStill's GitHub releases.
+/// "Check for Updates…" and the automatic daily check. With a Sparkle feed and public key in Info.plist, Sparkle downloads,
+/// verifies and installs the update in-app; otherwise the app compares against OpenStill's GitHub releases and links to them.
 final class UpdateController: NSObject, NSMenuItemValidation {
     private static let automaticKey = "CheckForUpdatesAutomatically"
+    private static let migratedKey = "UpdateSettingsMovedToSparkle"
     private static let lastCheckKey = "LastUpdateCheck"
     private static let skippedKey = "SkippedUpdateVersion"
     private var checking = false
     private let defaults = UserDefaults.standard
+    /// Nil outside the app bundle (swift run) and in builds without a Sparkle key.
+    private let sparkle: SPUStandardUpdaterController?
+
+    override init() {
+        if Bundle.main.bundleURL.pathExtension == "app", UpdateCheck.sparkleConfigured(info: Bundle.main.infoDictionary) {
+            sparkle = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
+        } else {
+            sparkle = nil
+        }
+        super.init()
+        // Carry over "Check for Updates Automatically" from the GitHub check the first time Sparkle runs.
+        if let updater = sparkle?.updater, !defaults.bool(forKey: Self.migratedKey) {
+            if defaults.object(forKey: Self.automaticKey) as? Bool == false { updater.automaticallyChecksForUpdates = false }
+            defaults.set(true, forKey: Self.migratedKey)
+        }
+    }
 
     private var automatic: Bool {
-        get { defaults.object(forKey: Self.automaticKey) as? Bool ?? true }
-        set { defaults.set(newValue, forKey: Self.automaticKey) }
+        get { sparkle?.updater.automaticallyChecksForUpdates ?? defaults.object(forKey: Self.automaticKey) as? Bool ?? true }
+        set {
+            if let updater = sparkle?.updater { updater.automaticallyChecksForUpdates = newValue }
+            else { defaults.set(newValue, forKey: Self.automaticKey) }
+        }
     }
     /// Nil when running outside the app bundle (swift run), where there is no version to compare.
     private var installedVersion: String? { Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String }
 
+    /// Sparkle schedules its own checks; the GitHub check runs at most once a day at launch.
     func checkAtLaunch() {
-        guard automatic, installedVersion != nil else { return }
+        guard sparkle == nil, automatic, installedVersion != nil else { return }
         if let last = defaults.object(forKey: Self.lastCheckKey) as? Date, Date().timeIntervalSince(last) < 24*60*60 { return }
         check(userInitiated: false)
     }
-    @objc func checkForUpdates(_ sender: Any?) { check(userInitiated: true) }
+    @objc func checkForUpdates(_ sender: Any?) {
+        if let sparkle { sparkle.checkForUpdates(sender) } else { check(userInitiated: true) }
+    }
     @objc func toggleAutomaticChecks(_ sender: NSMenuItem) { automatic.toggle(); sender.state = automatic ? .on : .off }
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
         if item.action == #selector(toggleAutomaticChecks(_:)) { item.state = automatic ? .on : .off }
-        if item.action == #selector(checkForUpdates(_:)) { return !checking }
+        if item.action == #selector(checkForUpdates(_:)) { return sparkle?.updater.canCheckForUpdates ?? !checking }
         return true
     }
 
