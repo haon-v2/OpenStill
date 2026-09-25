@@ -128,7 +128,8 @@ import Testing
     @Test func uprightVerticalMakesConvergingLinesParallel() throws {
         let size = CGSize(width: 1500, height: 1000)
         let lines = [LineSegment(CGPoint(x: 0.2, y: 0.1), CGPoint(x: 0.26, y: 0.9), weight: 800), LineSegment(CGPoint(x: 0.8, y: 0.1), CGPoint(x: 0.74, y: 0.9), weight: 800),
-                     LineSegment(CGPoint(x: 0.45, y: 0.15), CGPoint(x: 0.47, y: 0.85), weight: 600)]
+                     // The middle edge points at the same vanishing point (x = 0.5, y = 4.1) as the outer two.
+                     LineSegment(CGPoint(x: 0.45, y: 0.15), CGPoint(x: 0.45 + 0.05*0.7/3.95, y: 0.85), weight: 600)]
         let solution = try #require(Upright.solve(.vertical, lines: lines, displaySize: size))
         #expect(solution.vertical < -0.1)
         var t = TransformSettings(); t.upright = solution; t.constrain = false
@@ -143,8 +144,9 @@ import Testing
         let level = try #require(Upright.solve(.level, lines: [horizon], displaySize: size))
         #expect(abs(level.rotate + 3) < 0.1 && level.vertical == 0 && level.horizontal == 0)
         #expect(abs(try #require(Upright.straightenAngle(lines: [horizon], displaySize: size)) + 3) < 0.1)
-        // Guided: one plumb line and the horizon.
-        let plumb = LineSegment(CGPoint(x: 0.3, y: 0.2), CGPoint(x: 0.34, y: 0.8))
+        // Guided: the horizon plus an edge 600 px tall that leans 1° more than the camera roll.
+        let lean = 4 * Double.pi/180
+        let plumb = LineSegment(CGPoint(x: 0.3, y: 0.2), CGPoint(x: 0.3 - sin(lean)*600/1500, y: 0.2 + cos(lean)*600/1000))
         let guided = try #require(Upright.solve(.guided, lines: [horizon, plumb], displaySize: size))
         var t = TransformSettings(); t.upright = guided; t.constrain = false
         let p = Perspective(t, sourceSize: size, orientation: DisplayOrientation(turn: 0, flip: false))

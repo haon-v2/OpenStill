@@ -29,6 +29,15 @@ jobs:
           bash scripts/test.sh > test.log 2>&1
           status=$?
           grep -E "✘|error:|recorded an issue|Test run with|Expectation failed" test.log | head -120
+          if [ $status -ne 0 ]; then
+            # Tests that started but never finished (a crash takes the whole process down).
+            grep -oE "◇ Test [A-Za-z0-9_]+" test.log | sed 's/◇ Test //' | sort -u > started.txt
+            grep -oE "(✔|✘) Test [A-Za-z0-9_]+" test.log | sed -E 's/(✔|✘) Test //' | sort -u > finished.txt
+            echo "Unfinished tests:"; comm -23 started.txt finished.txt
+            echo "Crash report lines:"; grep -iE "fatal|crash|signal|Thread 0|frame #" test.log | head -40
+            bash scripts/test.sh --no-parallel > serial.log 2>&1
+            echo "Serial run tail:"; tail -30 serial.log
+          fi
           exit $status
       - name: App bundle
         run: |
