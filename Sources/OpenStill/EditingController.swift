@@ -25,6 +25,7 @@ extension ViewerController {
         canvas.rangeChosen = { [weak self] point in self?.sampleMaskRange(at:point) }
         canvas.whiteBalanceChosen = { [weak self] point in self?.chooseWhiteBalance(at:point) }
         canvas.objectChosen = { [weak self] point in self?.selectMaskObject(at:point) }
+        canvas.cropReport = { [weak self] selection, photo in self?.info.showCrop(selection:selection,photo:photo) }
         canvas.sunPlaced = { [weak self] point, final in
             guard let self else { return }; var edits = self.currentEdits
             var settings = edits.editableSunSettings(sourceSize:self.editSourceSize())
@@ -178,7 +179,8 @@ extension ViewerController {
         case "crop":
             // Start from the current full crop; the new rectangle is composed with the existing crop on Apply.
             finishMaskEditing()
-            canvas.beginCrop(aspect:info.cropAspect(for:EditGeometry(size:editSourceSize(),edits:edits).extent.size))
+            let pixels = EditGeometry(size:editSourceSize(),edits:edits).extent.size
+            canvas.beginCrop(aspect:info.cropAspect(for:pixels),pixels:pixels)
             info.status("Drag the frame to move it, or a corner to resize. Apply crop saves; Escape cancels.")
         case "applyCrop":
             guard let rect = canvas.cropSelection, rect.width > 0.01, rect.height > 0.01 else { info.status("Draw a crop rectangle on the photo first."); return }
