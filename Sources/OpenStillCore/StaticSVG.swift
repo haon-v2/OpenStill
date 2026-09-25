@@ -15,7 +15,7 @@ private final class SVGReader:NSObject,XMLParserDelegate {
     struct State {var transform=CGAffineTransform.identity,fill:CGColor?=CGColor(gray:0,alpha:1),stroke:CGColor?,width:CGFloat=1,opacity:CGFloat=1,fillOpacity:CGFloat=1,strokeOpacity:CGFloat=1,evenOdd=false,cap:CGLineCap = .butt,join:CGLineJoin = .miter}
     var stack:[State]=[],elements:[VectorElement]=[],bounds:CGRect?,failure:Error?,ignored=0
     func fail(_ parser:XMLParser,_ reason:String){failure=LogoError.invalid(reason+" Export plain SVG with outlined text, or use a transparent PNG.");parser.abortParsing()}
-    func parser(_ parser:XMLParser,didStartElement name:String,namespaceURI:String?,qualifiedName:String?,attributes attributes:[String:String]) {
+    func parser(_ parser:XMLParser,didStartElement name:String,namespaceURI:String?,qualifiedName:String?,attributes:[String:String]) {
         if name=="title" || name=="desc" || name=="metadata" || ignored>0{ignored += 1;return}
         do {
             guard stack.count<64,elements.count<10000,["svg","g","path","rect","circle","ellipse","line","polyline","polygon"].contains(name) else{throw LogoError.invalid("Unsupported SVG element: \(name).")}
