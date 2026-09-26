@@ -89,7 +89,10 @@ final class PhotoCanvas: NSView {
         }
         return context.makeImage()
     }
-    var image: CGImage? { didSet { logicalPixels=nil;offset = .zero; needsDisplay = true } }
+    var image: CGImage? { didSet { logicalPixels=nil;offset = .zero; hdrImage = nil; needsDisplay = true } }
+    /// Extended-range render of the same frame, shown by `hdrBackdrop` on HDR displays.
+    var hdrImage: CGImage? { didSet { needsDisplay = true } }
+    let hdrBackdrop = HDRBackdrop()
     private(set) var isFit = true
     private var pixelScale: CGFloat = 1
     var native: Bool {
@@ -204,7 +207,8 @@ final class PhotoCanvas: NSView {
                               y: ((bounds.midY - size.height / 2 + offset.y) * backing).rounded() / backing,
                               width: size.width, height: size.height)
             context.interpolationQuality = native && logicalPixels == nil ? .none : .high
-            context.draw(image, in: rect)
+            if let hdrImage { context.clear(rect); hdrBackdrop.show(hdrImage, in: rect) }
+            else { context.draw(image, in: rect); hdrBackdrop.show(nil, in: rect) }
             if let beforeImage {
                 let divider = rect.minX + rect.width*splitPosition
                 context.saveGState(); context.clip(to: CGRect(x: rect.minX, y: rect.minY, width: divider-rect.minX, height: rect.height))

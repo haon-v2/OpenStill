@@ -33,7 +33,7 @@ public enum ExportWorkflow {
         var name=settings.filenameTemplate
         for (key,value) in [("name",job.source.deletingPathExtension().lastPathComponent),("index",String(format:"%03d",index+1)),("date",String(date)),("version",job.versionName)]{name=name.replacingOccurrences(of:"{\(key)}",with:safe(value))}
         guard !name.isEmpty,name != ".",name != "..",name.utf8.count<220,!name.contains("/"),!name.contains("\\"),!name.contains(":"),!name.contains("{"),!name.contains("}"),!name.unicodeScalars.contains(where:{$0.value<32}) else{throw ExportWorkflowError.filename}
-        return name+"."+(settings.format == .jpeg ? "jpg":settings.format.rawValue)
+        return name+"."+(settings.format == .jpeg ? "jpg":settings.format == .heif ? "heic":settings.format.rawValue)
     }
     private static func reserve(_ name:String,directory:URL,protected:Set<URL>)throws->URL {
         let original=URL(fileURLWithPath:name),stem=original.deletingPathExtension().lastPathComponent,ext=original.pathExtension
@@ -60,8 +60,10 @@ public enum ExportWorkflow {
                     let name=try filename(job,index:i,settings:batch.settings)
                     let output=try reserve(name,directory:batch.directory,protected:protected)
                     do {
-                        let image=try ModernRenderer.render(source:job.source,recipe:job.recipe)
-                        try ModernRenderer.export(image,to:output,source:job.source,settings:batch.settings,metadata:batch.settings.keepMetadata ? job.metadata:nil)
+                        // SDR exports use the SDR rendition of an HDR edit; gain maps need both.
+                        let image=try ModernRenderer.render(source:job.source,recipe:batch.settings.isHDR ? job.recipe:job.recipe.sdr)
+                        let sdr=batch.settings.hdr == .gainMap && job.recipe.edits.hdr.enabled ? try ModernRenderer.render(source:job.source,recipe:job.recipe.sdr):nil
+                        try ModernRenderer.export(image,to:output,source:job.source,settings:batch.settings,metadata:batch.settings.keepMetadata ? job.metadata:nil,sdrImage:sdr)
                         result.jobs[i].output=output;result.jobs[i].state = .complete
                     }catch{try? FileManager.default.removeItem(at:output);throw error}
                 }

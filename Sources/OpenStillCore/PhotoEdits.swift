@@ -67,6 +67,7 @@ public struct PhotoEdits: Codable, Equatable {
             if let calibration = e.advanced!.calibration { let clean = calibration.sanitized; e.advanced!.calibration = clean.hasEffect ? clean : nil }
             if let options = e.advanced!.rawOptions { let clean = options.sanitized; e.advanced!.rawOptions = clean.isDefault ? nil : clean }
             if let blur = e.advanced!.lensBlur { e.advanced!.lensBlur = blur.sanitized }
+            if let hdr = e.advanced!.hdr { e.advanced!.hdr = hdr.sanitized }
             if let transform = e.advanced!.transform { let clean = transform.sanitized; e.advanced!.transform = clean == TransformSettings() ? nil : clean }
             e.monochrome = clamp(e.monochrome,0,1); e.blacks = clamp(e.blacks,-1,1); e.whites = clamp(e.whites,-1,1)
             e.straighten = clamp(e.straighten,-20,20); e.lutAmount = clamp(e.lutAmount,0,1); e.sunLength = clamp(e.sunLength,0,1)
@@ -306,6 +307,8 @@ public enum PhotoEditor {
             image = before.applyingFilter("CIDissolveTransition",parameters:[kCIInputTargetImageKey:graded,kCIInputTimeKey:e.lutAmount])
         }
         image = try masked(before,image,"LUT"); before = image
+        if stopBeforeTool == "HDR" { return image }
+        if modern, e.hdr.enabled { image = try masked(before,try HDRTone.expand(image,headroom:e.hdr.headroom),"HDR"); before = image }
         if stopBeforeTool == "Grain" { return image }
         if e.grain.amount > 0 { image = try masked(before,try DevelopTools.grain(image,settings:e.grain),"Grain") }
         if e.opacity < 1 { image = unadjusted.applyingFilter("CIDissolveTransition",parameters:[kCIInputTargetImageKey:image,kCIInputTimeKey:e.opacity]) }

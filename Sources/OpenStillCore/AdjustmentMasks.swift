@@ -117,6 +117,8 @@ public struct AdvancedEdits: Codable, Equatable {
     public var rawOptions: RawOptions?
     public var lensBlur: LensBlurSettings?
     public var rawDenoise: RawDenoiseBase?
+    /// HDR editing (highlights above SDR white).
+    public var hdr: HDRSettings?
     public init() {}
 }
 

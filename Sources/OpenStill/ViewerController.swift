@@ -143,12 +143,12 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         for child in [leftRail, librarySidebar, center, info, rightRail, shelf] {
             child.translatesAutoresizingMaskIntoConstraints = false; content.addSubview(child)
         }
-        for child in [canvas, libraryHost] {
+        for child in [canvas.hdrBackdrop, canvas, libraryHost] {
             child.translatesAutoresizingMaskIntoConstraints = false; center.addSubview(child)
             NSLayoutConstraint.activate([child.leadingAnchor.constraint(equalTo:center.leadingAnchor),child.trailingAnchor.constraint(equalTo:center.trailingAnchor),child.topAnchor.constraint(equalTo:center.topAnchor),child.bottomAnchor.constraint(equalTo:center.bottomAnchor)])
         }
         canvas.appearance = NSAppearance(named: .darkAqua)
-        for child in [canvas, libraryHost] { child.wantsLayer = true; child.layer?.cornerRadius = 16; child.layer?.masksToBounds = true }
+        for child in [canvas.hdrBackdrop, canvas, libraryHost] { child.wantsLayer = true; child.layer?.cornerRadius = 16; child.layer?.masksToBounds = true }
         libraryHost.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
         libraryHost.isHidden = true; librarySidebar.isHidden = true
         zoom.selectedSegment = 0
@@ -527,13 +527,19 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
     private func updateWorkspaceLayout() {
         let inspector = infoVisible && !isLibrary
         info.isHidden = !inspector; librarySidebar.isHidden = !foldersVisible
-        canvas.isHidden = isLibrary; libraryHost.isHidden = !isLibrary; shelf.isHidden = isLibrary
+        canvas.isHidden = isLibrary; canvas.hdrBackdrop.isHidden = isLibrary; libraryHost.isHidden = !isLibrary; shelf.isHidden = isLibrary
         // Deactivate alternatives first, preventing transient constraint conflicts.
         NSLayoutConstraint.deactivate([canvasToInspector,canvasToEdge,centerToFolders,centerToRail,centerToShelf,centerToFooter])
         NSLayoutConstraint.activate([inspector ? canvasToInspector : canvasToEdge, foldersVisible ? centerToFolders : centerToRail, isLibrary ? centerToFooter : centerToShelf])
         workspaceMode.selectedSegment = isLibrary ? 0 : 1
         leftRail.select(isLibrary ? "library" : "photo")
         if isLibrary { rightRail.select(nil) }
+    }
+    /// A merged photo (HDR, panorama, focus stack) joins the open folder's photos.
+    func addMergedPhoto(_ url: URL) {
+        guard !urls.contains(url) else { return }
+        urls.append(url); if !shootCatalog.isEmpty { shootCatalog.append(url) }
+        collection.reloadData(); refreshLibrary(); updateControls()
     }
     private func refreshLibrary() {
         let catalog = shootCatalog.isEmpty ? urls : shootCatalog
@@ -548,6 +554,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
             guard let self else { return };self.showEditor()
         }
         browser.selectionChanged = { [weak self] in self?.updateControls() }
+        browser.merged = { [weak self] url in self?.addMergedPhoto(url) }
         browser.recordsChanged = { [weak self] in
             guard let self,let id=self.photoRecord?.id,let latest=try? EditStorage.records.read(id) else{return}
             let changed=self.photoRecord?.active.revision != latest.active.revision || self.photoRecord?.activeVersionID != latest.activeVersionID
