@@ -14,6 +14,10 @@ on:
         description: "Dry run: build and sign with a throwaway key, publish nothing"
         type: boolean
         default: false
+      notes:
+        description: "What's new, shown before installing. Separate points with ; (empty: titles of app PRs merged since the last release)"
+        required: false
+        default: ""
       run_tests:
         description: "Run the test suite first (off by default: merged code was already tested on its PR)"
         type: boolean
@@ -54,6 +58,25 @@ jobs:
           if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then echo "Tag v$VERSION already exists"; exit 1; fi
           echo "BUILD=$((BUILD + 1))" >> "$GITHUB_ENV"
           echo "Releasing $VERSION (build $((BUILD + 1))), replacing $CURRENT (build $BUILD)"
+
+      - name: Write the release notes
+        env:
+          NOTES_INPUT: ${{ inputs.notes }}
+        run: |
+          set -euo pipefail
+          NOTES_FILE="$RUNNER_TEMP/notes.txt"; : > "$NOTES_FILE"
+          if [ -n "${NOTES_INPUT// /}" ]; then
+            printf '%s' "$NOTES_INPUT" | tr ';' '\n' > "$NOTES_FILE"
+          else
+            # Titles of pull requests merged since the last release that changed the app itself
+            # (not just workflows or docs), without the "Milestone N:" prefix.
+            PREVIOUS="$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)"
+            for MERGE in $(git rev-list --merges --reverse "${PREVIOUS:+$PREVIOUS..}HEAD"); do
+              git diff --name-only "$MERGE^1" "$MERGE" | grep -qE '^(Sources|Resources|Package\.swift)' || continue
+              git log -1 --format=%b "$MERGE" | head -1 | perl -pe 's/^Milestone \d+: *//; s/^(.)/\u$1/' >> "$NOTES_FILE"
+            done
+          fi
+          echo "What's new in $VERSION:"; cat "$NOTES_FILE"
 
       - name: Check the signing key
         if: env.DRY_RUN != 'true'
@@ -112,7 +135,7 @@ jobs:
           echo "Signature: $SIGNATURE"
           ARCHS="$(lipo -archs dist/OpenStill.app/Contents/MacOS/OpenStill)"
           MINIMUM="$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' Resources/Info.plist)"
-          VERSION="$VERSION" BUILD="$BUILD" MINIMUM="$MINIMUM" SIGNATURE="$SIGNATURE" ARCHS="$ARCHS" python3 scripts/appcast-add.py
+          NOTES="$(cat "$RUNNER_TEMP/notes.txt")" VERSION="$VERSION" BUILD="$BUILD" MINIMUM="$MINIMUM" SIGNATURE="$SIGNATURE" ARCHS="$ARCHS" python3 scripts/appcast-add.py
           echo "ZIP=$ZIP" >> "$GITHUB_ENV"
           git diff --stat
 

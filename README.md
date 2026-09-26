@@ -220,7 +220,7 @@ The Python runtime and models are stored in `~/Library/Application Support/OpenS
 
 ## Updates
 
-**OpenStill → Check for Updates…** uses [Sparkle](https://sparkle-project.org) to read the update feed, [`appcast.xml`](appcast.xml) on `main`. When a newer version is listed, OpenStill shows its notes and can download, verify, install and relaunch it for you. You can also skip that version or be reminded later. **Check for Updates Automatically** (on by default) checks once a day. **OpenStill → Settings… (⌘,)** shows the installed version, how updates are delivered, when OpenStill last checked, and has the same automatic-check switch, **Check Now** and a link to all releases. Edits and the library live in Application Support and are kept. The check sends no information about your photos. Sparkle sends only the request for the feed.
+**OpenStill → Check for Updates…** uses [Sparkle](https://sparkle-project.org) to read the update feed, [`appcast.xml`](appcast.xml) on `main`. When a newer version is listed, OpenStill shows **What's new** in that version before you install it, and can download, verify, install and relaunch it for you. You can also skip that version or be reminded later. **Check for Updates Automatically** (on by default) checks once a day. **OpenStill → Settings… (⌘,)** shows the installed version, how updates are delivered, when OpenStill last checked, and has the same automatic-check switch, **Check Now** and a link to all releases. Edits and the library live in Application Support and are kept. The check sends no information about your photos. Sparkle sends only the request for the feed.
 
 Until `SUPublicEDKey` is set in `Resources/Info.plist`, and in builds run with `swift run`, the app falls back to the older check. That check compares the installed version with the public [GitHub releases](https://github.com/haon-v2/OpenStill/releases) and opens the release page, and you replace OpenStill in Applications yourself.
 
@@ -230,7 +230,9 @@ Until `SUPublicEDKey` is set in `Resources/Info.plist`, and in builds run with `
 - raises the version and build number in `Resources/Info.plist` (tick **Run tests** to run the test suite first; it's off by default because merged code was already tested on its pull request);
 - builds the app, zips it and signs it for Sparkle;
 - creates the `v<version>` release with the zip;
-- adds the release to `appcast.xml` on `main`.
+- adds the release to `appcast.xml` on `main`, with its **What's new** list.
+
+**What's new** is shown in the update window before anyone installs. Type it in the **notes** box, separating points with `;` (for example `Faster library;Fixed crop presets`). Leave it empty to list the titles of the pull requests merged since the last release that changed the app (pull requests that only touch workflows or docs are left out).
 
 Installed copies see the update on their next check. Tick **Dry run** to build and sign with a throwaway key without publishing anything.
 
@@ -239,7 +241,7 @@ The workflow signs with the repository secret `SPARKLE_PRIVATE_KEY`. One-time se
 2. On GitHub, open **Settings → Secrets and variables → Actions → New repository secret**, name it `SPARKLE_PRIVATE_KEY`, and paste the file's contents.
 3. Delete the file: `rm ~/Desktop/sparkle-private-key`. Keep your own backup somewhere safe, such as a password manager.
 
-**By hand:** raise `CFBundleShortVersionString` and `CFBundleVersion` in `Resources/Info.plist` (Sparkle compares `CFBundleVersion`, so it must always go up). Run `bash scripts/release.sh`, which builds, zips, signs with the key in your keychain and adds the entry to `appcast.xml`. Then create the GitHub release `v<version>`, attach the zip, and push `appcast.xml` and `Info.plist` to `main`.
+**By hand:** raise `CFBundleShortVersionString` and `CFBundleVersion` in `Resources/Info.plist` (Sparkle compares `CFBundleVersion`, so it must always go up). Run `bash scripts/release.sh` (optionally with `NOTES`, one point per line), which builds, zips, signs with the key in your keychain and adds the entry to `appcast.xml`. Then create the GitHub release `v<version>`, attach the zip, and push `appcast.xml` and `Info.plist` to `main`.
 
 **Signing key:** created once with `generate_keys` (in `.build/artifacts/sparkle/Sparkle/bin/` after a build). It stores the private key in your login keychain and prints the public key, which goes in `Resources/Info.plist` as `SUPublicEDKey`. Every update must be signed with that same private key, because installed apps reject anything else.
 
