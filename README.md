@@ -87,6 +87,21 @@ Imported photos open in the library.
 
 In each group ★ marks the photo to keep: the highest rated, then a pick, then the largest file. **Flag extras as rejects** flags the others so you can review them with the Rejects filter. Duplicates are never deleted. Double-click a photo, or use **Show in Finder**, to see it in Finder.
 
+## Print, slideshows, web galleries and publishing
+
+Select photos in the library (or none, for every photo shown), then choose **Library → Actions**:
+- **Print…** lays photos out as a **single photo** per page, a **contact sheet** (with file names) or a **custom grid**. It supports US Letter, A4, A3 and common photo papers, portrait or landscape, with margins, captions (file name or title), output sharpening (none, low, standard, high) and resolution (180–360 dpi). **Printer profile…** converts to an RGB printer/paper ICC profile (choose "No color adjustment" in the print driver); other profiles print as sRGB. **Print…** opens the system print dialog; **Save as PDF…** and **Save as JPEG…** write the pages instead. Sharpening is applied for print only; your edits are unchanged.
+- **Slideshow…** plays full screen with a crossfade, a fade through black or a cut, an optional slow zoom (Ken Burns), a loop and music. Space pauses, ← → step, Esc ends. **Export Video…** writes an H.264 movie (720p, 1080p or 4K) with the music trimmed or looped to fit.
+- **Web gallery…** writes a folder with `index.html`, full-size images and thumbnails: a responsive grid with a keyboard-friendly lightbox, titles and captions, an optional watermark, and no outside scripts or fonts. Upload the folder to any web host; OpenStill doesn't upload it.
+- **Publish…** keeps publish collections, each tied to one service:
+  - **Folder** (a local folder, or one that iCloud Drive, Dropbox or a NAS keeps in sync);
+  - **Flickr**;
+  - **SmugMug** (enter the album key).
+
+  Add photos to a collection. **Publish** sends new and edited photos (edited ones are replaced) and removes photos you take out of the collection. For Flickr and SmugMug, enter the API key and secret from your own developer account (OpenStill doesn't include one), approve OpenStill in the browser, and paste the code shown. The sign-in is stored in your keychain. Deleting a collection leaves published photos where they are.
+
+Limits: the Flickr and SmugMug connections follow their published OAuth 1.0a upload APIs but haven't been tested against live accounts in CI; tell us if one misbehaves. Printing to CMYK profiles relies on the printer driver.
+
 ## HDR, panoramas and focus stacks
 
 Select photos in the library, then choose **Library → Actions**:
