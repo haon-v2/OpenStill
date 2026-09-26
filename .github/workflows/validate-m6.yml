@@ -27,6 +27,7 @@ jobs:
           export PKG_CONFIG_PATH="$PWD/.build/native/lib/pkgconfig"
           swift build > build.log 2>&1; status=$?
           grep -E "error:" build.log | head -60
+          [ $status -eq 0 ] || grep -v "warning:\|^ *|\|^ *\^" build.log | tail -60
           grep -E "warning:" build.log | grep -E "AIMask|LensBlur|AIMaskController|EditingController|MaskComponent|MaskEditing|LocalAI|EditorPanel|ModernRenderer|AdjustmentMasks|SelectiveControls|VersionPanel" | grep -v "init(source:)" | sort -u | head -40
           exit $status
       - name: Tests
