@@ -227,7 +227,7 @@ Until `SUPublicEDKey` is set in `Resources/Info.plist`, and in builds run with `
 ### Publishing an update
 
 **Automatic (recommended):** on GitHub, open **Actions → Release → Run workflow**, keep the branch on `main`, and enter the new version (for example `0.0.2`). The visible version can be any number not released before; the hidden build number (`CFBundleVersion`) goes up by one every release, and that is what Sparkle uses to decide what is newer. The workflow:
-- runs the tests and raises the version and build number in `Resources/Info.plist`;
+- raises the version and build number in `Resources/Info.plist` (tick **Run tests** to run the test suite first; it's off by default because merged code was already tested on its pull request);
 - builds the app, zips it and signs it for Sparkle;
 - creates the `v<version>` release with the zip;
 - adds the release to `appcast.xml` on `main`.
