@@ -69,7 +69,7 @@ final class LibrarySidebar: GlassChrome {
         stack.arrangedSubviews.forEach { stack.removeArrangedSubview($0); $0.removeFromSuperview() }
         heading("Local", size: 19)
         label("Your photos, on this Mac.")
-        let add = button("Open folder…", symbol: "folder.badge.plus", action: #selector(openFolder)); Appearance.primary(add)
+        let openButton = button("Open folder…", symbol: "folder.badge.plus", action: #selector(openFolder)); Appearance.primary(openButton)
         let current = collections.first { $0.id == collection }
         heading(current == nil ? "Current Folder" : "Current Collection")
         label(current?.name ?? folder?.lastPathComponent ?? "No folder open", emphasized: true)
