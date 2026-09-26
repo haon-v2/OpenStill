@@ -175,13 +175,13 @@ public enum PhotoImport {
                 let target = freeURL(folder.isEmpty ? destination : destination.appendingPathComponent(folder, isDirectory: true), stem: stem, ext: ext, taken: taken)
                 taken.insert(target.path.lowercased())
                 try verifiedCopy(candidate.url, to: target)
-                if let sidecar = candidate.sidecar { try? verifiedCopy(sidecar, to: XMPSidecar.url(for: target)) }
+                if let sidecar = candidate.sidecar { _ = try? verifiedCopy(sidecar, to: XMPSidecar.url(for: target)) }
                 if let backup = settings.backup {
                     let relative = String(target.path.dropFirst(destination.path.count + 1))
                     let copy = backup.standardizedFileURL.appendingPathComponent(relative)
                     do {
                         try verifiedCopy(candidate.url, to: copy)
-                        if let sidecar = candidate.sidecar { try? verifiedCopy(sidecar, to: XMPSidecar.url(for: copy)) }
+                        if let sidecar = candidate.sidecar { _ = try? verifiedCopy(sidecar, to: XMPSidecar.url(for: copy)) }
                     } catch { report.backupFailed.append("\(candidate.url.lastPathComponent): \(error.localizedDescription)") }
                 }
                 // Add to the library, with metadata and a develop preset when asked.
