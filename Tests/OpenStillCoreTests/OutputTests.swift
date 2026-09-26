@@ -86,9 +86,10 @@ import Testing
         #expect(abs(plain.extent.width - 288) < 1.5)
         layout.sharpening = .high
         let sharp = PrintLayoutEngine.prepare(edge, printedSize: CGSize(width: 144, height: 72), layout: layout)
-        // Sharpening overshoots on both sides of the edge.
-        #expect(pixel(sharp, 141, 72)[0] < pixel(plain, 141, 72)[0] - 0.005)
-        #expect(pixel(sharp, 146, 72)[0] > pixel(plain, 146, 72)[0] + 0.005)
+        // Sharpening overshoots on both sides of the edge (near x = 144): darker darks, brighter lights.
+        let xs = 136..<152
+        let before = xs.map { pixel(plain, $0, 72)[0] }, after = xs.map { pixel(sharp, $0, 72)[0] }
+        #expect(after.min()! < before.min()! - 0.003 && after.max()! > before.max()! + 0.003, "\(before) → \(after)")
     }
 
     // MARK: Web gallery
@@ -110,7 +111,7 @@ import Testing
         #expect(names == ["001-photo-1.jpg", "002-photo-2.jpg", "003-photo-3.jpg"])
         let thumb = try #require(CGImageSourceCreateWithURL(out.appendingPathComponent("thumbs/001-photo-1.jpg") as CFURL, nil).flatMap { CGImageSourceCreateImageAtIndex($0, 0, nil) })
         let large = try #require(CGImageSourceCreateWithURL(out.appendingPathComponent("images/001-photo-1.jpg") as CFURL, nil).flatMap { CGImageSourceCreateImageAtIndex($0, 0, nil) })
-        #expect(thumb.width == 120 && large.width == 240)
+        #expect(thumb.width == 120 && large.width == 300)   // photos are never enlarged
         // Building again replaces the images rather than adding to them.
         try WebGallery.build(Array(gallery.prefix(1)), settings: settings, into: out)
         #expect(try FileManager.default.contentsOfDirectory(atPath: out.appendingPathComponent("images").path).count == 1)

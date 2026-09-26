@@ -128,17 +128,22 @@ public enum SlideshowRenderer {
         let frames = Int((duration * Double(s.fps)).rounded()), space = CGColorSpace(name: CGColorSpace.sRGB)!
         var nextAudio = 0
         // The writer interleaves tracks, so audio is fed alongside the frames rather than after them.
-        func feedAudio(until seconds: Double) async throws {
+        // Never wait on audio while video is still to come: the writer may be holding audio back until it gets more video.
+        func feedAudio(until seconds: Double, wait: Bool = false) async throws {
             guard let audioInput, let audio else { return }
             while nextAudio < audio.count, CMTimeGetSeconds(CMSampleBufferGetPresentationTimeStamp(audio[nextAudio])) <= seconds {
-                while !audioInput.isReadyForMoreMediaData { try await Task.sleep(nanoseconds: 2_000_000) }
-                audioInput.append(audio[nextAudio]); nextAudio += 1
+                if audioInput.isReadyForMoreMediaData { audioInput.append(audio[nextAudio]); nextAudio += 1 }
+                else if wait { try await Task.sleep(nanoseconds: 2_000_000) }
+                else { return }
             }
         }
         for n in 0..<frames {
             if cancelled() { writer.cancelWriting(); throw CocoaError(.userCancelled) }
             try await feedAudio(until: Double(n) / Double(s.fps) + 0.5)
-            while !video.isReadyForMoreMediaData { try await Task.sleep(nanoseconds: 2_000_000) }
+            while !video.isReadyForMoreMediaData {
+                try await feedAudio(until: Double(n) / Double(s.fps) + 1)
+                try await Task.sleep(nanoseconds: 2_000_000)
+            }
             guard let pool = adaptor.pixelBufferPool else { throw SlideshowError.writer(writer.error?.localizedDescription ?? "no pixel buffers") }
             var buffer: CVPixelBuffer?
             CVPixelBufferPoolCreatePixelBuffer(nil, pool, &buffer)
@@ -149,7 +154,7 @@ public enum SlideshowRenderer {
             if n % 15 == 0 { progress?(Double(n) / Double(max(1, frames))) }
         }
         video.markAsFinished()
-        try await feedAudio(until: duration)
+        try await feedAudio(until: duration, wait: true)
         audioInput?.markAsFinished()
         await writer.finishWriting()
         guard writer.status == .completed else { throw SlideshowError.writer(writer.error?.localizedDescription ?? "unfinished") }
