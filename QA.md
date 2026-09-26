@@ -142,3 +142,21 @@ Automated fixtures are generated and contain no user photographs. The real S9 fi
   - the mapping of about 30 Camera Raw settings, relative and absolute white balance, and unsupported-setting reports;
   - import of a Lightroom catalog built by the test (keyword tree, picks, labels, virtual copies, smart collections and sets, missing photos, relink), which leaves the catalog file unmodified, and running the same import twice.
 - Not yet verified by hand on a Mac: a real Lightroom Classic catalog and Camera Raw sidecars from recent Lightroom versions. How close imported develop settings look to Lightroom's rendering has not been checked.
+
+## Import and duplicates — September 26, 2026
+
+- Added:
+  - card and folder import, with detection of photos already imported (size + SHA-256);
+  - folder and name templates, and verified copies that never overwrite;
+  - an optional verified backup copy and copying of sidecars;
+  - metadata, keyword and develop presets applied on import, and ejecting the card;
+  - exact and similar duplicate finding (Vision feature prints), with the extras flagged as rejects.
+- Automated tests: the new PhotoImportTests suite covers:
+  - template expansion and rejection of invalid names;
+  - a full import from a nested card layout (duplicate file names, a sidecar, a hidden file, a backup, metadata and a develop preset);
+  - that the source is unchanged, no partial files are left behind, and re-importing skips everything;
+  - that copies never overwrite, and that cancelling keeps finished copies;
+  - exact duplicates from files and from the catalog, and choosing the best copy;
+  - similar-photo grouping.
+- Not yet verified by hand on a Mac: a real camera card (mounting, ejecting, large RAW files), and similar-photo grouping on real bursts.
+

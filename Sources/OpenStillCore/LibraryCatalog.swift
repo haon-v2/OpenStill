@@ -373,6 +373,20 @@ public final class LibraryCatalog {
         _ = try? run("SELECT id FROM photos WHERE fingerprint = ?", [.text(fingerprint)]) { if let id = UUID(uuidString: Self.text($0, 0)) { ids.append(id) } }
         return ids
     }
+    /// Content hashes of indexed photos with exactly this file size, to spot files that were imported before.
+    public func fingerprints(size: Int64) -> Set<String> {
+        var out = Set<String>()
+        _ = try? run("SELECT fingerprint FROM photos WHERE size = ? AND fingerprint <> ''", [.int(size)]) { out.insert(Self.text($0, 0)) }
+        return out
+    }
+    /// Photos whose contents are byte-for-byte identical to another indexed photo, grouped by content hash.
+    public func exactDuplicates() -> [[CatalogPhoto]] {
+        var hashes: [String] = []
+        _ = try? run("SELECT fingerprint FROM photos WHERE fingerprint <> '' GROUP BY fingerprint HAVING count(*) > 1") { hashes.append(Self.text($0, 0)) }
+        guard !hashes.isEmpty else { return [] }
+        let ids = Set(hashes.flatMap { recordIDs(fingerprint: $0) })
+        return Dictionary(grouping: photos(ids: ids), by: \.fingerprint).values.map { $0.sorted { $0.path < $1.path } }.filter { $0.count > 1 }.sorted { $0[0].path < $1[0].path }
+    }
     public var photoCount: Int {
         var n = 0; _ = try? run("SELECT count(*) FROM photos") { n = Int(sqlite3_column_int64($0, 0)) }; return n
     }

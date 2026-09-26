@@ -556,6 +556,12 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         }
     }
     @objc func toggleFullscreen() { view.window?.toggleFullScreen(nil) }
+    private var photoImport: ImportWindow?
+    @objc func importPhotos() {
+        let window = photoImport ?? ImportWindow(); photoImport = window
+        window.imported = { [weak self] urls in guard let self, !urls.isEmpty else { return }; self.open(urls); self.showLibrary() }
+        window.showWindow(nil); window.window?.makeKeyAndOrderFront(nil)
+    }
     private var lightroomImport: LightroomImportWindow?
     @objc func importLightroomCatalog() {
         let window = lightroomImport ?? LightroomImportWindow(); lightroomImport = window

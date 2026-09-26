@@ -70,6 +70,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         add(app, "Quit OpenStill", #selector(NSApplication.terminate(_:)), "q")
         let file = menu("File")
         add(file, "Open Photo or Folder…", #selector(ViewerController.openPanel), "o", target: viewer)
+        add(file, "Import Photos…", #selector(ViewerController.importPhotos), "i", target: viewer, modifiers: [.command, .shift])
         add(file, "Export Edited Photo…", #selector(ViewerController.exportPhoto), "e", target: viewer, modifiers: [.command, .shift])
         add(file, "Export Portable Edits…", #selector(ViewerController.exportEditPackage), target: viewer)
         add(file, "Import Portable Edits…", #selector(ViewerController.importEditPackage), target: viewer)

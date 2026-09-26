@@ -63,6 +63,7 @@ final class ShootWindow:NSWindowController,NSCollectionViewDataSource,NSCollecti
     var collection:PhotoCollection?
     var collectionsChanged:(()->Void)?
     private var metadataWindow:MetadataWindow?
+    private var duplicatesWindow:DuplicatesWindow?
     private let queue=OperationQueue(),cache=NSCache<NSString,NSImage>()
     private let search = NSSearchField()
     private var preferredURL: URL?
@@ -93,7 +94,7 @@ final class ShootWindow:NSWindowController,NSCollectionViewDataSource,NSCollecti
         if embedded {
             let more = NSPopUpButton(frame:.zero,pullsDown:true)
             more.addItem(withTitle:"Actions")
-            for (title, action) in [("Edit selected",#selector(openSelected)),("Compare two",#selector(compareSelected)),("Edit metadata…",#selector(editMetadata)),("Write metadata to XMP",#selector(writeXMP)),("Read metadata from XMP",#selector(readXMP)),("Import Camera Raw edits from XMP",#selector(importCameraRaw)),("Add to collection…",#selector(addToCollection)),("Remove from this collection",#selector(removeFromCollection)),("Copy adjustments",#selector(copyAdjustments)),("Paste adjustments…",#selector(pasteAdjustments)),("Undo batch",#selector(undoBatch)),("Export selected…",#selector(exportSelection)),("Refresh",#selector(refreshAction))] {
+            for (title, action) in [("Edit selected",#selector(openSelected)),("Compare two",#selector(compareSelected)),("Edit metadata…",#selector(editMetadata)),("Write metadata to XMP",#selector(writeXMP)),("Read metadata from XMP",#selector(readXMP)),("Import Camera Raw edits from XMP",#selector(importCameraRaw)),("Add to collection…",#selector(addToCollection)),("Find duplicates…",#selector(findDuplicates)),("Remove from this collection",#selector(removeFromCollection)),("Copy adjustments",#selector(copyAdjustments)),("Paste adjustments…",#selector(pasteAdjustments)),("Undo batch",#selector(undoBatch)),("Export selected…",#selector(exportSelection)),("Refresh",#selector(refreshAction))] {
                 let item=NSMenuItem(title:title,action:action,keyEquivalent:"");item.target=self;more.menu?.addItem(item)
             }
             top=NSStackView(views:[minimum,flag,labelFilter,sort,NSView(),more])
@@ -223,6 +224,13 @@ final class ShootWindow:NSWindowController,NSCollectionViewDataSource,NSCollecti
         if !notes.isEmpty{text += "\n\nNot carried over:\n"+notes.sorted{$0.key<$1.key}.prefix(20).map{"• \($0.key)"+(items.count>1 ? " (\($0.value))":"")}.joined(separator:"\n")}
         alert.informativeText=text
         if let window=browserView.window ?? window{alert.beginSheetModal(for:window)}else{alert.runModal()}
+    }
+    /// Exact copies and near-duplicates among the selected photos, or all shown photos when none (or one) is selected.
+    @objc private func findDuplicates(){
+        let chosen=selectedItems.count>1 ? selectedItems:shown;guard chosen.count>1 else{message.stringValue="Open a folder with at least two photos to look for duplicates.";return}
+        let window=DuplicatesWindow(urls:chosen.map(\.url));duplicatesWindow=window
+        window.changed={[weak self] in self?.refresh();self?.recordsChanged?()}
+        window.showWindow(nil);window.window?.makeKeyAndOrderFront(nil)
     }
     @objc private func addToCollection(){
         let items=selectedItems;guard !items.isEmpty,let catalog=EditStorage.records.catalog else{message.stringValue="Select photos to add to a collection.";return}
