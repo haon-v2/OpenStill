@@ -4,7 +4,7 @@ import CryptoKit
 public enum SourceMode: String, Codable, CaseIterable { case original, cameraLook, raw }
 public enum RendererVersion: String, Codable { case legacy, linear2020 }
 public enum ExportProfile: String, Codable, CaseIterable { case sRGB, displayP3, adobeRGB, proPhotoRGB }
-public enum ExportFormat: String, Codable, CaseIterable { case jpeg, png, tiff }
+public enum ExportFormat: String, Codable, CaseIterable { case jpeg, png, tiff, heif }
 
 public struct RawSettings: Codable, Equatable, Hashable {
     public var whiteBalance: [Float]?
@@ -42,10 +42,14 @@ public struct ExportSettings: Codable, Equatable {
     public var keepGPS = false
     public var filenameTemplate = "{name}-edited"
     public var watermark:WatermarkSettings?
+    /// HDR output; nil = SDR. PQ and HLG need HEIF; a gain map works with JPEG or HEIF.
+    public var hdr: HDRExport?
     public init() {}
+    public var isHDR: Bool { hdr != nil }
     public var sanitized: ExportSettings {
         var s = self
-        s.bitDepth = format == .jpeg ? 8 : (bitDepth == 16 ? 16 : 8)
+        s.bitDepth = format == .jpeg || format == .heif ? 8 : (bitDepth == 16 ? 16 : 8)
+        if let mode = hdr, !(format == .heif || (format == .jpeg && mode == .gainMap)) { s.hdr = nil }
         s.quality = quality.isFinite ? min(1, max(0, quality)) : 0.9
         s.sharpening = sharpening.isFinite ? min(2, max(0, sharpening)) : 0
         if let edge = longestEdge { s.longestEdge = max(1, min(65535, edge)) }

@@ -50,7 +50,7 @@ public enum ShareExporter {
             try FileManager.default.copyItem(at: source, to: destination)
         } else if var recipe {
             recipe.edits = edits
-            try ModernRenderer.export(ModernRenderer.render(source:source, recipe:recipe), to:destination, source:source, settings:ExportSettings())
+            try ModernRenderer.export(ModernRenderer.render(source:source, recipe:recipe.sdr), to:destination, source:source, settings:ExportSettings())
         } else if !edits.isOriginal {
             try PhotoEditor.write(PhotoEditor.render(source: source, edits: edits), to: destination, source: source, type: .jpeg)
         } else if ["jpg", "jpeg", "jpe"].contains(source.pathExtension.lowercased()) {

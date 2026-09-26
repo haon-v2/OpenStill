@@ -52,6 +52,9 @@ final class ShootWindow:NSWindowController,NSCollectionViewDataSource,NSCollecti
     var edit:(([URL],URL)->Void)?
     var recordsChanged:(()->Void)?
     var selectionChanged:(()->Void)?
+    /// A merged photo was written; the viewer adds it to the library.
+    var merged:((URL)->Void)?
+    private var merging=false
     let browserView = NSView()
     private let urls:[URL]
     private var all:[ShootItem]=[],shown:[ShootItem]=[]
@@ -94,7 +97,7 @@ final class ShootWindow:NSWindowController,NSCollectionViewDataSource,NSCollecti
         if embedded {
             let more = NSPopUpButton(frame:.zero,pullsDown:true)
             more.addItem(withTitle:"Actions")
-            for (title, action) in [("Edit selected",#selector(openSelected)),("Compare two",#selector(compareSelected)),("Edit metadata…",#selector(editMetadata)),("Write metadata to XMP",#selector(writeXMP)),("Read metadata from XMP",#selector(readXMP)),("Import Camera Raw edits from XMP",#selector(importCameraRaw)),("Add to collection…",#selector(addToCollection)),("Find duplicates…",#selector(findDuplicates)),("Remove from this collection",#selector(removeFromCollection)),("Copy adjustments",#selector(copyAdjustments)),("Paste adjustments…",#selector(pasteAdjustments)),("Undo batch",#selector(undoBatch)),("Export selected…",#selector(exportSelection)),("Refresh",#selector(refreshAction))] {
+            for (title, action) in [("Edit selected",#selector(openSelected)),("Compare two",#selector(compareSelected)),("Edit metadata…",#selector(editMetadata)),("Write metadata to XMP",#selector(writeXMP)),("Read metadata from XMP",#selector(readXMP)),("Import Camera Raw edits from XMP",#selector(importCameraRaw)),("Add to collection…",#selector(addToCollection)),("Find duplicates…",#selector(findDuplicates)),("Merge to HDR…",#selector(mergeHDR)),("Merge to panorama…",#selector(mergePanorama)),("Focus stack…",#selector(mergeFocusStack)),("Remove from this collection",#selector(removeFromCollection)),("Copy adjustments",#selector(copyAdjustments)),("Paste adjustments…",#selector(pasteAdjustments)),("Undo batch",#selector(undoBatch)),("Export selected…",#selector(exportSelection)),("Refresh",#selector(refreshAction))] {
                 let item=NSMenuItem(title:title,action:action,keyEquivalent:"");item.target=self;more.menu?.addItem(item)
             }
             top=NSStackView(views:[minimum,flag,labelFilter,sort,NSView(),more])
@@ -225,6 +228,53 @@ final class ShootWindow:NSWindowController,NSCollectionViewDataSource,NSCollecti
         alert.informativeText=text
         if let window=browserView.window ?? window{alert.beginSheetModal(for:window)}else{alert.runModal()}
     }
+    @objc private func mergeHDR(){merge(.hdr)}
+    @objc private func mergePanorama(){merge(.panorama)}
+    @objc private func mergeFocusStack(){merge(.focusStack)}
+    /// HDR, panorama or focus stack from the selected photos, written as a float TIFF next to the first one.
+    private func merge(_ kind:MergeKind){
+        let items=selectedItems
+        guard !merging else{message.stringValue="A merge is already running.";return}
+        guard items.count>=2 else{message.stringValue="Select two or more photos to merge.";return}
+        // Panoramas follow capture order; the others don't depend on it.
+        let urls=items.sorted{$0.captured == $1.captured ? $0.url.lastPathComponent<$1.url.lastPathComponent:$0.captured<$1.captured}.map(\.url)
+        let alert=NSAlert();alert.messageText="\(kind == .focusStack ? "Focus stack":"Merge to "+kind.title.lowercased().replacingOccurrences(of:"hdr",with:"HDR")) · \(urls.count) photos"
+        let align=NSButton(checkboxWithTitle:"Align hand-held photos",target:nil,action:nil);align.state = .on
+        let deghost=NSPopUpButton();deghost.addItems(withTitles:["No deghosting","Low deghosting","Medium deghosting","High deghosting"]);deghost.selectItem(at:2)
+        let projection=NSPopUpButton();projection.addItems(withTitles:PanoramaProjection.allCases.map(\.title))
+        let crop=NSButton(checkboxWithTitle:"Crop to fill the frame",target:nil,action:nil);crop.state = .on
+        let stack=NSStackView();stack.orientation = .vertical;stack.alignment = .leading;stack.spacing=8
+        switch kind {
+        case .hdr:
+            alert.informativeText="Bracketed exposures of the same scene become one photo with the detail of all of them. Deghosting takes moving things from a single exposure."
+            stack.addArrangedSubview(align);stack.addArrangedSubview(deghost)
+        case .panorama:
+            alert.informativeText="Frames are joined in the order they were taken. Each frame should overlap its neighbour by about a third."
+            stack.addArrangedSubview(projection);stack.addArrangedSubview(crop)
+        case .focusStack:
+            alert.informativeText="Photos focused at different distances become one photo that is sharp throughout."
+            stack.addArrangedSubview(align)
+        }
+        stack.frame=NSRect(x:0,y:0,width:300,height:CGFloat(stack.arrangedSubviews.count)*30);alert.accessoryView=stack
+        alert.addButton(withTitle:"Merge");alert.addButton(withTitle:"Cancel")
+        let run:(NSApplication.ModalResponse)->Void={[weak self] response in
+            guard let self,response == .alertFirstButtonReturn else{return}
+            var options=MergeOptions();options.align=align.state == .on;options.deghost=[0,0.3,0.6,1][max(0,deghost.indexOfSelectedItem)]
+            options.projection=PanoramaProjection.allCases[max(0,projection.indexOfSelectedItem)];options.autoCrop=crop.state == .on
+            self.merging=true;self.message.stringValue="Merging \(urls.count) photos…"
+            DispatchQueue.global(qos:.userInitiated).async{[weak self] in
+                let result=Result{try autoreleasepool{try Merges.merge(urls,kind:kind,options:options,progress:{text in DispatchQueue.main.async{self?.message.stringValue=text}})}}
+                DispatchQueue.main.async{[weak self] in
+                    guard let self else{return};self.merging=false
+                    switch result{
+                    case .success(let url):self.message.stringValue="Saved \(url.lastPathComponent) next to the originals.";self.merged?(url)
+                    case .failure(let error):self.message.stringValue=error.localizedDescription
+                    }
+                }
+            }
+        }
+        if let window=browserView.window ?? window{alert.beginSheetModal(for:window,completionHandler:run)}else{run(alert.runModal())}
+    }
     /// Exact copies and near-duplicates among the selected photos, or all shown photos when none (or one) is selected.
     @objc private func findDuplicates(){
         let chosen=selectedItems.count>1 ? selectedItems:shown;guard chosen.count>1 else{message.stringValue="Open a folder with at least two photos to look for duplicates.";return}
@@ -326,6 +376,7 @@ extension ViewerController {
     @objc func showShoot(){
         guard !urls.isEmpty else{info.status("Open a photo folder first.");return}
         let window=ShootWindow(urls:shootCatalog.isEmpty ? urls:shootCatalog);shootWindow=window
+        window.merged = {[weak self] url in self?.addMergedPhoto(url)}
         window.edit = {[weak self] filtered,url in
             guard let self else{return}
             self.showShootSelection(filtered:filtered,url:url)

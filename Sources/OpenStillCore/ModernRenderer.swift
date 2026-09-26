@@ -90,6 +90,11 @@ public enum ModernRenderer {
         guard let result = context.createCGImage(image, from: image.extent, format: .RGBAh, colorSpace: profile.colorSpace) else { throw EditError.render }
         return result
     }
+    /// Extended-range Display P3 (half float) for an EDR layer: values above 1 are brighter than SDR white.
+    public static func displayHDR(_ image: CIImage) throws -> CGImage {
+        guard let result = context.createCGImage(image, from: image.extent, format: .RGBAh, colorSpace: CGColorSpace(name: CGColorSpace.extendedLinearDisplayP3)!) else { throw EditError.render }
+        return result
+    }
     /// Simulate the bounded output profile only at the display boundary.
     public static func outputPreview(_ image:CIImage,settings:ExportSettings)throws->CIImage {
         let settings=settings.sanitized
@@ -110,7 +115,8 @@ public enum ModernRenderer {
         if settings.format == .jpeg { image = image.composited(over: CIImage(color: .white).cropped(to: image.extent)) }
         return image.cropped(to:CGRect(x:0,y:0,width:image.extent.width.rounded(.down),height:image.extent.height.rounded(.down)))
     }
-    public static func export(_ image: CIImage, to destination: URL, source: URL?, settings: ExportSettings, metadata: IPTCMetadata? = nil) throws {
+    /// Writes an export. `sdrImage` is the SDR rendition used as the base of a gain-map export (else the HDR image is tone mapped).
+    public static func export(_ image: CIImage, to destination: URL, source: URL?, settings: ExportSettings, metadata: IPTCMetadata? = nil, sdrImage: CIImage? = nil) throws {
         let settings = settings.sanitized
         if let source {
             guard source.standardizedFileURL.resolvingSymlinksInPath() != destination.standardizedFileURL.resolvingSymlinksInPath() else { throw EditError.originalDestination }
@@ -120,9 +126,9 @@ public enum ModernRenderer {
                let ai = a[.systemFileNumber] as? NSNumber, let bi = b[.systemFileNumber] as? NSNumber,
                ai == bi, (a[.systemNumber] as? NSNumber) == (b[.systemNumber] as? NSNumber) { throw EditError.originalDestination }
         }
+        let original = image
         let image = try prepareOutput(image,settings:settings)
-        let format: CIFormat = settings.bitDepth == 16 ? .RGBA16 : .RGBA8
-        guard let cg = context.createCGImage(image, from: image.extent.integral, format: format, colorSpace: settings.profile.colorSpace) else { throw EditError.render }
+        let bounds = image.extent.integral
         var props: [String: Any] = [:]
         if settings.keepMetadata, let source, let io = CGImageSourceCreateWithURL(source as CFURL, nil), let original = CGImageSourceCopyPropertiesAtIndex(io, 0, nil) as? [String: Any] {
             for key in [kCGImagePropertyExifDictionary, kCGImagePropertyTIFFDictionary, kCGImagePropertyIPTCDictionary, kCGImagePropertyExifAuxDictionary] { props[key as String] = original[key as String] }
@@ -132,7 +138,7 @@ public enum ModernRenderer {
         var tiff = props[kCGImagePropertyTIFFDictionary as String] as? [String: Any] ?? [:]
         tiff["Orientation"] = 1; tiff["Software"] = "OpenStill"; props[kCGImagePropertyTIFFDictionary as String] = tiff
         var exif = props[kCGImagePropertyExifDictionary as String] as? [String: Any] ?? [:]
-        exif["PixelXDimension"] = cg.width; exif["PixelYDimension"] = cg.height; exif.removeValue(forKey: "MakerNote")
+        exif["PixelXDimension"] = Int(bounds.width); exif["PixelYDimension"] = Int(bounds.height); exif.removeValue(forKey: "MakerNote")
         props[kCGImagePropertyExifDictionary as String] = exif
         // The photographer's title, caption, keywords, creator and copyright replace what the camera wrote.
         if let metadata, !metadata.isEmpty {
@@ -142,6 +148,12 @@ public enum ModernRenderer {
                 props[key] = merged
             }
         }
+        if settings.format == .heif || settings.hdr != nil {
+            try (representation(image.cropped(to: bounds), original: original, sdrImage: sdrImage, settings: settings, properties: props)).write(to: destination, options: .atomic)
+            return
+        }
+        let format: CIFormat = settings.bitDepth == 16 ? .RGBA16 : .RGBA8
+        guard let cg = context.createCGImage(image, from: bounds, format: format, colorSpace: settings.profile.colorSpace) else { throw EditError.render }
         props[kCGImageDestinationLossyCompressionQuality as String] = settings.quality
         let type: UTType = settings.format == .jpeg ? .jpeg : (settings.format == .png ? .png : .tiff)
         let data = NSMutableData()
@@ -149,6 +161,29 @@ public enum ModernRenderer {
         CGImageDestinationAddImage(writer, cg, props as CFDictionary)
         guard CGImageDestinationFinalize(writer) else { throw EditError.render }
         try (data as Data).write(to: destination, options: .atomic)
+    }
+    /// HEIF (SDR or 10-bit PQ/HLG) and gain-map files, written by Core Image so HDR values survive.
+    static func representation(_ image: CIImage, original: CIImage, sdrImage: CIImage?, settings: ExportSettings, properties: [String: Any]) throws -> Data {
+        let tagged = image.settingProperties(properties)
+        let quality = CIImageRepresentationOption(rawValue: kCGImageDestinationLossyCompressionQuality as String)
+        switch settings.hdr {
+        case .pq?, .hlg?:
+            let space = CGColorSpace(name: settings.hdr == .pq ? CGColorSpace.itur_2100_PQ : CGColorSpace.itur_2100_HLG)!
+            do { return try context.heif10Representation(of: tagged, colorSpace: space, options: [quality: settings.quality]) }
+            catch { throw HDRExportError.heifUnavailable }
+        case .gainMap?:
+            guard #available(macOS 15, *) else { throw HDRExportError.needsMacOS15 }
+            let base = try prepareOutput(sdrImage ?? HDRTone.toneMapSDR(original), settings: settings).cropped(to: image.extent).settingProperties(properties)
+            let options: [CIImageRepresentationOption: Any] = [quality: settings.quality, .hdrImage: tagged]
+            let data = settings.format == .heif
+                ? context.heifRepresentation(of: base, format: .RGBA8, colorSpace: settings.profile.colorSpace, options: options)
+                : context.jpegRepresentation(of: base, colorSpace: settings.profile.colorSpace, options: options)
+            guard let data else { throw settings.format == .heif ? HDRExportError.heifUnavailable : EditError.render }
+            return data
+        case nil:
+            guard let data = context.heifRepresentation(of: tagged, format: .RGBA8, colorSpace: settings.profile.colorSpace, options: [quality: settings.quality]) else { throw HDRExportError.heifUnavailable }
+            return data
+        }
     }
 }
 

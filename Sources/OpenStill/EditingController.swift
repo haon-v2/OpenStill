@@ -62,7 +62,7 @@ extension ViewerController {
             sun.centerX = converted.centerX; sun.centerY = converted.centerY; edits.sunSettings = sun
         }
         guard currentSource != nil, renderedPhoto != nil, !localAI.isRunning, !aiPreparing else { return }
-        if photoRecord?.active.renderer == .legacy && (!edits.curves.isIdentity || edits.neutralBalance != NeutralBalance() || edits.optics.hasEffect || edits.profile.hasEffect || edits.calibration.hasEffect || !edits.retouch.isEmpty || edits.advanced?.masks.values.contains(where:{$0.components != nil || $0.range != nil}) == true) {
+        if photoRecord?.active.renderer == .legacy && (!edits.curves.isIdentity || edits.neutralBalance != NeutralBalance() || edits.optics.hasEffect || edits.hdr.enabled || edits.profile.hasEffect || edits.calibration.hasEffect || !edits.retouch.isEmpty || edits.advanced?.masks.values.contains(where:{$0.components != nil || $0.range != nil}) == true) {
             photoRecord?.upgrade(); editDocument = photoRecord!.active.document
         }
         currentEdits = edits; comparing = false
@@ -110,17 +110,24 @@ extension ViewerController {
         recipe?.edits = edits
         if recipe?.sourceMode == .raw { recipe = RenderRecipe(renderer:recipe!.renderer, sourceMode:.raw, raw:recipe!.raw, edits:edits) }
         info.status("Rendering edit…")
+        // HDR edits show in extended range on HDR displays; elsewhere the SDR rendition is shown.
+        let hdrPreview = edits.hdr.enabled && HDRBackdrop.available
+        var sdrEdits = edits; sdrEdits.hdrEnabled = false
         let work = DispatchWorkItem { [weak self] in
-            let result = Result { try autoreleasepool { () -> CGImage in
-                if let recipe, recipe.renderer == .linear2020 { return try ModernRenderer.display(ModernRenderer.render(source:source, recipe:recipe,maximumDimension:previewLimit)) }
-                if let linearSource { return try ModernRenderer.display(ModernRenderer.process(linearSource, edits:edits,maximumDimension:previewLimit)) }
-                return try PhotoEditor.render(original, edits: edits,previewMaxDimension:previewLimit)
+            let result = Result { try autoreleasepool { () -> (CGImage, CGImage?) in
+                func show(_ image: CIImage) throws -> (CGImage, CGImage?) {
+                    guard hdrPreview else { return (try ModernRenderer.display(image), nil) }
+                    return (try ModernRenderer.display(HDRTone.toneMapSDR(image)), try ModernRenderer.displayHDR(image))
+                }
+                if let recipe, recipe.renderer == .linear2020 { return try show(ModernRenderer.render(source:source, recipe:hdrPreview ? recipe:recipe.sdr,maximumDimension:previewLimit)) }
+                if let linearSource { return try show(ModernRenderer.process(linearSource, edits:hdrPreview ? edits:sdrEdits,maximumDimension:previewLimit)) }
+                return (try PhotoEditor.render(original, edits: edits,previewMaxDimension:previewLimit), nil)
             } }
             DispatchQueue.main.async {
                 guard let self, self.editToken == token, self.currentSource == source else { return }
                 switch result {
-                case .success(let image):
-                    self.canvas.replaceRenderedImage(image,pixelSize:interactive ? logicalSize:nil); self.updateHistogram(image)
+                case .success(let (image, hdr)):
+                    self.canvas.replaceRenderedImage(image,pixelSize:interactive ? logicalSize:nil); self.canvas.hdrImage = hdr; self.updateHistogram(image)
                     self.refreshCompareExtras(image, interactive:interactive)
                     self.refreshMaskOverlay()
                     self.info.status(interactive ? "Interactive preview · Full resolution on release":"Edited · \(image.width) × \(image.height) px · Original preserved")

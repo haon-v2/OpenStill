@@ -194,6 +194,13 @@ final class EditorPanel: GlassChrome {
             self.slider("Temperature", path: \.temperature, range: 2500...10000, in: content)
             self.slider("Tint", path: \.tint, range: -100...100, in: content)
         }
+        tool("HDR", symbol: "sun.max.circle", in: tools) { content in
+            self.toggle("Edit in HDR", path: \.hdrEnabled, in: content)
+            self.slider("Highlight headroom (stops)", path: \.hdrHeadroom, range: 0.5...4, in: content)
+            self.help(HDRBackdrop.available
+                ? "Bright highlights go above SDR white on this display. Export as HDR (PQ, HLG or a gain map) to keep them; SDR exports use the SDR rendition."
+                : "This display shows SDR, so you see the SDR rendition. HDR exports (PQ, HLG or a gain map) still keep the brighter highlights for HDR screens.", to: content)
+        }
         tool("Dehaze", symbol: "aqi.medium", in: tools) { content in
             self.slider("Dehaze", path: \.dehaze, range: -1...1, in: content)
             self.help("Positive removes atmospheric haze; negative adds it.", to: content)
