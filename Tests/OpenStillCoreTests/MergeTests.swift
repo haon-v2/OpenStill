@@ -1,6 +1,7 @@
 import Foundation
 import CoreImage
 import Testing
+import simd
 @testable import OpenStillCore
 
 @Suite struct MergeTests {
