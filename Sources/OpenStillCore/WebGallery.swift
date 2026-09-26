@@ -2,7 +2,7 @@ import Foundation
 import CoreImage
 
 /// A self-contained HTML gallery (grid plus lightbox) that can be uploaded to any web host. Nothing is uploaded by OpenStill.
-public struct WebGallerySettings: Codable, Equatable, Sendable {
+public struct WebGallerySettings: Codable, Equatable {
     public var title = "Gallery"
     public var subtitle = ""
     public var dark = true

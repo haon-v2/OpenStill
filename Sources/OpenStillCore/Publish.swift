@@ -17,7 +17,7 @@ public struct OAuthCredentials: Codable, Equatable, Sendable {
 public enum OAuth1 {
     /// RFC 3986 percent-encoding (only unreserved characters stay as they are).
     public static func encode(_ s: String) -> String {
-        var allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~")
+        let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~")
         return s.addingPercentEncoding(withAllowedCharacters: allowed) ?? s
     }
     /// HMAC-SHA1 signature over the method, base URL and every query, form and oauth_ parameter.
@@ -26,8 +26,10 @@ public enum OAuth1 {
         let query = (components.queryItems ?? []).map { ($0.name, $0.value ?? "") }
         components.query = nil; components.fragment = nil
         let base = components.url!.absoluteString
-        let normalized = (parameters + query).map { (encode($0.0), encode($0.1)) }.sorted { $0.0 == $1.0 ? $0.1 < $1.1 : $0.0 < $1.0 }
-            .map { "\($0.0)=\($0.1)" }.joined(separator: "&")
+        var pairs: [(String, String)] = []
+        for (name, value) in parameters + query { pairs.append((encode(name), encode(value))) }
+        pairs.sort { (a: (String, String), b: (String, String)) -> Bool in a.0 == b.0 ? a.1 < b.1 : a.0 < b.0 }
+        let normalized: String = pairs.map { (pair: (String, String)) -> String in pair.0 + "=" + pair.1 }.joined(separator: "&")
         let text = method.uppercased() + "&" + encode(base) + "&" + encode(normalized)
         let key = SymmetricKey(data: Data((encode(consumerSecret) + "&" + encode(tokenSecret)).utf8))
         let mac = HMAC<Insecure.SHA1>.authenticationCode(for: Data(text.utf8), using: key)
@@ -243,7 +245,7 @@ public struct PublishedPhoto: Codable, Equatable, Sendable {
 }
 public enum PublishState: String, Sendable { case new, modified, published }
 
-public struct PublishCollection: Codable, Identifiable, Equatable, Sendable {
+public struct PublishCollection: Codable, Identifiable, Equatable {
     public var id = UUID()
     public var name: String
     public var kind: PublishServiceKind

@@ -37,7 +37,7 @@ public enum PrintCaption: String, Codable, CaseIterable, Sendable {
     public var title: String { self == .none ? "No captions" : self == .filename ? "File name" : "Title (or file name)" }
 }
 
-public struct PrintLayout: Codable, Equatable, Sendable {
+public struct PrintLayout: Codable, Equatable {
     public var style = PrintStyle.single
     public var paper = PaperSize.letter
     public var landscape = false
