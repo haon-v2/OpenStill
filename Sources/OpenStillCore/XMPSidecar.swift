@@ -166,16 +166,41 @@ public enum XMPSidecar {
             CGImageMetadataSetTagWithPath(metadata, nil, path, tag)
         }
         func text(_ s: String) -> String? { s.isEmpty ? nil : s }
-        func alternative(_ s: String) -> Any? { s.isEmpty ? nil : ["x-default": s] as NSDictionary }
+        /// Language alternatives (dc:title, dc:description, dc:rights) as Lightroom writes them: rdf:Alt with an x-default item.
+        /// ImageIO's accepted value shapes differ between macOS versions, so each is tried and checked by reading it back.
+        func setAlternative(_ name: String, _ text: String) {
+            let path = "dc:\(name)" as CFString
+            CGImageMetadataRemoveTagWithPath(metadata, nil, path)
+            guard !text.isEmpty else { return }
+            func works() -> Bool {
+                guard let tag = CGImageMetadataCopyTagWithPath(metadata, nil, path) else { return false }
+                return string(tag) == text
+            }
+            // 1. An alternate-text tag holding one x-default item.
+            if let item = CGImageMetadataTagCreate(Namespace.dc as CFString, "dc" as CFString, name as CFString, .string, text as CFString) {
+                if let tag = CGImageMetadataTagCreate(Namespace.dc as CFString, "dc" as CFString, name as CFString, .alternateText, [item] as CFArray),
+                   CGImageMetadataSetTagWithPath(metadata, nil, path, tag), works() { return }
+            }
+            CGImageMetadataRemoveTagWithPath(metadata, nil, path)
+            // 2. An alternate-text tag holding the plain string.
+            if let tag = CGImageMetadataTagCreate(Namespace.dc as CFString, "dc" as CFString, name as CFString, .alternateText, [text] as CFArray),
+               CGImageMetadataSetTagWithPath(metadata, nil, path, tag), works() { return }
+            CGImageMetadataRemoveTagWithPath(metadata, nil, path)
+            // 3. The x-default path form.
+            if CGImageMetadataSetValueWithPath(metadata, nil, "dc:\(name)[x-default]" as CFString, text as CFString), works() { return }
+            CGImageMetadataRemoveTagWithPath(metadata, nil, path)
+            // 4. A plain string, which every XMP reader accepts even though it isn't the standard form.
+            _ = CGImageMetadataSetValueWithPath(metadata, nil, path, text as CFString)
+        }
         let m = xmp.iptc.sanitized
         let rating = xmp.flag == .reject && (xmp.rating ?? 0) == 0 ? nil : xmp.rating
         set(Namespace.xmp, "xmp", "Rating", .string, rating.map { String($0) })
         set(Namespace.xmp, "xmp", "Label", .string, xmp.label.flatMap { $0 == ColorLabel.none ? nil : $0.title })
         set(Namespace.openStill, "openstill", "Flag", .string, xmp.flag.flatMap { $0 == PhotoFlag.none ? nil : $0.rawValue })
-        set(Namespace.dc, "dc", "title", .alternateText, alternative(m.title))
-        set(Namespace.dc, "dc", "description", .alternateText, alternative(m.caption))
+        setAlternative("title", m.title)
+        setAlternative("description", m.caption)
         set(Namespace.dc, "dc", "creator", .arrayOrdered, m.creator.isEmpty ? nil : [m.creator] as NSArray)
-        set(Namespace.dc, "dc", "rights", .alternateText, alternative(m.copyright))
+        setAlternative("rights", m.copyright)
         // dc:subject lists every level by name; lr:hierarchicalSubject keeps the paths, as Lightroom writes them.
         var names: [String] = []
         for path in m.keywordPaths { if let leaf = path.components(separatedBy: " > ").last, !names.contains(leaf) { names.append(leaf) } }
