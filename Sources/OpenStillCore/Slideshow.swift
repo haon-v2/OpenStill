@@ -24,7 +24,7 @@ public struct SlideshowSettings: Codable, Equatable, Sendable {
         func clamp(_ v: Double, _ lo: Double, _ hi: Double, _ fallback: Double) -> Double { v.isFinite ? min(hi, max(lo, v)) : fallback }
         s.secondsPerSlide = clamp(secondsPerSlide, 1, 60, 4)
         s.transitionSeconds = transition == .cut ? 0 : clamp(transitionSeconds, 0.2, s.secondsPerSlide / 2, 1)
-        s.width = min(3840, max(320, width / 2 * 2)); s.height = min(2160, max(240, height / 2 * 2)); s.fps = min(60, max(12, fps))
+        s.width = min(3840, max(320, width / 2 * 2)); s.height = min(2160, max(180, height / 2 * 2)); s.fps = min(60, max(12, fps))
         return s
     }
     public func duration(slides: Int) -> Double { Double(max(0, slides)) * sanitized.secondsPerSlide }
