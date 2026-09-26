@@ -184,3 +184,23 @@ Automated fixtures are generated and contain no user photographs. The real S9 fi
     - the float file round trip.
 - Not yet verified by hand on a Mac: Vision masks on real portraits and groups, Lens blur on iPhone Portrait photos, and the downloaded depth, sky and Real-ESRGAN models producing good results in the app.
 
+
+## HDR and merges — September 26, 2026
+
+- Added:
+  - HDR editing (Edit in HDR, highlight headroom) with an extended-range preview on HDR displays;
+  - HEIF export, and HDR export as 10-bit PQ or HLG HEIF, or SDR with an HDR gain map (macOS 15);
+  - Merge to HDR with alignment and deghosting, Merge to panorama (cylindrical or perspective, auto crop) and Focus stack, written as float TIFFs next to the originals.
+- Automated tests:
+  - HDRTests:
+    - highlight expansion and the SDR tone map;
+    - sanitizing, the pipeline with HDR on and off, the SDR rendition of a recipe, legacy decoding;
+    - export settings (which formats allow which HDR modes), old presets, `.heic` names;
+    - PQ HEIF bit depth, SDR HEIF, and a gain map in a JPEG (macOS 15).
+  - MergeTests:
+    - HDR merge recovering clipped highlights and shadows, and deghosting;
+    - Vision alignment of a shifted frame;
+    - a three-frame panorama, and refusing frames that don't overlap;
+    - focus stacking keeping the sharp half of each frame;
+    - largest covered rectangle, cylindrical projection, output names, float TIFF values above white.
+- Not yet verified by hand on a Mac: the HDR preview on an XDR display, HDR exports viewed on HDR screens, and merges of real hand-held brackets, panoramas and focus stacks.
