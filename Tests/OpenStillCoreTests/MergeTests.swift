@@ -11,12 +11,19 @@ import simd
         Merges.context.render(image, toBitmap: &p, rowBytes: 16, bounds: CGRect(x: x, y: y, width: 1, height: 1), format: .RGBAf, colorSpace: ModernRenderer.workingSpace)
         return p
     }
-    /// Blurred noise stretched to 0…1: texture Vision can register, with no repeating pattern.
-    func texture(_ size: CGSize, radius: Double = 1.5, offset: CGPoint = .zero) -> CIImage {
-        let noise = CIFilter(name: "CIRandomGenerator")!.outputImage!.transformed(by: CGAffineTransform(translationX: -offset.x, y: -offset.y)).applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: radius])
-        let v = CIVector(x: 2.5, y: 2.5, z: 2.5, w: 0)
-        return noise.applyingFilter("CIColorMatrix", parameters: ["inputRVector": v, "inputGVector": v, "inputBVector": v, "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 0), "inputBiasVector": CIVector(x: -3.25, y: -3.25, z: -3.25, w: 1)])
-            .applyingFilter("CIColorClamp").cropped(to: CGRect(origin: .zero, size: size))
+    /// Smooth random blobs from 0 to 1 (seeded, so every run sees the same scene): texture alignment can lock onto.
+    /// A different `offset` gives an unrelated scene.
+    func texture(_ size: CGSize, radius: Double = 1.5, offset: CGPoint = .zero, cell: Int = 6) -> CIImage {
+        let w = Int(size.width) / cell + 3, h = Int(size.height) / cell + 3
+        var seed = UInt64(0x9E37_79B9_7F4A_7C15) &+ UInt64(offset.x * 7919 + offset.y * 104_729)
+        var data = [Float](repeating: 1, count: w * h * 4)
+        for i in 0..<(w * h) {
+            seed = seed &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+            let v = Float(seed >> 40) / Float(1 << 24)
+            data[i * 4] = v; data[i * 4 + 1] = v; data[i * 4 + 2] = v
+        }
+        let grid = CIImage(bitmapData: data.withUnsafeBytes { Data($0) }, bytesPerRow: w * 16, size: CGSize(width: w, height: h), format: .RGBAf, colorSpace: ModernRenderer.workingSpace)
+        return grid.samplingLinear().transformed(by: CGAffineTransform(scaleX: CGFloat(cell), y: CGFloat(cell))).cropped(to: CGRect(origin: .zero, size: size))
     }
     /// Whole image, top row first: p[(row * w + x) * 4].
     func pixels(_ image: CIImage) -> [Float] {
@@ -97,7 +104,7 @@ import simd
 
     @Test(.timeLimit(.minutes(1))) func focusStackKeepsTheSharpestParts() throws {
         let size = CGSize(width: 300, height: 200), bounds = CGRect(origin: .zero, size: size)
-        let sharp = scaled(texture(size), 0.6, 0.1)
+        let sharp = scaled(texture(size, cell: 2), 0.6, 0.1)
         let soft = sharp.clampedToExtent().applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: 4]).cropped(to: bounds)
         let left = CGRect(x: 0, y: 0, width: 150, height: 200), right = CGRect(x: 150, y: 0, width: 150, height: 200)
         let nearFocus = sharp.cropped(to: left).composited(over: soft), farFocus = sharp.cropped(to: right).composited(over: soft)
