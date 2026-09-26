@@ -104,7 +104,10 @@ import UniformTypeIdentifiers
         // Skin tones of light and dark complexions pass; blue, green and gray don't.
         func skin(_ r: Double, _ g: Double, _ b: Double) -> Float {
             let patch = CIImage(color: CIColor(red: r, green: g, blue: b)).cropped(to: CGRect(x: 0, y: 0, width: 4, height: 4))
-            return pixels(AIMasks.skinKernel!.apply(extent: patch.extent, arguments: [patch])!)[0]
+            // As in the app: the kernel sees ordinary (gamma-encoded) photo values, not linear light.
+            var p = [Float](repeating: 0, count: 4 * 16)
+            AIMasks.context.render(AIMasks.skinKernel!.apply(extent: patch.extent, arguments: [patch])!, toBitmap: &p, rowBytes: 64, bounds: patch.extent, format: .RGBAf, colorSpace: nil)
+            return p[0]
         }
         #expect(skin(0.85, 0.65, 0.52) > 0.9 && skin(0.45, 0.30, 0.22) > 0.9)
         #expect(skin(0.2, 0.3, 0.8) < 0.05 && skin(0.3, 0.7, 0.3) < 0.05 && skin(0.5, 0.5, 0.5) < 0.05)
@@ -138,7 +141,13 @@ import UniformTypeIdentifiers
         #expect(abs(same[0] - same[2]) < 0.01)   // still neutral: not balanced twice
         var warmer = denoised; warmer.temperature = 7500
         let warm = try render(warmer)
-        #expect(warm[0] > warm[2] + 0.02)
+        #expect(warm[0] > warm[2] * 1.1)
+        var cooler = denoised; cooler.temperature = 4000
+        let cool = try render(cooler)
+        #expect(cool[2] > cool[0] * 1.1)
+        // Gray keeps its brightness.
+        let g = RawDenoiseBase(temperature: 5200, tint: 0).gains(to: 7500, tint: 0)
+        #expect(abs(0.2126 * g.red + 0.7152 * g.green + 0.0722 * g.blue - 1) < 1e-6 && g.red > 1 && g.blue < 1)
         let saved = try JSONDecoder().decode(PhotoEdits.self, from: JSONEncoder().encode(denoised))
         #expect(saved.advanced?.rawDenoise == RawDenoiseBase(temperature: 5200, tint: 0))
     }

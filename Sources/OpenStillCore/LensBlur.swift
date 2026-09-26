@@ -72,6 +72,27 @@ public enum LensBlur {
 public struct RawDenoiseBase: Codable, Equatable, Sendable {
     public var temperature: Double, tint: Double
     public init(temperature: Double, tint: Double) { self.temperature = temperature; self.tint = tint }
+    /// Linear RGB of a black body at `kelvin` (Tanner Helland's fit), normalized to green.
+    static func white(_ kelvin: Double) -> (Double, Double, Double) {
+        let t = min(40000, max(1000, kelvin)) / 100
+        func sRGB(_ v: Double) -> Double { let c = min(255, max(0, v)) / 255; return c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4) }
+        let r = t <= 66 ? 255 : 329.698727446 * pow(t - 60, -0.1332047592)
+        let g = t <= 66 ? 99.4708025861 * log(t) - 161.1195681661 : 288.1221695283 * pow(t - 60, -0.0755148492)
+        let b = t >= 66 ? 255 : (t <= 19 ? 0 : 138.5177312231 * log(t - 10) - 305.0447927307)
+        let lr = sRGB(r), lg = max(sRGB(g), 1e-4), lb = sRGB(b)
+        return (lr / lg, 1, lb / lg)
+    }
+    /// Channel gains that move the white balance from this setting to another. A higher temperature warms the photo,
+    /// a higher tint adds magenta, as with the RAW white balance sliders.
+    public func gains(to kelvin: Double, tint newTint: Double) -> (red: Double, green: Double, blue: Double) {
+        let from = Self.white(temperature), to = Self.white(kelvin)
+        var r = from.0 / max(to.0, 1e-4), b = from.2 / max(to.2, 1e-4)
+        let g = exp(-(newTint - tint) * 0.004)
+        // Keep overall brightness: normalize so the luminance of a gray stays put.
+        let luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
+        r /= luminance; b /= luminance
+        return (r, g / luminance, b)
+    }
     /// Only what the RAW decoder uses, so the denoised image is the plain decoded photo.
     public static func decodeOnly(_ edits: PhotoEdits) -> PhotoEdits {
         var e = PhotoEdits()
