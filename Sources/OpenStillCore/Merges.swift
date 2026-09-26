@@ -416,8 +416,8 @@ public enum Merges {
             let q = inverse * SIMD3(x, y, 1)
             guard q.z > 1e-9 else { continue }
             guard let a = floating.sample(floating.normalized, q.x / q.z, q.y / q.z), let b = reference.sample(reference.normalized, x, y) else { continue }
-            let x = Double(a), y = Double(b)
-            sa += x; sb += y; saa += x * x; sbb += y * y; sab += x * y; count += 1
+            let fa = Double(a), fb = Double(b)
+            sa += fa; sb += fb; saa += fa * fa; sbb += fb * fb; sab += fa * fb; count += 1
         } }
         guard count >= 16 else { return nil }
         let c = Double(count), va = saa - sa * sa / c, vb = sbb - sb * sb / c
