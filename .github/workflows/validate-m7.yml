@@ -40,8 +40,21 @@ jobs:
         run: |
           set +e
           export PKG_CONFIG_PATH="$PWD/.build/native/lib/pkgconfig"
-          perl -e 'alarm shift; exec @ARGV' 900 bash scripts/test.sh > test.log 2>&1
-          status=$?
+          bash scripts/test.sh > test.log 2>&1 &
+          pid=$!
+          for i in $(seq 1 84); do sleep 10; kill -0 $pid 2>/dev/null || break; done
+          if kill -0 $pid 2>/dev/null; then
+            echo "--- still running after 14 minutes: sampling the test process ---"
+            for p in $(pgrep -f "OpenStillPackageTests|swiftpm-testing"); do
+              echo "== pid $p: $(ps -o command= -p $p | cut -c1-120)"
+              sample $p 3 -file /tmp/sample-$p.txt > /dev/null 2>&1
+              grep -nE "^ +[0-9]+ Thread_|OpenStill|Merges|HDRTone|Vision|VN[A-Z]|CIContext|CIRender|swift_once|dispatch_once|_dispatch_sync|psynch_cvwait|semaphore_wait|swift_task" /tmp/sample-$p.txt | head -250
+            done
+            pkill -f "OpenStillPackageTests|swiftpm-testing"; kill $pid 2>/dev/null; status=1
+          else
+            wait $pid; status=$?
+          fi
+          echo "--- last lines ---"; tail -15 test.log
           grep -E "✘|error:|recorded an issue|Test run with|time limit" test.log | head -120
           if [ $status -ne 0 ]; then echo "--- started but not finished ---"; python3 -c "import re;t=open('test.log').read();s=set(re.findall(r'Test (\\w+\\(\\)) started',t));d=set(re.findall(r'Test (\\w+\\(\\)) (?:passed|failed)',t));print(sorted(s-d))"; fi
           exit $status
