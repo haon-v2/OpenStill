@@ -10,6 +10,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build tools
         run: brew install meson ninja pkg-config cmake || true
+      - name: XMP probe
+        run: swift .github/xmp-probe.swift || true
       - name: Native dependencies
         run: bash scripts/build-native.sh > native.log 2>&1 || { tail -80 native.log; exit 1; }
       - name: Build
