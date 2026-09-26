@@ -183,6 +183,14 @@ public enum SlideshowRenderer {
         guard let track = try? await asset.loadTracks(withMediaType: .audio).first else { throw SlideshowError.music }
         let length = (try? await asset.load(.duration)).map(CMTimeGetSeconds) ?? 0
         guard length > 0.1 else { throw SlideshowError.music }
+        // Decoding blocks until the audio is read; do it on a dispatch queue so it never ties up Swift's shared task threads.
+        return try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                continuation.resume(with: Result { try decode(track, length: length, duration: duration) })
+            }
+        }
+    }
+    static func decode(_ track: AVAssetTrack, length: Double, duration: Double) throws -> [CMSampleBuffer] {
         let composition = AVMutableComposition()
         guard let music = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else { throw SlideshowError.music }
         var offset = 0.0
