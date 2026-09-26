@@ -118,7 +118,7 @@ extension ViewerController {
         finishMaskEditing(); canvas.clearTool()
         let token = editToken, edits = currentEdits
         let geometry = EditGeometry(size:CGSize(width:original.width,height:original.height),edits:edits)
-        let samplePoint = LensCorrections.sourcePoint(geometry.sourcePoint(point),size:geometry.sourceSize,settings:edits.lens)
+        let samplePoint = LensCorrections.sourcePoint(geometry.sourcePoint(point),size:geometry.sourceSize,settings:edits.optics)
         info.status("Sampling neutral color…")
         editQueue.async { [weak self] in
             let result = Result { () -> PhotoEdits in

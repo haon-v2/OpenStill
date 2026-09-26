@@ -2,7 +2,7 @@ import AppKit
 import OpenStillCore
 
 final class PhotoCanvas: NSView {
-    enum Tool: Hashable { case browse, crop, erase, sun, whiteBalance, maskBrush, maskLinear, maskRadial, maskObject, maskRange, retouchSource, retouch }
+    enum Tool: Hashable { case browse, crop, erase, sun, whiteBalance, maskBrush, maskLinear, maskRadial, maskObject, maskRange, retouchSource, retouch, guide }
     var tool: Tool = .browse { didSet { needsDisplay = true; updateAccessibility(); reportCrop() } }
     var sunPlaced: ((CGPoint, Bool) -> Void)?
     var sunPosition = CGPoint(x:0.7,y:0.8) { didSet { needsDisplay = true; updateAccessibility() } }
@@ -14,6 +14,9 @@ final class PhotoCanvas: NSView {
     var rangeChosen: ((CGPoint) -> Void)?
     var whiteBalanceChosen: ((CGPoint) -> Void)?
     var objectChosen: ((CGPoint) -> Void)?
+    /// Upright guides, in displayed 0…1 coordinates. Shown while the guide tool is active.
+    var guideLines: [(CGPoint, CGPoint)] = [] { didSet { needsDisplay = true } }
+    var guideDrawn: ((CGPoint, CGPoint) -> Void)?
     var maskOverlay: CGImage? { didSet { needsDisplay = true } }
     /// Red/blue clipping warning drawn over the photo.
     var clippingOverlay: CGImage? { didSet { needsDisplay = true } }
@@ -61,7 +64,7 @@ final class PhotoCanvas: NSView {
     }
     private var brushPaths: [[CGPoint]] = []
     var brushWidth: CGFloat = 0.035
-    func clearTool() { draggingSun = false; tool = .browse; maskOverlay = nil; maskPath = []; cropStart = nil; cropMoveOrigin = nil; cropSelection = nil; brushPaths = []; needsDisplay = true }
+    func clearTool() { draggingSun = false; tool = .browse; guideLines = []; maskOverlay = nil; maskPath = []; cropStart = nil; cropMoveOrigin = nil; cropSelection = nil; brushPaths = []; needsDisplay = true }
     private var logicalPixels:CGSize?
     func replaceRenderedImage(_ next: CGImage, pixelSize:CGSize? = nil) {
         let saved = offset
@@ -209,7 +212,22 @@ final class PhotoCanvas: NSView {
             }
             if let clippingOverlay { context.saveGState(); context.interpolationQuality = .none; context.draw(clippingOverlay, in: rect); context.restoreGState() }
             if let maskOverlay, !(tool == .maskLinear && maskPath.count > 1) { context.draw(maskOverlay, in: rect) }
-            if let first = maskPath.first, let last = maskPath.last {
+            if tool == .guide {
+                context.saveGState(); context.clip(to:rect)
+                var lines = guideLines
+                if let first = maskPath.first, let last = maskPath.last, maskPath.count > 1 { lines.append((first,last)) }
+                for (start,end) in lines {
+                    let a = CGPoint(x:rect.minX+start.x*rect.width,y:rect.minY+start.y*rect.height), b = CGPoint(x:rect.minX+end.x*rect.width,y:rect.minY+end.y*rect.height)
+                    context.setStrokeColor(NSColor.black.withAlphaComponent(0.6).cgColor); context.setLineWidth(3)
+                    context.move(to:a); context.addLine(to:b); context.strokePath()
+                    context.setStrokeColor(NSColor.systemYellow.cgColor); context.setLineWidth(1.5)
+                    context.move(to:a); context.addLine(to:b); context.strokePath()
+                    context.setFillColor(NSColor.systemYellow.cgColor)
+                    for p in [a,b] { context.fillEllipse(in:CGRect(x:p.x-3.5,y:p.y-3.5,width:7,height:7)) }
+                }
+                context.restoreGState()
+            }
+            if tool != .guide, let first = maskPath.first, let last = maskPath.last {
                 let a = CGPoint(x:rect.minX+first.x*rect.width,y:rect.minY+first.y*rect.height)
                 let b = CGPoint(x:rect.minX+last.x*rect.width,y:rect.minY+last.y*rect.height)
                 context.saveGState(); context.clip(to:rect)
@@ -369,7 +387,7 @@ final class PhotoCanvas: NSView {
                 }
             case .erase: brushPaths.append([point])
             case .sun: break
-            case .maskBrush, .maskLinear, .maskRadial: maskPath = [point]
+            case .maskBrush, .maskLinear, .maskRadial, .guide: maskPath = [point]
             case .retouchSource:retouchSourceChosen?(point)
             case .retouch:if event.modifierFlags.contains(.option){retouchSourceChosen?(point)}else{maskPath=[point]}
             case .maskObject: objectChosen?(point)
@@ -395,7 +413,7 @@ final class PhotoCanvas: NSView {
                 else {cropSelection = CropGeometry.rectangle(from:start,to:point,in:photoSize,aspect:cropAspect)}
             }
             if tool == .maskBrush || tool == .retouch { maskPath.append(point) }
-            if (tool == .maskLinear || tool == .maskRadial), let first = maskPath.first { maskPath = [first,point] }
+            if (tool == .maskLinear || tool == .maskRadial || tool == .guide), let first = maskPath.first { maskPath = [first,point] }
             if tool == .erase, !brushPaths.isEmpty { brushPaths[brushPaths.count-1].append(point) }
             needsDisplay = true; return
         }
@@ -410,6 +428,10 @@ final class PhotoCanvas: NSView {
         if draggingSplit { draggingSplit = false; return }
         if tool == .crop {cropStart = nil; cropMoveOrigin = nil; return}
         if tool == .sun, draggingSun { draggingSun = false; moveSun(event,final:true); return }
+        if tool == .guide {
+            if let first = maskPath.first, let last = maskPath.last, hypot((last.x-first.x)*imageRect.width,(last.y-first.y)*imageRect.height) > 12 { guideDrawn?(first,last) }
+            maskPath = []; needsDisplay = true
+        }
         if !maskPath.isEmpty {
             let kind = tool == .maskBrush ? "brush" : (tool == .maskLinear ? "linear" : "radial")
             let points = maskPath; maskPath = []; if tool == .retouch {retouchDrawn?(points)}else{maskDrawn?(points,kind)}; needsDisplay = true

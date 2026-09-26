@@ -34,9 +34,11 @@ public enum RawDecoder {
         let settings = settings.sanitized
         var output = OSRawImage(); var error = [CChar](repeating: 0, count: 512)
         let status: Int32
+        let o = settings.options ?? RawOptions()
+        var options = OSRawOptions(demosaic: settings.options == nil ? -1 : o.demosaic.libraw, noise_threshold: o.waveletThreshold, median_passes: Int32(o.colorNoise), fbdd: Int32(o.impulseNoise))
         if let wb = settings.whiteBalance {
-            status = wb.withUnsafeBufferPointer { os_raw_decode(url.path, $0.baseAddress, Int32(settings.highlightRecovery), settings.temperature ?? 6500, settings.tint ?? 0, halfSize ? 1:0, &output, &error, error.count) }
-        } else { status = os_raw_decode(url.path, nil, Int32(settings.highlightRecovery), settings.temperature ?? 6500, settings.tint ?? 0, halfSize ? 1:0, &output, &error, error.count) }
+            status = wb.withUnsafeBufferPointer { os_raw_decode(url.path, $0.baseAddress, Int32(settings.highlightRecovery), settings.temperature ?? 6500, settings.tint ?? 0, halfSize ? 1:0, &options, &output, &error, error.count) }
+        } else { status = os_raw_decode(url.path, nil, Int32(settings.highlightRecovery), settings.temperature ?? 6500, settings.tint ?? 0, halfSize ? 1:0, &options, &output, &error, error.count) }
         guard status == 0, let pixels = output.pixels else { throw RawDecodeError(message: String(cString: error)) }
         defer { os_raw_release(&output) }
         let width = Int(output.width), height = Int(output.height)

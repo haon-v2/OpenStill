@@ -109,6 +109,10 @@ public struct AdvancedEdits: Codable, Equatable {
     public var colorGrading: ColorGrading?
     public var grain: GrainSettings?
     public var defringe: DefringeSettings?
+    public var transform: TransformSettings?
+    public var profile: ProfileSettings?
+    public var calibration: CalibrationSettings?
+    public var rawOptions: RawOptions?
     public init() {}
 }
 

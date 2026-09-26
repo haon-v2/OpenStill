@@ -25,6 +25,7 @@ extension ViewerController {
         canvas.rangeChosen = { [weak self] point in self?.sampleMaskRange(at:point) }
         canvas.whiteBalanceChosen = { [weak self] point in self?.chooseWhiteBalance(at:point) }
         canvas.objectChosen = { [weak self] point in self?.selectMaskObject(at:point) }
+        canvas.guideDrawn = { [weak self] a, b in self?.addGuide(a, b) }
         canvas.toggleClipping = { [weak self] in self?.editingCommand("toggleClipping") }
         canvas.toggleSplit = { [weak self] in self?.editingCommand("compareSplit") }
         canvas.toggleCompare = { [weak self] in self?.editingCommand("compare") }
@@ -61,7 +62,7 @@ extension ViewerController {
             sun.centerX = converted.centerX; sun.centerY = converted.centerY; edits.sunSettings = sun
         }
         guard currentSource != nil, renderedPhoto != nil, !localAI.isRunning, !aiPreparing else { return }
-        if photoRecord?.active.renderer == .legacy && (!edits.curves.isIdentity || edits.neutralBalance != NeutralBalance() || edits.lens.hasEffect || !edits.retouch.isEmpty || edits.advanced?.masks.values.contains(where:{$0.components != nil || $0.range != nil}) == true) {
+        if photoRecord?.active.renderer == .legacy && (!edits.curves.isIdentity || edits.neutralBalance != NeutralBalance() || edits.optics.hasEffect || edits.profile.hasEffect || edits.calibration.hasEffect || !edits.retouch.isEmpty || edits.advanced?.masks.values.contains(where:{$0.components != nil || $0.range != nil}) == true) {
             photoRecord?.upgrade(); editDocument = photoRecord!.active.document
         }
         currentEdits = edits; comparing = false
@@ -228,6 +229,8 @@ extension ViewerController {
         case "loadPreset": loadPreset()
         default:
             if name.hasPrefix("preset:") { applyPreset(String(name.dropFirst(7))) }
+            if name.hasPrefix("profile:") || name.hasPrefix("rawOptions:") || name == "importDCP" { profileCommand(name) }
+            if name.hasPrefix("upright:") || ["resetTransform","clearGuides","autoStraighten"].contains(name) { transformCommand(name) }
             if name == "ai:sky" { chooseImage(title: "Choose replacement sky") { [weak self] sky in self?.runAI("sky", sky: sky) } }
             else if name.hasPrefix("ai:") { runAI(String(name.dropFirst(3))) }
         }
@@ -254,7 +257,7 @@ extension ViewerController {
     private func savePreset() {
         guard let window = view.window else { return }
         var preset = currentEdits
-        preset.ensureAdvanced(); preset.advanced!.masks = [:]; preset.advanced!.rawWhiteBalance = nil; preset.straighten = 0; preset.advanced!.lutAsset = nil; preset.advanced!.lutName = nil; preset.advanced!.lutID = nil; preset.advanced!.aiBackgroundAsset = nil; preset.advanced!.aiFeatureKey = nil
+        preset.ensureAdvanced(); preset.advanced!.masks = [:]; preset.advanced!.rawWhiteBalance = nil; preset.straighten = 0; preset.advanced!.lutAsset = nil; preset.advanced!.lutName = nil; preset.advanced!.lutID = nil; preset.advanced!.aiBackgroundAsset = nil; preset.advanced!.aiFeatureKey = nil; preset.advanced!.transform = nil
         preset.baseAsset = nil; preset.overlayAsset = nil; preset.crop = nil; preset.rotation = 0; preset.flip = false
         let panel = NSSavePanel(); panel.title = "Save preset"; panel.nameFieldStringValue = "My preset.openstillpreset"; panel.allowedContentTypes = [UTType(filenameExtension: "openstillpreset") ?? .json]
         panel.beginSheetModal(for: window) { [weak self] response in
@@ -273,7 +276,7 @@ extension ViewerController {
                 preset.baseAsset = self.currentEdits.baseAsset; preset.overlayAsset = self.currentEdits.overlayAsset
                 preset.crop = self.currentEdits.crop; preset.rotation = self.currentEdits.rotation; preset.flip = self.currentEdits.flip
                 preset.ensureAdvanced(); preset.straighten = self.currentEdits.straighten
-                preset.advanced!.masks = self.currentEdits.advanced?.masks ?? [:]
+                preset.advanced!.masks = self.currentEdits.advanced?.masks ?? [:]; preset.advanced!.transform = self.currentEdits.advanced?.transform
                 preset.advanced!.aiBackgroundAsset = self.currentEdits.advanced?.aiBackgroundAsset; preset.advanced!.aiFeatureKey = self.currentEdits.advanced?.aiFeatureKey
                 preset.advanced!.lutAsset = self.currentEdits.advanced?.lutAsset; preset.advanced!.lutName = self.currentEdits.advanced?.lutName; preset.advanced!.lutID = self.currentEdits.advanced?.lutID; preset.lutAmount = self.currentEdits.lutAmount
                 self.changeEdits(preset, title: url.deletingPathExtension().lastPathComponent, commit: true)
@@ -323,7 +326,7 @@ extension ViewerController {
                 var maskImage = legacyMask
                 if let adjustmentMask {
                     let geometry = EditGeometry(size:size,edits:edits)
-                    let selection = try adjustmentMask.coverage(geometry:geometry,lens:edits.lens,input:incoming,modern:renderer == .linear2020)
+                    let selection = try adjustmentMask.coverage(geometry:geometry,lens:edits.optics,input:incoming,modern:renderer == .linear2020)
                     guard let cg = CIContext().createCGImage(selection,from:geometry.extent) else { throw EditError.render }
                     maskImage = cg
                 }

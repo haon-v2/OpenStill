@@ -36,7 +36,7 @@ extension ViewerController {
     }
     func chooseRetouchSource(_ point:CGPoint){
         let geometry=EditGeometry(size:editSourceSize(),edits:currentEdits)
-        let source=LensCorrections.sourcePoint(geometry.sourcePoint(point),size:geometry.sourceSize,settings:currentEdits.lens)
+        let source=LensCorrections.sourcePoint(geometry.sourcePoint(point),size:geometry.sourceSize,settings:currentEdits.optics)
         retouchSession.setSource(source);canvas.retouchSource=point;activateRetouch()
     }
     func activateRetouch(){
@@ -45,7 +45,7 @@ extension ViewerController {
         guard retouchSession.source != nil else{canvas.tool = .retouchSource;info.status("Click a clean source area first.");return}
         if let source=retouchSession.source {
             let geometry=EditGeometry(size:editSourceSize(),edits:currentEdits)
-            let corrected=LensCorrections.correctedPoint(source,size:geometry.sourceSize,settings:currentEdits.lens)
+            let corrected=LensCorrections.correctedPoint(source,size:geometry.sourceSize,settings:currentEdits.optics)
             let p=CGPoint(x:corrected.x*geometry.sourceSize.width,y:corrected.y*geometry.sourceSize.height).applying(geometry.transform)
             canvas.retouchSource=CGPoint(x:p.x/geometry.extent.width,y:p.y/geometry.extent.height)
         }
@@ -56,7 +56,7 @@ extension ViewerController {
     func drawRetouch(_ points:[CGPoint]){
         guard canvas.tool == .retouch,!aiPreparing,!localAI.isRunning else{return}
         let geometry=EditGeometry(size:editSourceSize(),edits:currentEdits)
-        let sourcePoints=points.map{LensCorrections.sourcePoint(geometry.sourcePoint($0),size:geometry.sourceSize,settings:currentEdits.lens)}
+        let sourcePoints=points.map{LensCorrections.sourcePoint(geometry.sourcePoint($0),size:geometry.sourceSize,settings:currentEdits.optics)}
         let scale=hypot(geometry.transform.a,geometry.transform.b)
         let radius=retouchSession.radius*min(geometry.extent.width,geometry.extent.height)/(max(0.001,scale)*min(geometry.sourceSize.width,geometry.sourceSize.height))
         guard let stroke=retouchSession.stroke(points:sourcePoints,radius:radius)else{return}

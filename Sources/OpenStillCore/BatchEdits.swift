@@ -2,14 +2,14 @@ import Foundation
 import CoreImage
 
 public enum AdjustmentGroup:String,Codable,CaseIterable {
-    case develop,curves,color,monochrome,details,glow,vignette,sunrays,lut,enhance,lens,geometry,retouch,presence,grading,grain
+    case develop,curves,color,monochrome,details,glow,vignette,sunrays,lut,enhance,lens,geometry,retouch,presence,grading,grain,transform,profile
     public var title:String {
-        switch self {case .develop:return "Develop";case .curves:return "Curves";case .color:return "Color";case .monochrome:return "Black & white";case .details:return "Details & noise";case .glow:return "Glow";case .vignette:return "Vignette";case .sunrays:return "Sunrays";case .lut:return "LUT";case .enhance:return "Enhance";case .lens:return "Lens corrections";case .geometry:return "Crop & rotation";case .retouch:return "Healing & cloning";case .presence:return "Clarity, texture & dehaze";case .grading:return "Color grading";case .grain:return "Grain"}
+        switch self {case .develop:return "Develop";case .curves:return "Curves";case .color:return "Color";case .monochrome:return "Black & white";case .details:return "Details & noise";case .glow:return "Glow";case .vignette:return "Vignette";case .sunrays:return "Sunrays";case .lut:return "LUT";case .enhance:return "Enhance";case .lens:return "Lens corrections";case .geometry:return "Crop & rotation";case .retouch:return "Healing & cloning";case .presence:return "Clarity, texture & dehaze";case .grading:return "Color grading";case .grain:return "Grain";case .transform:return "Transform";case .profile:return "Profile & calibration"}
     }
     var maskKeys:[String] {
-        switch self {case .details:return ["Details","Structure","Denoise"];case .retouch:return ["Retouch"];case .presence:return ["Clarity","Texture","Dehaze"];case .lens,.geometry:return [];default:return [title]}
+        switch self {case .details:return ["Details","Structure","Denoise"];case .retouch:return ["Retouch"];case .presence:return ["Clarity","Texture","Dehaze"];case .lens,.geometry,.transform,.profile:return [];default:return [title]}
     }
-    public static let defaults=Set(allCases.filter{![.lens,.geometry,.retouch].contains($0)})
+    public static let defaults=Set(allCases.filter{![.lens,.geometry,.retouch,.transform].contains($0)})
 }
 public struct BatchOptions {
     public var groups=AdjustmentGroup.defaults
@@ -68,6 +68,12 @@ public enum BatchEdits {
             case .presence:result.clarity=source.clarity;result.texture=source.texture;result.dehaze=source.dehaze
             case .grading:result.colorGrading=source.colorGrading
             case .grain:result.grain=source.grain
+            case .profile:result.profile=source.profile;result.calibration=source.calibration;result.rawOptions=source.rawOptions
+            case .transform:
+                // Guides belong to one photo; detected Upright modes are solved again for each target in prepare.
+                var transform=source.transform;transform.guides=nil
+                if transform.upright?.mode == .guided {transform.upright=nil}
+                result.transform=transform
             }
             if options.masks {for key in group.maskKeys{result.setMask(source.advanced?.masks[key]?.independentCopy(),for:key)}}
         }
@@ -82,13 +88,17 @@ public enum BatchEdits {
             do {
                 let compatible=try geometry.map{$0 == (try BatchGeometry.read(target))} ?? true
                 after=try merging(source.record.active.document.current,into:after,options:options,geometryCompatible:compatible)
+                if options.groups.contains(.transform),let mode=after.transform.upright?.mode {
+                    var recipe=target.record.active.recipe;recipe.edits=after
+                    after.transform.upright=try Upright.analyze(source:target.url,recipe:recipe,mode:mode)
+                }
             }catch let reason {error=reason.localizedDescription}
             var entry=BatchEntry(photoID:target.id,sourcePath:target.url.path,sourceHash:target.record.contentFingerprint,versionID:target.record.activeVersionID,beforeRevision:target.record.active.revision,before:target.record.active.document.current,after:after)
             entry.failure=error;entries.append(entry)
         }
         return BatchTransaction(sourceName:source.url.lastPathComponent,entries:entries)
     }
-    private static func needsModern(_ e:PhotoEdits)->Bool{!e.curves.isIdentity || e.neutralBalance != NeutralBalance() || e.lens.hasEffect || !e.retouch.isEmpty || e.advanced?.masks.values.contains{$0.components != nil || $0.range != nil}==true}
+    private static func needsModern(_ e:PhotoEdits)->Bool{!e.curves.isIdentity || e.neutralBalance != NeutralBalance() || e.optics.hasEffect || e.profile.hasEffect || e.calibration.hasEffect || !e.retouch.isEmpty || e.advanced?.masks.values.contains{$0.components != nil || $0.range != nil}==true}
     private static func journalURL(_ id:UUID,store:PhotoRecordStore)->URL{store.root.appendingPathComponent("BatchHistory/\(id.uuidString).json")}
     private static func save(_ transaction:BatchTransaction,store:PhotoRecordStore)throws {
         let path=journalURL(transaction.id,store:store);try FileManager.default.createDirectory(at:path.deletingLastPathComponent(),withIntermediateDirectories:true)
