@@ -14,6 +14,10 @@ on:
         description: "Dry run: build and sign with a throwaway key, publish nothing"
         type: boolean
         default: false
+      run_tests:
+        description: "Run the test suite first (off by default: merged code was already tested on its PR)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -70,6 +74,7 @@ jobs:
         run: bash scripts/build-native.sh > native.log 2>&1 || { tail -80 native.log; exit 1; }
 
       - name: Tests
+        if: inputs.run_tests == true || inputs.run_tests == 'true'
         run: |
           set +e
           bash scripts/test.sh > test.log 2>&1
