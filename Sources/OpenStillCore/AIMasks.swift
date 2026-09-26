@@ -220,7 +220,8 @@ public enum AIMasks {
     }
     /// A stand-in depth map when a photo has none: the subject (or people) near, everything else far, with a soft falloff.
     public static func subjectDepth(_ image: CGImage) throws -> CGImage {
-        let mask = (try? subject(image)) ?? (try people(image))
+        let mask: CGImage
+        if let found = try? subject(image) { mask = found } else { mask = try people(image) }
         let s = size(image)
         let soft = CIImage(cgImage: mask).clampedToExtent().applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: Double(min(s.width, s.height)) * 0.01]).cropped(to: CGRect(origin: .zero, size: s))
         return try grayscale(soft, size: s)
