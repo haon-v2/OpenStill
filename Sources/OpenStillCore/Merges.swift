@@ -299,8 +299,9 @@ public enum Merges {
             let gain = Float(0.18 / max(median, 1e-6))
             normalized = lum.map { powf(min(1, $0 * gain), 1 / 2.2) }
             let bytes = normalized.map { UInt8(max(0, min(255, $0 * 255 + 0.5))) }
+            let w = width, h = height
             cgImage = CGDataProvider(data: Data(bytes) as CFData).flatMap {
-                CGImage(width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 8, bytesPerRow: width, space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue), provider: $0, decode: nil, shouldInterpolate: true, intent: .defaultIntent)
+                CGImage(width: w, height: h, bitsPerComponent: 8, bitsPerPixel: 8, bytesPerRow: w, space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue), provider: $0, decode: nil, shouldInterpolate: true, intent: .defaultIntent)
             }
         }
         /// Bilinear sample at a Core Image coordinate (origin bottom left, pixel centres at +0.5).
