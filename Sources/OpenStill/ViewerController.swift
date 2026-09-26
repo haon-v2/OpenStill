@@ -18,6 +18,9 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
     private var libraryBrowser: ShootWindow?
     private var libraryURLs: [URL] = []
     private var folderURL: URL?
+    /// The collection the library shows, when opened from the sidebar's Collections.
+    private var openCollection: PhotoCollection?
+    private var smartCollectionWindow: SmartCollectionWindow?
     private var isLibrary = false
     private var foldersVisible = false
     private var centerToFolders: NSLayoutConstraint!
@@ -90,6 +93,14 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         librarySidebar.browse = { [weak self] in self?.openPanel() }
         librarySidebar.open = { [weak self] url in self?.open([url]) }
         librarySidebar.filter = { [weak self] index in self?.showLibrary(); self?.libraryBrowser?.setFlagFilter(index) }
+        librarySidebar.subfoldersChanged = { [weak self] _ in if let self, let folder = self.folderURL, self.openCollection == nil { self.open([folder]) } }
+        librarySidebar.openCollection = { [weak self] collection in self?.open(collection: collection) }
+        librarySidebar.newSmartCollection = { [weak self] in
+            guard let self else { return }
+            let window = SmartCollectionWindow(); self.smartCollectionWindow = window
+            window.created = { [weak self] collection in self?.librarySidebar.reloadCollections(); self?.open(collection: collection) }
+            window.showWindow(nil); window.window?.makeKeyAndOrderFront(nil)
+        }
         leftRail.select("photo"); rightRail.select("edit")
 
         canvas.navigate = { [weak self] step in self?.advance(step) }
@@ -310,7 +321,14 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         }
     }
 
-    func open(_ inputs: [URL]) {
+    /// Shows a collection's photos in the library. Photos whose files have moved or been deleted are left out.
+    func open(collection: PhotoCollection) {
+        guard let catalog = EditStorage.records.catalog else { return }
+        let files = catalog.members(of: collection).map { URL(fileURLWithPath: $0.path) }
+        open(files, collection: collection)
+        showLibrary()
+    }
+    func open(_ inputs: [URL], collection libraryCollection: PhotoCollection? = nil) {
         _ = view
         let token = UUID()
         catalogGeneration = token
@@ -318,7 +336,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         generation = UUID()
         store.reset()
         urls = [];shootCatalog=[];shootWindow?.close();shootWindow=nil
-        libraryBrowser?.stopBrowsing(); libraryBrowser?.browserView.removeFromSuperview(); libraryBrowser=nil; libraryURLs=[]; folderURL=nil
+        libraryBrowser?.stopBrowsing(); libraryBrowser?.browserView.removeFromSuperview(); libraryBrowser=nil; libraryURLs=[]; folderURL=nil; openCollection=libraryCollection
         librarySidebar.update(folder:nil,count:0)
         selected = 0
         metadata = nil
@@ -333,8 +351,9 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         canvas.image = nil
         canvas.message = "Reading photos…"
         spinner.startAnimation(nil)
+        let subfolders = LibrarySidebar.includeSubfolders
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            let result = Result { try PhotoCatalog.open(inputs) }
+            let result = Result { try libraryCollection == nil ? PhotoCatalog.open(inputs, includeSubfolders: subfolders) : PhotoCatalog.files(inputs) }
             DispatchQueue.main.async {
                 guard let self, self.catalogGeneration == token else { return }
                 self.spinner.stopAnimation(nil)
@@ -342,14 +361,14 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
                 case .success(let catalog):
                     self.urls = catalog.urls;self.shootCatalog=catalog.urls
                     self.folderURL = catalog.folder
-                    self.librarySidebar.update(folder:catalog.folder,count:catalog.urls.count)
+                    self.librarySidebar.update(folder:catalog.folder,count:catalog.urls.count,collection:libraryCollection?.id)
                     if self.isLibrary { self.refreshLibrary() }
 
                     self.selected = catalog.selectedIndex
-                    self.view.window?.title = catalog.folder.map { "\($0.lastPathComponent) — OpenStill" } ?? "OpenStill"
+                    self.view.window?.title = libraryCollection.map { "\($0.name) — OpenStill" } ?? catalog.folder.map { "\($0.lastPathComponent) — OpenStill" } ?? "OpenStill"
                     self.collection.reloadData()
                     if catalog.urls.isEmpty {
-                        self.canvas.message = "No supported photos in this folder.\nOpen another folder or drop in a photo."
+                        self.canvas.message = libraryCollection == nil ? "No supported photos in this folder.\nOpen another folder or drop in a photo." : "No photos in this collection yet."
                         self.metadata = nil
                         self.info.show(nil)
                         self.updateControls()
@@ -423,7 +442,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         let selectionCount = selectedURLs.count
         toolbarItems["share"]?.toolTip = "Share \(selectionCount) selected photo\(selectionCount == 1 ? "" : "s") (⇧⌘S)"
         info.show(metadata, rendering: renderedPhoto?.description)
-        view.window?.title = isLibrary ? (folderURL?.lastPathComponent ?? "Local Library") : (hasPhotos ? urls[selected].lastPathComponent : "OpenStill")
+        view.window?.title = isLibrary ? (openCollection?.name ?? folderURL?.lastPathComponent ?? "Local Library") : (hasPhotos ? urls[selected].lastPathComponent : "OpenStill")
         var subtitle = hasPhotos ? "\(selected + 1) of \(urls.count)" : "Photo editor"
         if hasPhotos, selectionCount != 1 { subtitle += " · \(selectionCount) selected" }
         view.window?.subtitle = isLibrary ? "Local library · \(shootCatalog.count) photos" : subtitle
@@ -521,6 +540,8 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         if libraryURLs == catalog, let browser = libraryBrowser { browser.refresh(); return }
         libraryBrowser?.stopBrowsing();libraryBrowser?.browserView.removeFromSuperview()
         let browser = ShootWindow(urls:catalog,embedded:true,selectedURL:currentSource);libraryBrowser=browser;libraryURLs=catalog
+        browser.collection = openCollection
+        browser.collectionsChanged = { [weak self] in self?.librarySidebar.reloadCollections() }
         let content=browser.browserView;content.translatesAutoresizingMaskIntoConstraints=false;libraryHost.addSubview(content)
         NSLayoutConstraint.activate([content.leadingAnchor.constraint(equalTo:libraryHost.leadingAnchor),content.trailingAnchor.constraint(equalTo:libraryHost.trailingAnchor),content.topAnchor.constraint(equalTo:libraryHost.topAnchor),content.bottomAnchor.constraint(equalTo:libraryHost.bottomAnchor)])
         browser.edit = { [weak self] _,_ in

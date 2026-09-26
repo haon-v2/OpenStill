@@ -34,13 +34,21 @@ public struct PhotoCatalog {
         }
     }
 
-    public static func open(_ inputs: [URL]) throws -> PhotoCatalog {
+    /// Opens a folder (or the folder of one photo), or exactly the given files when there are several.
+    /// With `includeSubfolders`, a folder's nested folders are scanned too; hidden files and packages are skipped.
+    public static func open(_ inputs: [URL], includeSubfolders: Bool = false) throws -> PhotoCatalog {
         guard !inputs.isEmpty else { return PhotoCatalog(urls: [], selectedIndex: 0, folder: nil) }
         let first = inputs[0].standardizedFileURL
         let isDirectory = try first.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true
         let directory = isDirectory ? first : first.deletingLastPathComponent()
         let candidates: [URL]
-        if inputs.count == 1 {
+        if inputs.count == 1 && includeSubfolders {
+            var found: [URL] = []
+            let enumerator = FileManager.default.enumerator(at: directory, includingPropertiesForKeys: [.isRegularFileKey],
+                                                            options: [.skipsHiddenFiles, .skipsPackageDescendants])
+            while let next = enumerator?.nextObject() as? URL { found.append(next) }
+            candidates = found
+        } else if inputs.count == 1 {
             candidates = try FileManager.default.contentsOfDirectory(
                 at: directory, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles])
         } else {
@@ -49,10 +57,20 @@ public struct PhotoCatalog {
         let urls = candidates.filter {
             supports($0) && (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
         }.map(\.standardizedFileURL).sorted {
-            $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending
+            let order = $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent)
+            return order == .orderedSame ? $0.path < $1.path : order == .orderedAscending
         }
         return PhotoCatalog(urls: urls, selectedIndex: urls.firstIndex(of: first) ?? 0,
                             folder: inputs.count == 1 ? directory : nil)
+    }
+}
+
+extension PhotoCatalog {
+    /// Exactly these files (for a collection), skipping ones that are missing or unsupported.
+    public static func files(_ inputs: [URL]) -> PhotoCatalog {
+        let urls = inputs.map(\.standardizedFileURL).filter { supports($0) && FileManager.default.fileExists(atPath: $0.path) }
+            .sorted { let o = $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent); return o == .orderedSame ? $0.path < $1.path : o == .orderedAscending }
+        return PhotoCatalog(urls: urls, selectedIndex: 0, folder: nil)
     }
 }
 

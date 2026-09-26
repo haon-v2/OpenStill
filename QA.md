@@ -112,3 +112,18 @@ Automated fixtures are generated and contain no user photographs. The real S9 fi
 - Added RAW decoding options: demosaic method and LibRaw's wavelet, median and FBDD noise reduction.
 - Automated tests: new TransformTests and CameraProfileTests suites cover identity at defaults, sanitizing, JSON compatibility, orientation and homography round trips, constrained crops without empty edges, rendered pixels matching point mapping in all four orientations, Newton inversion of the optics, masks following the perspective, Upright solving for converging verticals, level and guided lines, line detection on a synthetic photo, neutral-preserving calibration, each built-in look, DCP parsing and application, RAW options reaching the decode recipe, portable packages carrying imported profiles, and batch copying.
 - Not yet verified by hand in the native app on a Mac: Guided line drawing, the Upright buttons on real architecture photos, DCP import with a real camera profile, and the RAW decoding popups on a RAW file.
+
+## Library catalog — September 26, 2026
+
+- Added a local SQLite catalog, with fast lookup of unchanged files by path, size and modification date and a one-time index of existing records. Also added Include subfolders, color labels (6–9), IPTC metadata editing with hierarchical keywords, metadata presets, batch apply, IPTC in exports, collections, smart collections, metadata search and a disk preview cache.
+- Automated tests: the new LibraryCatalogTests suite covers:
+  - indexing and fast lookup, moved and changed files, and one-time migration of existing records;
+  - mirroring of ratings, flags, labels and metadata into the catalog;
+  - metadata sanitizing and loading records saved before this version;
+  - free-text search and every smart-rule field;
+  - collections and smart collections, with rename and delete;
+  - subfolder scanning that skips hidden folders;
+  - IPTC fields read back from an exported JPEG;
+  - preview cache replacement;
+  - library filtering by label and keyword.
+- Not yet verified by hand in the native app on a Mac: the label keys, the metadata window, the collection sidebar, the smart collection editor, and first-launch indexing of a large existing library.

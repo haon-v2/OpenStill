@@ -97,7 +97,7 @@ public enum ModernRenderer {
         if settings.format == .jpeg { image = image.composited(over: CIImage(color: .white).cropped(to: image.extent)) }
         return image.cropped(to:CGRect(x:0,y:0,width:image.extent.width.rounded(.down),height:image.extent.height.rounded(.down)))
     }
-    public static func export(_ image: CIImage, to destination: URL, source: URL?, settings: ExportSettings) throws {
+    public static func export(_ image: CIImage, to destination: URL, source: URL?, settings: ExportSettings, metadata: IPTCMetadata? = nil) throws {
         let settings = settings.sanitized
         if let source {
             guard source.standardizedFileURL.resolvingSymlinksInPath() != destination.standardizedFileURL.resolvingSymlinksInPath() else { throw EditError.originalDestination }
@@ -121,6 +121,14 @@ public enum ModernRenderer {
         var exif = props[kCGImagePropertyExifDictionary as String] as? [String: Any] ?? [:]
         exif["PixelXDimension"] = cg.width; exif["PixelYDimension"] = cg.height; exif.removeValue(forKey: "MakerNote")
         props[kCGImagePropertyExifDictionary as String] = exif
+        // The photographer's title, caption, keywords, creator and copyright replace what the camera wrote.
+        if let metadata, !metadata.isEmpty {
+            for (key, value) in metadata.imageProperties {
+                var merged = props[key] as? [String: Any] ?? [:]
+                for (k, v) in value as? [String: Any] ?? [:] { merged[k] = v }
+                props[key] = merged
+            }
+        }
         props[kCGImageDestinationLossyCompressionQuality as String] = settings.quality
         let type: UTType = settings.format == .jpeg ? .jpeg : (settings.format == .png ? .png : .tiff)
         let data = NSMutableData()

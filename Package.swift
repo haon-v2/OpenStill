@@ -13,7 +13,7 @@ let package = Package(
         .systemLibrary(name: "CLensfun", pkgConfig: "lensfun"),
         .systemLibrary(name: "CLCMS", pkgConfig: "lcms2"),
         .target(name: "CImagingBridge", dependencies: ["CLensfun", "CLCMS"]),
-        .target(name: "OpenStillCore", dependencies: ["CRawBridge", "CImagingBridge"]),
+        .target(name: "OpenStillCore", dependencies: ["CRawBridge", "CImagingBridge"], linkerSettings: [.linkedLibrary("sqlite3")]),
         .executableTarget(name: "OpenStill", dependencies: ["OpenStillCore", .product(name: "Sparkle", package: "Sparkle")]),
         .testTarget(name: "OpenStillCoreTests", dependencies: ["OpenStillCore"])
     ],

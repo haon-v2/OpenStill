@@ -1,4 +1,5 @@
 import AppKit
+import OpenStillCore
 
 /// Compact native navigation for the library and editing sides of the workspace.
 final class WorkspaceRail: GlassChrome {
@@ -34,8 +35,16 @@ final class LibrarySidebar: GlassChrome {
     var open: ((URL) -> Void)?
     var browse: (() -> Void)?
     var filter: ((Int) -> Void)?
+    var subfoldersChanged: ((Bool) -> Void)?
+    var openCollection: ((PhotoCollection) -> Void)?
+    var newSmartCollection: (() -> Void)?
     private let stack = LibraryStack()
     private var folder: URL?
+    private var count = 0
+    private var shownCollection: UUID?
+    private var collections: [PhotoCollection] = []
+    static let subfoldersKey = "OpenStillIncludeSubfolders"
+    static var includeSubfolders: Bool { UserDefaults.standard.bool(forKey: subfoldersKey) }
     private var recent: [URL] = UserDefaults.standard.stringArray(forKey: "OpenStillRecentFolders")?.map { URL(fileURLWithPath: $0) } ?? []
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -48,22 +57,40 @@ final class LibrarySidebar: GlassChrome {
         update(folder: nil, count: 0)
     }
     required init?(coder: NSCoder) { fatalError() }
-    func update(folder: URL?, count: Int) {
+    /// Rebuilds the list after collections change, keeping the current folder or collection.
+    func reloadCollections() { update(folder: folder, count: count, collection: shownCollection) }
+    func update(folder: URL?, count: Int, collection: UUID? = nil) {
         if let folder, folder != self.folder {
             recent.removeAll { $0 == folder }; recent.insert(folder, at: 0); recent = Array(recent.prefix(8))
             UserDefaults.standard.set(recent.map(\.path), forKey: "OpenStillRecentFolders")
         }
-        self.folder = folder
+        self.folder = folder; self.count = count; shownCollection = collection
+        collections = EditStorage.records.catalog?.collections() ?? []
         stack.arrangedSubviews.forEach { stack.removeArrangedSubview($0); $0.removeFromSuperview() }
         heading("Local", size: 19)
         label("Your photos, on this Mac.")
-        let add = button("Open folder…", symbol: "folder.badge.plus", action: #selector(openFolder)); Appearance.primary(add)
-        heading("Current Folder")
-        label(folder?.lastPathComponent ?? "No folder open", emphasized: true)
-        if let folder { label(folder.path); button("Show in Finder", symbol: "arrow.up.forward.square", action: #selector(reveal)) }
+        let openButton = button("Open folder…", symbol: "folder.badge.plus", action: #selector(openFolder)); Appearance.primary(openButton)
+        let current = collections.first { $0.id == collection }
+        heading(current == nil ? "Current Folder" : "Current Collection")
+        label(current?.name ?? folder?.lastPathComponent ?? "No folder open", emphasized: true)
+        if let folder, current == nil { label(folder.path); button("Show in Finder", symbol: "arrow.up.forward.square", action: #selector(reveal)) }
+        let subfolders = NSButton(checkboxWithTitle: "Include subfolders", target: self, action: #selector(toggleSubfolders(_:)))
+        subfolders.state = Self.includeSubfolders ? .on : .off; subfolders.font = .systemFont(ofSize: 11); add(subfolders)
         button("All photos · \(count)", symbol: "photo.on.rectangle", action: #selector(filterPhotos(_:)), tag: 0)
         button("Picks", symbol: "flag", action: #selector(filterPhotos(_:)), tag: 1)
         button("Rejected", symbol: "flag.slash", action: #selector(filterPhotos(_:)), tag: 2)
+        heading("Collections")
+        for (index, c) in collections.enumerated() {
+            let b = button(c.name, symbol: c.isSmart ? "gearshape" : "rectangle.stack", action: #selector(chooseCollection(_:)), tag: index)
+            b.state = c.id == collection ? .on : .off
+            let menu = NSMenu()
+            for (title, action) in [("Rename…", #selector(renameCollection(_:))), ("Delete…", #selector(deleteCollection(_:)))] {
+                let item = NSMenuItem(title: title, action: action, keyEquivalent: ""); item.target = self; item.tag = index; menu.addItem(item)
+            }
+            b.menu = menu; b.toolTip = (c.isSmart ? "Smart collection" : "Collection") + " · Control-click to rename or delete"
+        }
+        if collections.isEmpty { label("Select photos, then choose Actions → Add to collection.") }
+        button("New smart collection…", symbol: "plus.rectangle.on.rectangle", action: #selector(createSmartCollection))
         heading("Recent Folders")
         for (index, url) in recent.enumerated() {
             let b = button(url.lastPathComponent, symbol: "folder", action: #selector(openRecent(_:)), tag: index)
@@ -92,5 +119,30 @@ final class LibrarySidebar: GlassChrome {
     @objc private func openFolder() { browse?() }
     @objc private func reveal() { if let folder { NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: folder.path) } }
     @objc private func filterPhotos(_ sender: NSButton) { filter?(sender.tag) }
+    @objc private func toggleSubfolders(_ sender: NSButton) { UserDefaults.standard.set(sender.state == .on, forKey: Self.subfoldersKey); subfoldersChanged?(sender.state == .on) }
+    @objc private func chooseCollection(_ sender: NSButton) { guard collections.indices.contains(sender.tag) else { return }; openCollection?(collections[sender.tag]) }
+    @objc private func createSmartCollection() { newSmartCollection?() }
+    @objc private func renameCollection(_ sender: NSMenuItem) {
+        guard collections.indices.contains(sender.tag), let window else { return }
+        let c = collections[sender.tag], alert = NSAlert(); alert.messageText = "Rename collection"
+        let field = NSTextField(string: c.name); field.frame = NSRect(x: 0, y: 0, width: 260, height: 24); alert.accessoryView = field
+        alert.addButton(withTitle: "Rename"); alert.addButton(withTitle: "Cancel")
+        alert.beginSheetModal(for: window) { [weak self] response in
+            guard response == .alertFirstButtonReturn, !field.stringValue.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+            try? EditStorage.records.catalog?.renameCollection(c.id, to: field.stringValue); self?.reloadCollections()
+        }
+    }
+    @objc private func deleteCollection(_ sender: NSMenuItem) {
+        guard collections.indices.contains(sender.tag), let window else { return }
+        let c = collections[sender.tag], alert = NSAlert(); alert.messageText = "Delete “\(c.name)”?"
+        alert.informativeText = "Only the collection is removed. The photos, their edits and the files stay."
+        alert.addButton(withTitle: "Delete collection"); alert.addButton(withTitle: "Cancel")
+        alert.beginSheetModal(for: window) { [weak self] response in
+            guard response == .alertFirstButtonReturn else { return }
+            try? EditStorage.records.catalog?.deleteCollection(c.id)
+            if self?.shownCollection == c.id { self?.shownCollection = nil }
+            self?.reloadCollections()
+        }
+    }
     @objc private func openRecent(_ sender: NSButton) { guard recent.indices.contains(sender.tag) else { return }; open?(recent[sender.tag]) }
 }
