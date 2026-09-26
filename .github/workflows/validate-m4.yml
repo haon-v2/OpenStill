@@ -25,8 +25,5 @@ jobs:
           status=$?
           grep -E "✘|error:|recorded an issue|Test run with|XMPImport" test.log | head -120
           exit $status
-      - name: XMP probe
-        if: always()
-        run: swift .github/xmp-probe.swift 2>&1 | tail -60 || true
       - name: App bundle
         run: bash scripts/build-app.sh > app.log 2>&1 || { tail -60 app.log; exit 1; }

@@ -166,31 +166,12 @@ public enum XMPSidecar {
             CGImageMetadataSetTagWithPath(metadata, nil, path, tag)
         }
         func text(_ s: String) -> String? { s.isEmpty ? nil : s }
-        /// Language alternatives (dc:title, dc:description, dc:rights) as Lightroom writes them: rdf:Alt with an x-default item.
-        /// ImageIO's accepted value shapes differ between macOS versions, so each is tried and checked by reading it back.
+        /// Language alternatives (dc:title, dc:description, dc:rights) as Lightroom writes them: an rdf:Alt with an x-default item.
+        /// ImageIO builds that from the `[x-default]` path; alternate-text tags created directly serialize to nothing.
         func setAlternative(_ name: String, _ text: String) {
-            let path = "dc:\(name)" as CFString
-            CGImageMetadataRemoveTagWithPath(metadata, nil, path)
+            CGImageMetadataRemoveTagWithPath(metadata, nil, "dc:\(name)" as CFString)
             guard !text.isEmpty else { return }
-            func works() -> Bool {
-                guard let tag = CGImageMetadataCopyTagWithPath(metadata, nil, path) else { return false }
-                return string(tag) == text
-            }
-            // 1. An alternate-text tag holding one x-default item.
-            if let item = CGImageMetadataTagCreate(Namespace.dc as CFString, "dc" as CFString, name as CFString, .string, text as CFString) {
-                if let tag = CGImageMetadataTagCreate(Namespace.dc as CFString, "dc" as CFString, name as CFString, .alternateText, [item] as CFArray),
-                   CGImageMetadataSetTagWithPath(metadata, nil, path, tag), works() { return }
-            }
-            CGImageMetadataRemoveTagWithPath(metadata, nil, path)
-            // 2. An alternate-text tag holding the plain string.
-            if let tag = CGImageMetadataTagCreate(Namespace.dc as CFString, "dc" as CFString, name as CFString, .alternateText, [text] as CFArray),
-               CGImageMetadataSetTagWithPath(metadata, nil, path, tag), works() { return }
-            CGImageMetadataRemoveTagWithPath(metadata, nil, path)
-            // 3. The x-default path form.
-            if CGImageMetadataSetValueWithPath(metadata, nil, "dc:\(name)[x-default]" as CFString, text as CFString), works() { return }
-            CGImageMetadataRemoveTagWithPath(metadata, nil, path)
-            // 4. A plain string, which every XMP reader accepts even though it isn't the standard form.
-            _ = CGImageMetadataSetValueWithPath(metadata, nil, path, text as CFString)
+            CGImageMetadataSetValueWithPath(metadata, nil, "dc:\(name)[x-default]" as CFString, text as CFString)
         }
         let m = xmp.iptc.sanitized
         let rating = xmp.flag == .reject && (xmp.rating ?? 0) == 0 ? nil : xmp.rating
