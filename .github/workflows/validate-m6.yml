@@ -24,6 +24,7 @@ jobs:
         run: bash scripts/build-native.sh > native.log 2>&1 || { tail -80 native.log; exit 1; }
       - name: Build
         run: |
+          set +e
           export PKG_CONFIG_PATH="$PWD/.build/native/lib/pkgconfig"
           swift build > build.log 2>&1; status=$?
           grep -E "error:" build.log | head -60
