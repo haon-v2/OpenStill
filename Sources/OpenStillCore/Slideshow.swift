@@ -137,7 +137,11 @@ public enum SlideshowRenderer {
             guard let audioInput, let audio else { return }
             let started = Date()
             while nextAudio < audio.count, CMTimeGetSeconds(CMSampleBufferGetPresentationTimeStamp(audio[nextAudio])) <= seconds {
-                if audioInput.isReadyForMoreMediaData { audioInput.append(audio[nextAudio]); nextAudio += 1 }
+                if audioInput.isReadyForMoreMediaData {
+                    audioInput.append(audio[nextAudio]); nextAudio += 1
+                    // Once the music is all in, tell the writer so it stops waiting for more.
+                    if nextAudio == audio.count { audioInput.markAsFinished() }
+                }
                 else if wait {
                     if Date().timeIntervalSince(started) > 20 { throw stalled("Music") }
                     try await Task.sleep(nanoseconds: 2_000_000)
@@ -164,45 +168,40 @@ public enum SlideshowRenderer {
             if n % 15 == 0 { progress?(Double(n) / Double(max(1, frames))) }
         }
         video.markAsFinished()
-        try await feedAudio(until: duration, wait: true)
-        audioInput?.markAsFinished()
+        try await feedAudio(until: duration + 1, wait: true)
+        if let audioInput, let audio, nextAudio < audio.count { audioInput.markAsFinished() }
         await writer.finishWriting()
         guard writer.status == .completed else { throw SlideshowError.writer(writer.error?.localizedDescription ?? "unfinished") }
         progress?(1)
     }
 
-    /// Decoded music as PCM sample buffers covering `duration` seconds (looping a short track), or nil without music.
+    /// Decoded music as PCM sample buffers covering `duration` seconds, or nil without music.
+    /// A short track is repeated in an audio composition, so every repeat has correct timing.
     static func musicSamples(_ path: String?, duration: Double) async throws -> [CMSampleBuffer]? {
         guard let path, !path.isEmpty else { return nil }
         let asset = AVURLAsset(url: URL(fileURLWithPath: path))
         guard let track = try? await asset.loadTracks(withMediaType: .audio).first else { throw SlideshowError.music }
         let length = (try? await asset.load(.duration)).map(CMTimeGetSeconds) ?? 0
         guard length > 0.1 else { throw SlideshowError.music }
-        let pcm: [String: Any] = [AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: 44_100, AVNumberOfChannelsKey: 2, AVLinearPCMBitDepthKey: 16, AVLinearPCMIsFloatKey: false, AVLinearPCMIsBigEndianKey: false, AVLinearPCMIsNonInterleaved: false]
-        var out: [CMSampleBuffer] = [], offset = 0.0
+        let composition = AVMutableComposition()
+        guard let music = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else { throw SlideshowError.music }
+        var offset = 0.0
         while offset < duration {
-            let reader: AVAssetReader
-            do { reader = try AVAssetReader(asset: asset) } catch { throw SlideshowError.music }
-            let output = AVAssetReaderTrackOutput(track: track, outputSettings: pcm)
-            reader.add(output)
-            reader.timeRange = CMTimeRange(start: .zero, duration: CMTime(seconds: min(length, duration - offset), preferredTimescale: 44_100))
-            guard reader.startReading() else { throw SlideshowError.music }
-            while let sample = output.copyNextSampleBuffer() {
-                // Shift looped passes to follow on in time.
-                let shifted = offset == 0 ? sample : retime(sample, by: offset) ?? sample
-                out.append(shifted)
-            }
-            offset += length
+            let piece = min(length, duration - offset)
+            do {
+                try music.insertTimeRange(CMTimeRange(start: .zero, duration: CMTime(seconds: piece, preferredTimescale: 44_100)), of: track, at: CMTime(seconds: offset, preferredTimescale: 44_100))
+            } catch { throw SlideshowError.music }
+            offset += piece
         }
+        let pcm: [String: Any] = [AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: 44_100, AVNumberOfChannelsKey: 2, AVLinearPCMBitDepthKey: 16, AVLinearPCMIsFloatKey: false, AVLinearPCMIsBigEndianKey: false, AVLinearPCMIsNonInterleaved: false]
+        let reader: AVAssetReader
+        do { reader = try AVAssetReader(asset: composition) } catch { throw SlideshowError.music }
+        let output = AVAssetReaderTrackOutput(track: music, outputSettings: pcm)
+        reader.add(output)
+        guard reader.startReading() else { throw SlideshowError.music }
+        var out: [CMSampleBuffer] = []
+        while let sample = output.copyNextSampleBuffer() { out.append(sample) }
+        guard reader.status == .completed, !out.isEmpty else { throw SlideshowError.music }
         return out
-    }
-    static func retime(_ sample: CMSampleBuffer, by seconds: Double) -> CMSampleBuffer? {
-        var timing = CMSampleTimingInfo()
-        guard CMSampleBufferGetSampleTimingInfo(sample, at: 0, timingInfoOut: &timing) == noErr else { return nil }
-        timing.presentationTimeStamp = CMTimeAdd(timing.presentationTimeStamp, CMTime(seconds: seconds, preferredTimescale: 44_100))
-        timing.decodeTimeStamp = .invalid
-        var copy: CMSampleBuffer?
-        guard CMSampleBufferCreateCopyWithNewTiming(allocator: nil, sampleBuffer: sample, sampleTimingEntryCount: 1, sampleTimingArray: &timing, sampleBufferOut: &copy) == noErr else { return nil }
-        return copy
     }
 }
