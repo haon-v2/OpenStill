@@ -129,18 +129,28 @@ public enum SlideshowRenderer {
         var nextAudio = 0
         // The writer interleaves tracks, so audio is fed alongside the frames rather than after them.
         // Never wait on audio while video is still to come: the writer may be holding audio back until it gets more video.
+        // A stuck writer is reported with its state rather than hanging forever.
+        func stalled(_ step: String) -> SlideshowError {
+            .writer("\(step) stalled (writer \(writer.status.rawValue), video ready \(video.isReadyForMoreMediaData), audio ready \(audioInput?.isReadyForMoreMediaData ?? false), audio \(nextAudio)/\(audio?.count ?? 0)): \(writer.error?.localizedDescription ?? "no error")")
+        }
         func feedAudio(until seconds: Double, wait: Bool = false) async throws {
             guard let audioInput, let audio else { return }
+            let started = Date()
             while nextAudio < audio.count, CMTimeGetSeconds(CMSampleBufferGetPresentationTimeStamp(audio[nextAudio])) <= seconds {
                 if audioInput.isReadyForMoreMediaData { audioInput.append(audio[nextAudio]); nextAudio += 1 }
-                else if wait { try await Task.sleep(nanoseconds: 2_000_000) }
+                else if wait {
+                    if Date().timeIntervalSince(started) > 20 { throw stalled("Music") }
+                    try await Task.sleep(nanoseconds: 2_000_000)
+                }
                 else { return }
             }
         }
         for n in 0..<frames {
             if cancelled() { writer.cancelWriting(); throw CocoaError(.userCancelled) }
             try await feedAudio(until: Double(n) / Double(s.fps) + 0.5)
+            let waiting = Date()
             while !video.isReadyForMoreMediaData {
+                if Date().timeIntervalSince(waiting) > 20 { writer.cancelWriting(); throw stalled("Frame \(n)") }
                 try await feedAudio(until: Double(n) / Double(s.fps) + 1)
                 try await Task.sleep(nanoseconds: 2_000_000)
             }

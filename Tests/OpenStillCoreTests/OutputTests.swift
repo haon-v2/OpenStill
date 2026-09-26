@@ -162,6 +162,16 @@ import Testing
         try wav.write(to: url)
     }
 
+    @Test(.timeLimit(.minutes(1))) func slideshowExportsSilentVideo() async throws {
+        let folder = try temp(); defer { try? FileManager.default.removeItem(at: folder) }
+        var s = SlideshowSettings(); s.width = 320; s.height = 180; s.fps = 12; s.secondsPerSlide = 1; s.transitionSeconds = 0.4
+        let movie = folder.appendingPathComponent("silent.mov")
+        try await SlideshowRenderer.exportVideo([flat(1, 0, 0, 800, 600), flat(0, 0, 1, 500, 500)], settings: s, to: movie)
+        let asset = AVURLAsset(url: movie)
+        #expect(abs(CMTimeGetSeconds(try await asset.load(.duration)) - 2) < 0.25)
+        #expect(try await asset.loadTracks(withMediaType: .audio).isEmpty)
+    }
+
     @Test(.timeLimit(.minutes(2))) func slideshowExportsVideoWithMusic() async throws {
         let folder = try temp(); defer { try? FileManager.default.removeItem(at: folder) }
         let music = folder.appendingPathComponent("tone.wav"); try tone(music)
