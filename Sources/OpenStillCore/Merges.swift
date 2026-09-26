@@ -1,10 +1,9 @@
 import Foundation
 import CoreImage
 import ImageIO
-import Vision
 import simd
 
-/// HDR merge, panorama and focus stacking. Photos are aligned with Vision's homographic registration,
+/// HDR merge, panorama and focus stacking. Photos are aligned by OpenStill's own shift, rotation and scale search,
 /// merged in linear light, and written as a 16-bit float TIFF next to the originals.
 public enum MergeKind: String, CaseIterable, Sendable {
     case hdr, panorama, focusStack
@@ -277,13 +276,12 @@ public enum Merges {
 
     // MARK: Registration
 
-    /// A small copy for alignment: linear luminance, and an exposure-normalized gamma image for Vision.
+    /// A small copy for alignment: linear luminance, and an exposure-normalized gamma copy for comparing frames.
     struct Proxy {
         let width: Int, height: Int, scale: Double
         let linear: [Float]       // top row first
         let normalized: [Float]   // 0…1, gamma encoded, median lifted to middle gray
         let median: Double
-        let cgImage: CGImage?
         init(_ image: CIImage, longest: Double = 1024) {
             let image = image.transformed(by: CGAffineTransform(translationX: -image.extent.minX, y: -image.extent.minY))
             let extent = image.extent
@@ -299,11 +297,6 @@ public enum Merges {
             median = sorted.isEmpty ? 0.18 : Double(sorted[sorted.count / 2])
             let gain = Float(0.18 / max(median, 1e-6))
             normalized = lum.map { powf(min(1, $0 * gain), 1 / 2.2) }
-            let bytes = normalized.map { UInt8(max(0, min(255, $0 * 255 + 0.5))) }
-            let w = width, h = height
-            cgImage = CGDataProvider(data: Data(bytes) as CFData).flatMap {
-                CGImage(width: w, height: h, bitsPerComponent: 8, bitsPerPixel: 8, bytesPerRow: w, space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue), provider: $0, decode: nil, shouldInterpolate: true, intent: .defaultIntent)
-            }
         }
         /// Bilinear sample at a Core Image coordinate (origin bottom left, pixel centres at +0.5).
         func sample(_ values: [Float], _ x: Double, _ y: Double) -> Float? {
@@ -317,24 +310,11 @@ public enum Merges {
         }
     }
     /// Homography taking `floating` proxy coordinates to `reference` proxy coordinates, or nil when no good match.
-    /// Vision's matrix convention is checked against the pixels rather than assumed.
     static func align(_ floating: Proxy, to reference: Proxy, strict: Bool = false) -> double3x3? {
         var candidates: [double3x3] = strict ? [] : [matrix_identity_double3x3]
-        // Vision needs a large overlap; a plain shift search covers panorama frames that share only a third.
-        if let shift = translation(floating, reference) { candidates.append(shift) }
-        if let a = floating.cgImage, let b = reference.cgImage {
-            let request = VNHomographicImageRegistrationRequest(targetedCGImage: a, options: [:])
-            if (try? VNImageRequestHandler(cgImage: b, options: [:]).perform([request])) != nil,
-               let result = request.results?.first as? VNImageHomographicAlignmentObservation {
-                let m = result.warpTransform
-                let v = double3x3(columns: (SIMD3<Double>(m.columns.0), SIMD3<Double>(m.columns.1), SIMD3<Double>(m.columns.2)))
-                let flipF = double3x3(rows: [SIMD3(1, 0, 0), SIMD3(0, -1, Double(floating.height)), SIMD3(0, 0, 1)])
-                let flipR = double3x3(rows: [SIMD3(1, 0, 0), SIMD3(0, -1, Double(reference.height)), SIMD3(0, 0, 1)])
-                for base in [v, v.transpose] where abs(base.determinant) > 1e-9 {
-                    for c in [base, base.inverse] { candidates += [c, flipR * c * flipF] }
-                }
-            }
-        }
+        // A whole-frame shift search finds the rough position even when frames share only a third,
+        // then a local search adds rotation and scale for hand-held shots.
+        if let shift = translation(floating, reference) { candidates.append(refine(shift, floating, reference)) }
         var best: (double3x3, Double)?
         for h in candidates {
             guard let s = score(h, floating, reference), s.1 >= (strict ? 0.08 : 0.3) else { continue }
@@ -343,6 +323,29 @@ public enum Merges {
         guard let best else { return nil }
         if strict, best.1 < 0.6 { return nil }
         return best.0
+    }
+    /// Shift, rotation about the frame centre and scale around a starting shift, by pattern search on the correlation.
+    static func refine(_ start: double3x3, _ floating: Proxy, _ reference: Proxy) -> double3x3 {
+        let cx = Double(floating.width) / 2, cy = Double(floating.height) / 2
+        func make(_ p: [Double]) -> double3x3 {
+            let c = cos(p[2]) * p[3], s = sin(p[2]) * p[3]
+            return double3x3(rows: [SIMD3(c, -s, -c * cx + s * cy + cx + p[0]), SIMD3(s, c, -s * cx - c * cy + cy + p[1]), SIMD3(0, 0, 1)])
+        }
+        var p = [start[2][0], start[2][1], 0, 1]
+        var steps = [2.0, 2.0, 0.5 * .pi / 180, 0.01]
+        guard var best = score(make(p), floating, reference)?.0 else { return start }
+        for _ in 0..<80 {
+            var improved = false
+            for i in 0..<4 {
+                for sign in [1.0, -1.0] {
+                    var q = p; q[i] += sign * steps[i]
+                    guard abs(q[2]) < 0.2, q[3] > 0.8, q[3] < 1.25, let s = score(make(q), floating, reference), s.1 >= 0.08, s.0 > best else { continue }
+                    best = s.0; p = q; improved = true
+                }
+            }
+            if !improved { steps = steps.map { $0 / 2 }; if steps[0] < 0.1 { break } }
+        }
+        return make(p)
     }
     /// A grayscale grid, top row first, for the shift search.
     struct Grid {

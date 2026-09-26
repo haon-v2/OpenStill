@@ -96,7 +96,7 @@ Select photos in the library, then choose **Library → Actions**:
 
 The result is a 16-bit floating-point TIFF saved next to the first photo (for example `IMG_0001-HDR.tif`) and added to the library. Originals are unchanged. An HDR merge keeps highlights brighter than white: turn on **HDR → Edit in HDR**, or lower Exposure, to see them.
 
-Alignment uses Apple's Vision registration on this Mac. These are OpenStill's own merges, not Adobe's: panoramas use feathered seams rather than multi-band blending, there is no spherical projection or boundary warp, and focus stacking can show halos along strong edges. Check the result at 100%.
+Alignment is OpenStill's own: it finds the shift between frames, then refines rotation and scale, on this Mac. It doesn't correct perspective differences between hand-held frames. These are OpenStill's own merges, not Adobe's: panoramas use feathered seams rather than multi-band blending, there is no spherical projection or boundary warp, and focus stacking can show halos along strong edges. Check the result at 100%.
 
 ## XMP sidecars and Lightroom
 

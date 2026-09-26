@@ -199,7 +199,7 @@ Automated fixtures are generated and contain no user photographs. The real S9 fi
     - PQ HEIF bit depth, SDR HEIF, and a gain map in a JPEG (macOS 15).
   - MergeTests:
     - HDR merge recovering clipped highlights and shadows, and deghosting;
-    - Vision alignment of a shifted frame;
+    - alignment of a shifted and of a rotated frame (OpenStill's own search, no Vision);
     - a three-frame panorama, and refusing frames that don't overlap;
     - focus stacking keeping the sharp half of each frame;
     - largest covered rectangle, cylindrical projection, output names, float TIFF values above white.

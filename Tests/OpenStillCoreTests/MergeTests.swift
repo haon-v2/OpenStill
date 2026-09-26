@@ -84,6 +84,18 @@ import simd
         // A point of the floating frame lands 17 px left and 11 px up in the reference.
         let p = h * SIMD3<Double>(320, 240, 1)
         #expect(abs(p.x / p.z - 303) < 2 && abs(p.y / p.z - 251) < 2, "\(p.x / p.z), \(p.y / p.z)")
+        // A hand-held frame is also turned 1.5° about the scene point (420, 350).
+        let angle = 1.5 * Double.pi / 180, c = (x: 420.0, y: 350.0)
+        let turned = scene.transformed(by: CGAffineTransform(translationX: c.x, y: c.y).rotated(by: -angle).translatedBy(x: -c.x, y: -c.y))
+        let tilted = turned.cropped(to: CGRect(x: 83, y: 111, width: 640, height: 480)).transformed(by: CGAffineTransform(translationX: -83, y: -111))
+        let r = try #require(Merges.align(Merges.Proxy(tilted), to: Merges.Proxy(reference), strict: true))
+        for (x, y) in [(320.0, 240.0), (60.0, 60.0), (580.0, 420.0)] {
+            // Frame point → scene point (rotate by +angle about c) → reference point.
+            let sx = x + 83 - c.x, sy = y + 111 - c.y
+            let ex = c.x + cos(angle) * sx - sin(angle) * sy - 100, ey = c.y + sin(angle) * sx + cos(angle) * sy - 100
+            let q = r * SIMD3<Double>(x, y, 1)
+            #expect(abs(q.x / q.z - ex) < 1.5 && abs(q.y / q.z - ey) < 1.5, "(\(x), \(y)) → \(q.x / q.z), \(q.y / q.z); expected \(ex), \(ey)")
+        }
     }
 
     @Test(.timeLimit(.minutes(2))) func panoramaJoinsOverlappingFrames() throws {
