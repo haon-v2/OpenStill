@@ -93,7 +93,7 @@ final class ShootWindow:NSWindowController,NSCollectionViewDataSource,NSCollecti
         if embedded {
             let more = NSPopUpButton(frame:.zero,pullsDown:true)
             more.addItem(withTitle:"Actions")
-            for (title, action) in [("Edit selected",#selector(openSelected)),("Compare two",#selector(compareSelected)),("Edit metadata…",#selector(editMetadata)),("Add to collection…",#selector(addToCollection)),("Remove from this collection",#selector(removeFromCollection)),("Copy adjustments",#selector(copyAdjustments)),("Paste adjustments…",#selector(pasteAdjustments)),("Undo batch",#selector(undoBatch)),("Export selected…",#selector(exportSelection)),("Refresh",#selector(refreshAction))] {
+            for (title, action) in [("Edit selected",#selector(openSelected)),("Compare two",#selector(compareSelected)),("Edit metadata…",#selector(editMetadata)),("Write metadata to XMP",#selector(writeXMP)),("Read metadata from XMP",#selector(readXMP)),("Import Camera Raw edits from XMP",#selector(importCameraRaw)),("Add to collection…",#selector(addToCollection)),("Remove from this collection",#selector(removeFromCollection)),("Copy adjustments",#selector(copyAdjustments)),("Paste adjustments…",#selector(pasteAdjustments)),("Undo batch",#selector(undoBatch)),("Export selected…",#selector(exportSelection)),("Refresh",#selector(refreshAction))] {
                 let item=NSMenuItem(title:title,action:action,keyEquivalent:"");item.target=self;more.menu?.addItem(item)
             }
             top=NSStackView(views:[minimum,flag,labelFilter,sort,NSView(),more])
@@ -185,6 +185,44 @@ final class ShootWindow:NSWindowController,NSCollectionViewDataSource,NSCollecti
         let window=MetadataWindow(items:items);metadataWindow=window
         window.saved = {[weak self] updated in guard let self else{return};for record in updated{if let i=self.all.firstIndex(where:{$0.id==record.id}){self.all[i].record=record}};self.applyFilter(preserving:Set(items.map(\.id)));self.recordsChanged?()}
         window.showWindow(nil);window.window?.makeKeyAndOrderFront(nil)
+    }
+    /// Writes rating, flag, label and metadata to each photo's .xmp sidecar, keeping any other tags already in it.
+    @objc private func writeXMP(){
+        let items=selectedItems;guard !items.isEmpty else{message.stringValue="Select photos to write XMP sidecars for.";return}
+        var failures=0
+        for item in items{do{try XMPSidecar.write(item.record,for:item.url)}catch{failures += 1}}
+        message.stringValue="Wrote \(items.count-failures) XMP sidecar\(items.count-failures == 1 ? "":"s")"+(failures>0 ? " · \(failures) couldn’t be written (is the folder read-only?)":".")
+    }
+    /// Reads rating, flag, label and metadata from sidecars (or XMP embedded in the photo), replacing what OpenStill has.
+    @objc private func readXMP(){
+        let items=selectedItems;guard !items.isEmpty else{message.stringValue="Select photos to read XMP for.";return}
+        var read=0
+        for item in items{
+            guard let xmp=XMPSidecar.read(item.url),xmp.hasLibraryMetadata,let updated=try? EditStorage.records.update(item.id,{xmp.apply(to:&$0)}) else{continue}
+            if let i=all.firstIndex(where:{$0.id==item.id}){all[i].record=updated};read += 1
+        }
+        applyFilter(preserving:Set(items.map(\.id)));recordsChanged?()
+        message.stringValue=read == 0 ? "No XMP metadata found for the selected photos.":"Read XMP metadata for \(read) of \(items.count) photos."
+    }
+    /// Adds a "Camera Raw" version developed with the Lightroom / Camera Raw settings in each photo's XMP.
+    @objc private func importCameraRaw(){
+        let items=selectedItems;guard !items.isEmpty else{message.stringValue="Select photos with Camera Raw or Lightroom XMP sidecars.";return}
+        var imported=0,none=0,notes:[String:Int]=[:],approximate:Set<String>=[]
+        for item in items{
+            guard let xmp=XMPSidecar.read(item.url),xmp.hasDevelopSettings else{none += 1;continue}
+            var outcome:CameraRawImport?
+            guard let updated=try? EditStorage.records.update(item.id,{outcome=$0.importCameraRaw(xmp)}),let result=outcome else{none += 1;continue}
+            if let i=all.firstIndex(where:{$0.id==item.id}){all[i].record=updated}
+            imported += 1;for line in result.unsupported{notes[line.components(separatedBy:" (").first ?? line,default:0] += 1};approximate.formUnion(result.approximated.map{$0.components(separatedBy:" (").first ?? $0})
+        }
+        applyFilter(preserving:Set(items.map(\.id)));recordsChanged?()
+        let alert=NSAlert();alert.messageText=imported == 0 ? "No Camera Raw settings found":"Imported Camera Raw settings for \(imported) photo\(imported == 1 ? "":"s")"
+        var text=imported == 0 ? "The selected photos have no .xmp sidecar with develop settings.":"Each photo has a new version named “Camera Raw”. The originals and the sidecars are unchanged. OpenStill’s tools are its own, so the look is close to Lightroom’s but not identical."
+        if none>0 && imported>0{text += "\n\n\(none) photo\(none == 1 ? " had":"s had") no develop settings."}
+        if !approximate.isEmpty{text += "\n\nApproximated: "+approximate.sorted().joined(separator:", ")+"."}
+        if !notes.isEmpty{text += "\n\nNot carried over:\n"+notes.sorted{$0.key<$1.key}.prefix(20).map{"• \($0.key)"+(items.count>1 ? " (\($0.value))":"")}.joined(separator:"\n")}
+        alert.informativeText=text
+        if let window=browserView.window ?? window{alert.beginSheetModal(for:window)}else{alert.runModal()}
     }
     @objc private func addToCollection(){
         let items=selectedItems;guard !items.isEmpty,let catalog=EditStorage.records.catalog else{message.stringValue="Select photos to add to a collection.";return}

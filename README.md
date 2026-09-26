@@ -47,7 +47,7 @@ The Info panel reads embedded EXIF, TIFF, and auxiliary metadata through Apple's
 
 The camera, lens, ISO, focal length, aperture, and shutter remain visible above the editing tools. **Info → All recorded metadata** expands every property supplied by ImageIO, including nested EXIF/TIFF/GPS fields when available.
 
-Missing fields say **Not recorded**. Capture time is the camera's recorded local time; its offset is shown when embedded. Images exported without EXIF cannot reveal settings that were removed. Proprietary maker notes, sidecar XMP files, and lens-ID databases are not parsed in this version.
+Missing fields say **Not recorded**. Capture time is the camera's recorded local time; its offset is shown when embedded. Images exported without EXIF cannot reveal settings that were removed. Proprietary maker notes and lens-ID databases are not parsed. XMP sidecars are read into the library (see **XMP sidecars and Lightroom** below), not shown in the Info panel.
 
 Common formats include JPEG, PNG, HEIC, TIFF, and other formats supported by the installed macOS ImageIO decoders. Sensor RAW development uses bundled LibRaw 0.22.2. Unsupported files show a capability error. Animated/multipage images show the first frame/page. EXIF orientation is applied. Images retain their embedded color space for display, but HDR editing and HDR proofing are outside this release.
 
@@ -64,7 +64,26 @@ OpenStill keeps a local SQLite catalog (`Catalog.sqlite`, next to your edit reco
 - **Search** matches filenames, titles, captions, keywords, camera and lens. Every word must match.
 - **Preview cache.** Library thumbnails are saved as small JPEGs under `Previews`, keyed by the edit version and revision, so unchanged photos appear without rendering again. An edit makes a new preview and removes the old one.
 
-Moved or deleted files drop out of collections until they're found again. XMP sidecars and Lightroom catalog import come in a later release.
+Moved or deleted files drop out of collections until they're found again.
+
+## XMP sidecars and Lightroom
+
+OpenStill reads and writes `.xmp` sidecars, the files Lightroom, Bridge and Camera Raw keep next to photos (`IMG_0001.CR2` → `IMG_0001.xmp`). Your photos themselves are never changed.
+
+- **Reading.** The first time OpenStill opens a photo, it takes the rating, pick/reject, color label, title, caption, creator, copyright, location and keywords from its sidecar, or from XMP embedded in the photo when there is no sidecar. Bridge's reject rating (−1) becomes a reject flag, and hierarchical keywords (`lr:hierarchicalSubject`) keep their levels. **Actions → Read metadata from XMP** reads them again for the selected photos.
+- **Writing.** **Actions → Write metadata to XMP** writes the selected photos' rating, label, keywords and other metadata to their sidecars. Turn on **Settings → Write metadata to XMP sidecars automatically** to do this whenever they change. OpenStill replaces only the fields it manages and keeps everything else already in the file, including Camera Raw develop settings. Pick/reject is stored as `openstill:Flag`, because Lightroom doesn't write picks to XMP. A photo shot as RAW + JPEG shares one sidecar name, as in Lightroom.
+- **Camera Raw / Lightroom edits.** **Actions → Import Camera Raw edits from XMP** adds a version named "Camera Raw" developed with the settings in each photo's sidecar. The version keeps the original untouched. It carries over:
+  - exposure, contrast, highlights, shadows, whites, blacks, white balance, vibrance and saturation;
+  - clarity, texture, dehaze, and the HSL / Color mixer;
+  - color grading (and older split toning), the point tone curve (sampled at OpenStill's five points), grain, and post-crop vignette;
+  - sharpening, noise reduction, defringe, manual Transform sliders, crop and black & white.
+  OpenStill's tools are its own, so the result is close to Lightroom's but not identical. Anything it can't carry over is listed afterwards instead of being silently dropped: masks and local adjustments, spot removal, lens profiles, Upright, parametric curves, B&W mix, camera profiles and looks. White balance is an absolute temperature for RAW photos; for JPEG and other rendered photos, Camera Raw's relative temperature is approximated.
+- **Import a Lightroom Classic catalog** (**File → Import Lightroom Catalog…**). Choose an `.lrcat` file. It is opened read-only, so Lightroom's copy is never changed. OpenStill imports, for each photo it finds:
+  - rating, pick/reject and color label;
+  - keywords (with their hierarchy), title, caption and the other metadata;
+  - develop settings, as a version named "Lightroom";
+  - regular collections.
+  Photos stay where they are. If they've moved (for example to a new drive), **Relink…** points a top-level folder of the catalog to its new location. Smart collections and virtual copies are skipped. Custom label names other than Red, Yellow, Green, Blue and Purple aren't imported. Importing the same catalog again updates ratings and metadata but doesn't add a second "Lightroom" version.
 
 ## Lumix S9 and Real Time LUT
 

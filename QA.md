@@ -127,3 +127,18 @@ Automated fixtures are generated and contain no user photographs. The real S9 fi
   - preview cache replacement;
   - library filtering by label and keyword.
 - Not yet verified by hand in the native app on a Mac: the label keys, the metadata window, the collection sidebar, the smart collection editor, and first-launch indexing of a large existing library.
+
+## XMP sidecars and Lightroom import — September 26, 2026
+
+- Added:
+  - XMP sidecar reading (on first open and on demand) and writing, with an automatic-write preference; unknown tags and Camera Raw settings are kept;
+  - Camera Raw (`crs:`) develop settings import as a new version, with a report of what isn't carried over;
+  - Lightroom Classic catalog import (read-only), covering ratings, picks, labels, hierarchical keywords, metadata, collections and develop settings, with relinking of moved folders.
+- Automated tests: the new XMPImportTests suite covers:
+  - a round trip of every library field through XMP, including hierarchical keywords and alternative-language text;
+  - preserving Camera Raw settings and other tags when writing, and removing cleared fields;
+  - Bridge's reject rating and unknown label names;
+  - reading sidecars into new records, and writing them only when the preference is on and a library field changed;
+  - the mapping of about 30 Camera Raw settings, relative and absolute white balance, and unsupported-setting reports;
+  - import of a Lightroom catalog built by the test (keyword tree, picks, labels, virtual copies, smart collections and sets, missing photos, relink), which leaves the catalog file unmodified, and running the same import twice.
+- Not yet verified by hand on a Mac: a real Lightroom Classic catalog and Camera Raw sidecars from recent Lightroom versions. How close imported develop settings look to Lightroom's rendering has not been checked.

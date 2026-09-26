@@ -1,7 +1,7 @@
 import AppKit
 import OpenStillCore
 
-/// OpenStill → Settings… (⌘,). Holds update preferences; later milestones add more sections.
+/// OpenStill → Settings… (⌘,). Update and library preferences.
 final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let updates: UpdateController
     private let version = NSTextField(labelWithString: "")
@@ -10,10 +10,11 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let lastChecked = NSTextField(labelWithString: "")
     private let checkNow = NSButton(title: "Check Now", target: nil, action: nil)
     private let releases = NSButton(title: "View All Releases", target: nil, action: nil)
+    private let writeXMP = NSButton(checkboxWithTitle: "Write metadata to XMP sidecars automatically", target: nil, action: nil)
 
     init(updates: UpdateController) {
         self.updates = updates
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 460, height: 260), styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 460, height: 380), styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.title = "Settings"; window.isReleasedWhenClosed = false
         super.init(window: window)
         window.delegate = self
@@ -36,16 +37,20 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         let buttons = NSStackView(views: [checkNow, releases]); buttons.spacing = 8
         let privacy = NSTextField(wrappingLabelWithString: "Only OpenStill's public release list on GitHub is requested. Nothing about you or your photos is sent.")
         privacy.font = .systemFont(ofSize: 11); privacy.textColor = .secondaryLabelColor
-        let stack = NSStackView(views: [title, version, method, automatic, lastChecked, buttons, privacy])
+        let library = NSTextField(labelWithString: "Library"); library.font = .systemFont(ofSize: 15, weight: .semibold)
+        writeXMP.target = self; writeXMP.action = #selector(toggleXMP)
+        let xmpNote = NSTextField(wrappingLabelWithString: "When you change a rating, flag, label, keywords or other metadata, OpenStill also writes it to a .xmp file next to the photo, where Lightroom, Bridge and other apps can read it. Other information already in the file is kept. Your photos themselves are never changed.")
+        xmpNote.font = .systemFont(ofSize: 11); xmpNote.textColor = .secondaryLabelColor
+        let stack = NSStackView(views: [title, version, method, automatic, lastChecked, buttons, privacy, library, writeXMP, xmpNote])
         stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 10
         stack.edgeInsets = NSEdgeInsets(top: 22, left: 24, bottom: 22, right: 24)
-        stack.setCustomSpacing(16, after: method); stack.setCustomSpacing(16, after: buttons)
+        stack.setCustomSpacing(16, after: method); stack.setCustomSpacing(16, after: buttons); stack.setCustomSpacing(24, after: privacy)
         stack.translatesAutoresizingMaskIntoConstraints = false
         let content = NSView(); content.addSubview(stack); window.contentView = content
         NSLayoutConstraint.activate([
             stack.topAnchor.constraint(equalTo: content.topAnchor), stack.bottomAnchor.constraint(equalTo: content.bottomAnchor),
             stack.leadingAnchor.constraint(equalTo: content.leadingAnchor), stack.trailingAnchor.constraint(equalTo: content.trailingAnchor),
-            method.widthAnchor.constraint(equalToConstant: 412), privacy.widthAnchor.constraint(equalToConstant: 412)
+            method.widthAnchor.constraint(equalToConstant: 412), privacy.widthAnchor.constraint(equalToConstant: 412), xmpNote.widthAnchor.constraint(equalToConstant: 412)
         ])
     }
 
@@ -61,7 +66,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             lastChecked.stringValue = "Last checked " + date.formatted(.relative(presentation: .named))
         } else { lastChecked.stringValue = "Not checked yet" }
         checkNow.isEnabled = !updates.isChecking
+        writeXMP.state = XMPSidecar.autoWrite ? .on : .off
     }
+    @objc private func toggleXMP() { UserDefaults.standard.set(writeXMP.state == .on, forKey: XMPSidecar.autoWriteKey) }
     @objc private func toggleAutomatic() { updates.automaticChecks = automatic.state == .on; refresh() }
     @objc private func check() { updates.checkForUpdates(self); refresh() }
     @objc private func openReleases() { NSWorkspace.shared.open(UpdateCheck.releasesPage) }

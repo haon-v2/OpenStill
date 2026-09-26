@@ -556,6 +556,12 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         }
     }
     @objc func toggleFullscreen() { view.window?.toggleFullScreen(nil) }
+    private var lightroomImport: LightroomImportWindow?
+    @objc func importLightroomCatalog() {
+        let window = lightroomImport ?? LightroomImportWindow(); lightroomImport = window
+        window.completed = { [weak self] in guard let self else { return }; self.librarySidebar.reloadCollections(); self.libraryBrowser?.refresh() }
+        window.showWindow(nil); window.window?.makeKeyAndOrderFront(nil)
+    }
     private func escapeView() {
         if canvas.tool != .browse { finishMaskEditing(); canvas.clearTool(); info.status("Tool cancelled. Edits are saved on this Mac."); return }
         if view.window?.styleMask.contains(.fullScreen) == true { toggleFullscreen() }

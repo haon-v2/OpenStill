@@ -73,6 +73,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         add(file, "Export Edited Photo…", #selector(ViewerController.exportPhoto), "e", target: viewer, modifiers: [.command, .shift])
         add(file, "Export Portable Edits…", #selector(ViewerController.exportEditPackage), target: viewer)
         add(file, "Import Portable Edits…", #selector(ViewerController.importEditPackage), target: viewer)
+        add(file, "Import Lightroom Catalog…", #selector(ViewerController.importLightroomCatalog), target: viewer)
         add(file, "Reveal in Finder", #selector(ViewerController.revealPhoto), "r", target: viewer)
         add(file, "Share Photo…", #selector(ViewerController.sharePhoto), "s", target: viewer, modifiers: [.command, .shift])
         add(file, "Move to Trash…", #selector(ViewerController.trashPhoto), "\u{7f}", target: viewer)
