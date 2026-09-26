@@ -14,8 +14,8 @@ import simd
     /// Blurred noise stretched to 0…1: texture Vision can register, with no repeating pattern.
     func texture(_ size: CGSize, radius: Double = 1.5, offset: CGPoint = .zero) -> CIImage {
         let noise = CIFilter(name: "CIRandomGenerator")!.outputImage!.transformed(by: CGAffineTransform(translationX: -offset.x, y: -offset.y)).applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: radius])
-        let v = CIVector(x: 4, y: 4, z: 4, w: 0)
-        return noise.applyingFilter("CIColorMatrix", parameters: ["inputRVector": v, "inputGVector": v, "inputBVector": v, "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 0), "inputBiasVector": CIVector(x: -5.5, y: -5.5, z: -5.5, w: 1)])
+        let v = CIVector(x: 2.5, y: 2.5, z: 2.5, w: 0)
+        return noise.applyingFilter("CIColorMatrix", parameters: ["inputRVector": v, "inputGVector": v, "inputBVector": v, "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 0), "inputBiasVector": CIVector(x: -3.25, y: -3.25, z: -3.25, w: 1)])
             .applyingFilter("CIColorClamp").cropped(to: CGRect(origin: .zero, size: size))
     }
     /// Whole image, top row first: p[(row * w + x) * 4].
@@ -69,10 +69,10 @@ import simd
     }
 
     @Test(.timeLimit(.minutes(1))) func alignmentFindsAShift() throws {
-        let size = CGSize(width: 640, height: 480), bounds = CGRect(origin: .zero, size: size)
         let scene = scaled(texture(CGSize(width: 800, height: 700), radius: 2), 0.6, 0.1)
-        let reference = scene.cropped(to: bounds)
-        let floating = scene.transformed(by: CGAffineTransform(translationX: 17, y: -11)).cropped(to: bounds)
+        func frame(_ x: CGFloat, _ y: CGFloat) -> CIImage { scene.cropped(to: CGRect(x: x, y: y, width: 640, height: 480)).transformed(by: CGAffineTransform(translationX: -x, y: -y)) }
+        // The floating frame was taken 17 px further left and 11 px higher.
+        let reference = frame(100, 100), floating = frame(83, 111)
         let h = try #require(Merges.align(Merges.Proxy(floating), to: Merges.Proxy(reference), strict: true))
         // A point of the floating frame lands 17 px left and 11 px up in the reference.
         let p = h * SIMD3<Double>(320, 240, 1)

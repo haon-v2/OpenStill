@@ -285,6 +285,7 @@ public enum Merges {
         let median: Double
         let cgImage: CGImage?
         init(_ image: CIImage, longest: Double = 1024) {
+            let image = image.transformed(by: CGAffineTransform(translationX: -image.extent.minX, y: -image.extent.minY))
             let extent = image.extent
             scale = min(1, longest / Double(max(extent.width, extent.height)))
             width = max(1, Int((Double(extent.width) * scale).rounded())); height = max(1, Int((Double(extent.height) * scale).rounded()))
@@ -319,6 +320,8 @@ public enum Merges {
     /// Vision's matrix convention is checked against the pixels rather than assumed.
     static func align(_ floating: Proxy, to reference: Proxy, strict: Bool = false) -> double3x3? {
         var candidates: [double3x3] = strict ? [] : [matrix_identity_double3x3]
+        // Vision needs a large overlap; a plain shift search covers panorama frames that share only a third.
+        if let shift = translation(floating, reference) { candidates.append(shift) }
         if let a = floating.cgImage, let b = reference.cgImage {
             let request = VNHomographicImageRegistrationRequest(targetedCGImage: a, options: [:])
             if (try? VNImageRequestHandler(cgImage: b, options: [:]).perform([request])) != nil,
@@ -335,26 +338,91 @@ public enum Merges {
         var best: (double3x3, Double)?
         for h in candidates {
             guard let s = score(h, floating, reference), s.1 >= (strict ? 0.08 : 0.3) else { continue }
-            if best == nil || s.0 < best!.1 { best = (h, s.0) }
+            if best == nil || s.0 > best!.1 { best = (h, s.0) }
         }
         guard let best else { return nil }
-        if strict, best.1 > 0.1 { return nil }
+        if strict, best.1 < 0.6 { return nil }
         return best.0
     }
-    /// Mean luminance difference (gamma, exposure-normalized) and the fraction of the reference the floating frame covers.
+    /// A grayscale grid, top row first, for the shift search.
+    struct Grid {
+        let v: [Float], w: Int, h: Int
+        init(_ v: [Float], _ w: Int, _ h: Int) { self.v = v; self.w = w; self.h = h }
+        var half: Grid {
+            let w2 = max(1, w / 2), h2 = max(1, h / 2)
+            var out = [Float](repeating: 0, count: w2 * h2)
+            for r in 0..<h2 { for c in 0..<w2 {
+                let r0 = min(2 * r, h - 1), r1 = min(2 * r + 1, h - 1), c0 = min(2 * c, w - 1), c1 = min(2 * c + 1, w - 1)
+                out[r * w2 + c] = (v[r0 * w + c0] + v[r0 * w + c1] + v[r1 * w + c0] + v[r1 * w + c1]) * 0.25
+            } }
+            return Grid(out, w2, h2)
+        }
+        /// Correlation with `b` when this grid's pixel (c, r) sits on b's (c + dx, r + dy); nil for a small overlap or a flat area.
+        func ncc(_ b: Grid, dx: Int, dy: Int, minimum: Double, step: Int) -> Double? {
+            let c0 = max(0, -dx), c1 = min(w, b.w - dx), r0 = max(0, -dy), r1 = min(h, b.h - dy)
+            guard c1 > c0, r1 > r0, Double((c1 - c0) * (r1 - r0)) >= minimum else { return nil }
+            var sa = 0.0, sb = 0.0, saa = 0.0, sbb = 0.0, sab = 0.0, n = 0.0
+            var r = r0
+            while r < r1 {
+                var c = c0
+                while c < c1 {
+                    let x = Double(v[r * w + c]), y = Double(b.v[(r + dy) * b.w + c + dx])
+                    sa += x; sb += y; saa += x * x; sbb += y * y; sab += x * y; n += 1
+                    c += step
+                }
+                r += step
+            }
+            let va = saa - sa * sa / n, vb = sbb - sb * sb / n
+            guard va > 1e-9, vb > 1e-9 else { return nil }
+            return (sab - sa * sb / n) / (va * vb).squareRoot()
+        }
+    }
+    /// The whole-frame shift that best lines the frames up (normalized cross-correlation, coarse to fine),
+    /// as a homography from floating to reference coordinates.
+    static func translation(_ floating: Proxy, _ reference: Proxy) -> double3x3? {
+        var levels = [(Grid(floating.normalized, floating.width, floating.height), Grid(reference.normalized, reference.width, reference.height))]
+        while let last = levels.last, max(last.0.w, last.0.h, last.1.w, last.1.h) > 96 { levels.append((last.0.half, last.1.half)) }
+        var best: (dx: Int, dy: Int)?
+        for (index, level) in levels.enumerated().reversed() {
+            let (a, b) = level
+            var shifts: [(Int, Int)] = []
+            if let prior = best {
+                for dy in -2...2 { for dx in -2...2 { shifts.append((prior.dx * 2 + dx, prior.dy * 2 + dy)) } }
+            } else {
+                for dy in (1 - a.h)..<b.h { for dx in (1 - a.w)..<b.w { shifts.append((dx, dy)) } }
+            }
+            let minimum = Double(min(a.w * a.h, b.w * b.h)) * 0.15
+            var top = -2.0, pick: (Int, Int)?
+            for (dx, dy) in shifts {
+                guard let r = a.ncc(b, dx: dx, dy: dy, minimum: minimum, step: index == 0 ? 2 : 1), r > top else { continue }
+                top = r; pick = (dx, dy)
+            }
+            guard let pick else { return nil }
+            best = (pick.0, pick.1)
+        }
+        guard let best else { return nil }
+        // Grid rows run down; Core Image's y runs up.
+        let tx = Double(best.dx), ty = Double(reference.height - floating.height - best.dy)
+        return double3x3(rows: [SIMD3(1, 0, tx), SIMD3(0, 1, ty), SIMD3(0, 0, 1)])
+    }
+    /// Normalized cross-correlation where the frames overlap (1 = same picture, whatever the brightness),
+    /// and the fraction of the reference the floating frame covers.
     static func score(_ h: double3x3, _ floating: Proxy, _ reference: Proxy) -> (Double, Double)? {
         guard abs(h.determinant) > 1e-9 else { return nil }
-        let inverse = h.inverse, n = 48
-        var total = 0.0, count = 0
+        let inverse = h.inverse, n = 64
+        var sa = 0.0, sb = 0.0, saa = 0.0, sbb = 0.0, sab = 0.0, count = 0
         for gy in 0..<n { for gx in 0..<n {
             let x = (Double(gx) + 0.5) / Double(n) * Double(reference.width), y = (Double(gy) + 0.5) / Double(n) * Double(reference.height)
             let q = inverse * SIMD3(x, y, 1)
             guard q.z > 1e-9 else { continue }
             guard let a = floating.sample(floating.normalized, q.x / q.z, q.y / q.z), let b = reference.sample(reference.normalized, x, y) else { continue }
-            total += Double(abs(a - b)); count += 1
+            let x = Double(a), y = Double(b)
+            sa += x; sb += y; saa += x * x; sbb += y * y; sab += x * y; count += 1
         } }
-        guard count > 0 else { return nil }
-        return (total / Double(count), Double(count) / Double(n * n))
+        guard count >= 16 else { return nil }
+        let c = Double(count), va = saa - sa * sa / c, vb = sbb - sb * sb / c
+        guard va > 1e-9, vb > 1e-9 else { return nil }
+        return ((sab - sa * sb / c) / (va * vb).squareRoot(), c / Double(n * n))
     }
     /// Multiplier that brings `floating` to the reference exposure, from pixels both frames expose well.
     static func exposureRatio(_ floating: Proxy, to reference: Proxy, transform h: double3x3) -> Double? {
