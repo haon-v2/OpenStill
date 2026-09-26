@@ -77,7 +77,7 @@ final class MaskComponentPanel:NSStackView {
     @objc private func colorChanged(){guard let rgb=color.color.usingColorSpace(.sRGB)else{return};range("Color range",final:true){$0.red=rgb.redComponent;$0.green=rgb.greenComponent;$0.blue=rgb.blueComponent}}
     @objc private func sample(){command?("sampleRange")}
     @objc private func aiAction(){let i=aiActions.indexOfSelectedItem;aiActions.selectItem(at:0);guard i>0,i<=Self.aiChoices.count else{return};command?("ai."+Self.aiChoices[i-1].1)}
-    func select(_ id:UUID){selectedID=id;update(root,enabled:true)}
+    func selectComponent(_ id:UUID){selectedID=id;update(root,enabled:true)}
     @objc private func action(){
         let i=componentActions.indexOfSelectedItem;componentActions.selectItem(at:0)
         if (1...6).contains(i){

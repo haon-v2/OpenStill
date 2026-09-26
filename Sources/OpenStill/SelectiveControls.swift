@@ -111,7 +111,7 @@ final class MaskPanel: NSStackView {
     var maskChanged:((AdjustmentMask?,String,Bool)->Void)?
     private let components=MaskComponentPanel()
     var selectedID:UUID? {components.selectedID}
-    func selectComponent(_ id:UUID){components.select(id)}
+    func selectComponent(_ id:UUID){components.selectComponent(id)}
     var command: ((String)->Void)?
     var featherChanged: ((Double,Bool)->Void)?
     var brushChanged: ((Double,Double,Double)->Void)?
