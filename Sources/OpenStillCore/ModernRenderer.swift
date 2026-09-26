@@ -77,6 +77,8 @@ public enum ModernRenderer {
                     base = base.applyingFilter("CIColorMatrix",parameters:["inputRVector":CIVector(x:g.red,y:0,z:0,w:0),"inputGVector":CIVector(x:0,y:g.green,z:0,w:0),"inputBVector":CIVector(x:0,y:0,z:g.blue,w:0)])
                 }
                 edits.temperature = 6500; edits.tint = 0; edits.neutralBalance = NeutralBalance()
+                // process() would reload the base from disk; give it the white-balanced image instead.
+                edits.baseAsset = nil
             }
             return try process(base, edits:edits, maximumDimension:maximumDimension, lutOverride:lutOverride, stopBeforeTool:stopBeforeTool)
         }
