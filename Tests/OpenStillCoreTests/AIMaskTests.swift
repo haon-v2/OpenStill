@@ -27,7 +27,7 @@ import UniformTypeIdentifiers
         return asset.lastPathComponent
     }
 
-    @Test func depthRangeSelectsANearFarBand() throws {
+    @Test(.timeLimit(.minutes(1))) func depthRangeSelectsANearFarBand() throws {
         let size = CGSize(width: 100, height: 80)
         var mask = AdjustmentMask(kind: "depthRange"); mask.asset = try verticalDepth(size); mask.feather = 0
         var range = RangeSelection(); range.low = 0.5; range.high = 1; range.softness = 0.05; mask.range = range
@@ -48,7 +48,7 @@ import UniformTypeIdentifiers
         #expect(abs(value(r, w, 2, 50) - value(r, w, w - 3, 50)) > 0.9)
     }
 
-    @Test func lensBlurKeepsTheFocusBandSharp() throws {
+    @Test(.timeLimit(.minutes(1))) func lensBlurKeepsTheFocusBandSharp() throws {
         let size = CGSize(width: 400, height: 300)
         let checker = CIFilter(name: "CICheckerboardGenerator", parameters: ["inputColor0": CIColor.white, "inputColor1": CIColor.black, "inputWidth": 4.0, "inputCenter": CIVector(x: 0, y: 0)])!
             .outputImage!.cropped(to: CGRect(origin: .zero, size: size))
@@ -69,7 +69,7 @@ import UniformTypeIdentifiers
         #expect(!LensBlurSettings().hasEffect)
     }
 
-    @Test func lensBlurRunsInThePipelineAndSurvivesSaving() throws {
+    @Test(.timeLimit(.minutes(1))) func lensBlurRunsInThePipelineAndSurvivesSaving() throws {
         let size = CGSize(width: 200, height: 150)
         let checker = CIFilter(name: "CICheckerboardGenerator", parameters: ["inputColor0": CIColor(red: 0.8, green: 0.8, blue: 0.8), "inputColor1": CIColor(red: 0.1, green: 0.1, blue: 0.1), "inputWidth": 3.0, "inputCenter": CIVector(x: 0, y: 0)])!
             .outputImage!.cropped(to: CGRect(origin: .zero, size: size))
@@ -92,7 +92,7 @@ import UniformTypeIdentifiers
         #expect(cleared.advanced?.lensBlur == nil)
     }
 
-    @Test func helpers() throws {
+    @Test(.timeLimit(.minutes(1))) func helpers() throws {
         let hull = AIMasks.convexHull([CGPoint(x: 0, y: 0), CGPoint(x: 10, y: 0), CGPoint(x: 10, y: 10), CGPoint(x: 0, y: 10), CGPoint(x: 5, y: 5), CGPoint(x: 3, y: 7)])
         #expect(hull.count == 4 && !hull.contains(CGPoint(x: 5, y: 5)))
         // Depth maps are stretched to use the full range.
@@ -111,7 +111,7 @@ import UniformTypeIdentifiers
         #expect(AIMaskKind.allCases.allSatisfy { !$0.title.isEmpty })
     }
 
-    @Test func emptyPhotosReportNothingFound() throws {
+    @Test(.timeLimit(.minutes(1))) func emptyPhotosReportNothingFound() throws {
         let context = CGContext(data: nil, width: 160, height: 120, bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
         context.setFillColor(CGColor(red: 0.3, green: 0.5, blue: 0.7, alpha: 1)); context.fill(CGRect(x: 0, y: 0, width: 160, height: 120))
         let plain = context.makeImage()!
@@ -123,7 +123,7 @@ import UniformTypeIdentifiers
         #expect(AIMasks.embeddedDepth(url, size: CGSize(width: 160, height: 120)) == nil)
     }
 
-    @Test func rawDenoiseKeepsEditsLive() throws {
+    @Test(.timeLimit(.minutes(1))) func rawDenoiseKeepsEditsLive() throws {
         var edits = PhotoEdits(); edits.exposure = 1; edits.temperature = 5200; edits.ensureAdvanced(); edits.advanced!.rawRecovery = 4
         edits.setMask(AdjustmentMask(kind: "radial"), for: "Develop")
         let decode = RawDenoiseBase.decodeOnly(edits)

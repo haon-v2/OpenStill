@@ -35,9 +35,10 @@ jobs:
         run: |
           set +e
           export PKG_CONFIG_PATH="$PWD/.build/native/lib/pkgconfig"
-          bash scripts/test.sh > test.log 2>&1
+          perl -e 'alarm shift; exec @ARGV' 900 bash scripts/test.sh > test.log 2>&1
           status=$?
-          grep -E "✘|error:|recorded an issue|Test run with" test.log | head -120
+          grep -E "✘|error:|recorded an issue|Test run with|time limit" test.log | head -120
+          if [ $status -ne 0 ]; then echo "--- last test output ---"; grep -E "started|passed|failed" test.log | tail -25; fi
           exit $status
       - name: App bundle
         run: bash scripts/build-app.sh > app.log 2>&1 || { tail -60 app.log; exit 1; }
