@@ -55,5 +55,23 @@ jobs:
           grep -E "✘|error:|recorded an issue|Test run with|time limit" test.log | head -120
           if [ $status -ne 0 ]; then echo "--- started but not finished ---"; python3 -c "import re;t=open('test.log').read();s=set(re.findall(r'Test (\\w+\\(\\)) started',t));d=set(re.findall(r'Test (\\w+\\(\\)) (?:passed|failed)',t));print(sorted(s-d))"; fi
           exit $status
+      - name: Crash report
+        if: failure()
+        run: |
+          report=$(ls -t ~/Library/Logs/DiagnosticReports/*.ips 2>/dev/null | head -1)
+          [ -n "$report" ] || { echo "No crash report"; exit 0; }
+          echo "== $report"
+          python3 - "$report" <<'PY'
+          import json, sys
+          lines = open(sys.argv[1]).read().split('\n', 1)
+          body = json.loads(lines[1])
+          print('exception:', body.get('exception'), body.get('termination', {}).get('indicator'))
+          images = body.get('usedImages', [])
+          for thread in body.get('threads', []):
+              if thread.get('triggered'):
+                  for frame in thread.get('frames', [])[:30]:
+                      image = images[frame.get('imageIndex', 0)].get('name', '?') if images else '?'
+                      print(image, frame.get('symbol', '?'), frame.get('sourceFile', ''), frame.get('sourceLine', ''))
+          PY
       - name: App bundle
         run: bash scripts/build-app.sh > app.log 2>&1 || { tail -60 app.log; exit 1; }
