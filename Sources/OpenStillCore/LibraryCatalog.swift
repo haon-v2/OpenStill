@@ -131,7 +131,7 @@ public struct CatalogPhoto: Equatable, Sendable {
     /// EXIF, TIFF and GPS facts plus file size and modification time.
     public static func read(_ url: URL, id: UUID) -> CatalogPhoto {
         var p = CatalogPhoto(id: id, path: url.standardizedFileURL.path)
-        let values = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
+        let values = try? URL(fileURLWithPath: url.path).resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
         p.size = Int64(values?.fileSize ?? 0); p.modified = values?.contentModificationDate?.timeIntervalSince1970 ?? 0
         guard let io = CGImageSourceCreateWithURL(url as CFURL, nil), let props = CGImageSourceCopyPropertiesAtIndex(io, 0, nil) as? [String: Any] else { return p }
         let exif = props[kCGImagePropertyExifDictionary as String] as? [String: Any] ?? [:]

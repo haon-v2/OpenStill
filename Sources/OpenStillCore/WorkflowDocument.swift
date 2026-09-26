@@ -222,7 +222,8 @@ public final class PhotoRecordStore {
         lock.lock(); defer { lock.unlock() }
         let path = source.standardizedFileURL.path
         // Fast path: the catalog knows this exact file (same path, size and modification time), so no hashing.
-        let values = try? source.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
+        // A fresh URL: Foundation caches resource values per URL object, which would hide a replaced file.
+        let values = try? URL(fileURLWithPath: path).resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
         if let catalog, let size = values?.fileSize, let modified = values?.contentModificationDate?.timeIntervalSince1970,
            let id = catalog.recordID(path: path, size: Int64(size), modified: modified), let record = try? read(id), record.sourcePath == path { return record }
         let fingerprint = try Self.contentHash(source)
