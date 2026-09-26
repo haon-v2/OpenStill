@@ -17,6 +17,7 @@
         </item>
         <item>
             <title>OpenStill 0.0.2</title>
+            <description><![CDATA[<h3>What’s new in 0.0.2</h3><ul><li>Perspective correction with Upright (Auto, Level, Vertical, Full, Guided) in the new Transform tool</li><li>Camera profiles, DCP import and calibration in the new Profile &amp; calibration tool</li><li>RAW decoding options: demosaic method and noise reduction</li><li>Library catalog for faster opening, with an Include subfolders option</li><li>Color labels (keys 6–9), title, caption, keywords and other metadata, with presets</li><li>Collections and smart collections, and search across keywords, camera and lens</li><li>Saved previews so the library shows edited photos without re-rendering</li></ul>]]></description>
             <pubDate>Sat, 26 Sep 2026 02:27:08 GMT</pubDate>
             <sparkle:version>18</sparkle:version>
             <sparkle:shortVersionString>0.0.2</sparkle:shortVersionString>
