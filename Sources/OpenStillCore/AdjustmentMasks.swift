@@ -46,9 +46,11 @@ public struct AdjustmentMask: Codable, Equatable {
             let rx = max(1,abs(end.x-start.x)*size.width), ry = max(1,abs(end.y-start.y)*size.height)
             mask = CIFilter(name:"CIRadialGradient",parameters:["inputCenter":CIVector(x:0,y:0),"inputRadius0":max(0,1-feather),"inputRadius1":1,"inputColor0":CIColor(red:1,green:1,blue:1),"inputColor1":CIColor(red:0,green:0,blue:0)])!.outputImage!
                 .transformed(by:CGAffineTransform(scaleX:rx,y:ry).concatenating(CGAffineTransform(translationX:center.x,y:center.y))).cropped(to:bounds)
-        case "object":
+        case "object", "depthMap":
             guard let asset else { mask=black; break }
-            mask = CIImage(cgImage:try PhotoDecoder.decode(EditStorage.asset(asset)))
+            // Depth maps are data, not pictures: read their values without color management.
+            let decoded = try PhotoDecoder.decode(EditStorage.asset(asset))
+            mask = kind == "depthMap" ? CIImage(cgImage:decoded,options:[.colorSpace:NSNull()]) : CIImage(cgImage:decoded)
             mask = mask.transformed(by:CGAffineTransform(scaleX:size.width/mask.extent.width,y:size.height/mask.extent.height)).cropped(to:bounds)
         default: mask = black
         }
@@ -113,6 +115,8 @@ public struct AdvancedEdits: Codable, Equatable {
     public var profile: ProfileSettings?
     public var calibration: CalibrationSettings?
     public var rawOptions: RawOptions?
+    public var lensBlur: LensBlurSettings?
+    public var rawDenoise: RawDenoiseBase?
     public init() {}
 }
 

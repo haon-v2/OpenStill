@@ -17,6 +17,8 @@ final class MaskComponentPanel:NSStackView {
     private let tolerance=ContinuousSlider(range:0...1,value:0.15),softness=ContinuousSlider(range:0...1,value:0.15)
     private let luminance=NSStackView(),colors=NSStackView()
     private let componentActions=NSPopUpButton(frame:.zero,pullsDown:true)
+    private let aiActions=NSPopUpButton(frame:.zero,pullsDown:true)
+    private static let aiChoices:[(String,String)]=[("Subject","subject"),("Background","background"),("People","people"),("Person 1","person.1"),("Person 2","person.2"),("Person 3","person.3"),("Person 4","person.4"),("Face","face"),("Eyes","eyes"),("Eyebrows","eyebrows"),("Lips","lips"),("Skin","skin"),("Sky (local AI)","sky"),("Depth range","depth")]
     private static var clipboard:AdjustmentMask?
     override init(frame:NSRect){
         super.init(frame:frame);orientation = .vertical;alignment = .leading;spacing=8
@@ -29,6 +31,8 @@ final class MaskComponentPanel:NSStackView {
         opacity.setAccessibilityLabel("Mask component opacity");opacity.changed = { [weak self] value,final in self?.mutate("Mask opacity",final:final){$0.opacity=value/100} };row(opacity)
         componentActions.addItems(withTitles:["Component actions…","New brush","New linear gradient","New radial","New object selection","New color range","New luminance range","Duplicate component","Delete component","Invert component","Copy entire tool mask","Paste independent mask"])
         componentActions.target=self;componentActions.action = #selector(action);row(componentActions)
+        aiActions.addItem(withTitle:"Select with AI…");for (title,_) in Self.aiChoices{aiActions.addItem(withTitle:title)}
+        aiActions.target=self;aiActions.action = #selector(aiAction);aiActions.setAccessibilityLabel("Add an AI selection");aiActions.toolTip="Runs on this Mac. Each choice adds a new mask component you can combine, invert or subtract.";row(aiActions)
         for stack in [rangeControls,colors,luminance] {stack.orientation = .vertical;stack.alignment = .leading;stack.spacing=8}
         row(rangeControls);rangeControls.addArrangedSubview(colors);rangeControls.addArrangedSubview(luminance)
         color.target=self;color.action = #selector(colorChanged);color.setAccessibilityLabel("Color range target");colors.addArrangedSubview(color)
@@ -55,7 +59,7 @@ final class MaskComponentPanel:NSStackView {
         for c in list {picker.addItem(withTitle:(c.visible ? "":"Hidden · ")+c.name);picker.lastItem?.representedObject=c.id.uuidString}
         if let i=list.firstIndex(where:{$0.id==selectedID}){picker.selectItem(at:i)}
         let c=selected
-        picker.isEnabled=enabled && c != nil;name.isEnabled=enabled && c != nil;visible.isEnabled=enabled && c != nil;operation.isEnabled=enabled && c != nil;opacity.isEnabled=enabled && c != nil;componentActions.isEnabled=enabled
+        aiActions.isEnabled=enabled;picker.isEnabled=enabled && c != nil;name.isEnabled=enabled && c != nil;visible.isEnabled=enabled && c != nil;operation.isEnabled=enabled && c != nil;opacity.isEnabled=enabled && c != nil;componentActions.isEnabled=enabled
         name.stringValue=c?.name ?? "";visible.state=c?.visible == false ? .off:.on;operation.selectItem(at:MaskCombination.allCases.firstIndex(of:c?.operation ?? .add) ?? 0);opacity.doubleValue=(c?.opacity ?? 1)*100
         let range=c?.selection.range ?? RangeSelection(),kind=c?.selection.kind
         rangeControls.isHidden=kind != "colorRange" && kind != "luminanceRange";colors.isHidden=kind != "colorRange";luminance.isHidden=kind != "luminanceRange"
@@ -72,6 +76,8 @@ final class MaskComponentPanel:NSStackView {
     @objc private func combine(){mutate("Combine masks"){$0.operation=MaskCombination.allCases[max(0,operation.indexOfSelectedItem)]}}
     @objc private func colorChanged(){guard let rgb=color.color.usingColorSpace(.sRGB)else{return};range("Color range",final:true){$0.red=rgb.redComponent;$0.green=rgb.greenComponent;$0.blue=rgb.blueComponent}}
     @objc private func sample(){command?("sampleRange")}
+    @objc private func aiAction(){let i=aiActions.indexOfSelectedItem;aiActions.selectItem(at:0);guard i>0,i<=Self.aiChoices.count else{return};command?("ai."+Self.aiChoices[i-1].1)}
+    func selectComponent(_ id:UUID){selectedID=id;update(root,enabled:true)}
     @objc private func action(){
         let i=componentActions.indexOfSelectedItem;componentActions.selectItem(at:0)
         if (1...6).contains(i){

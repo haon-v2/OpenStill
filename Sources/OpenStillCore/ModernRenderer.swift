@@ -68,7 +68,20 @@ public enum ModernRenderer {
             return CIImage(cgImage:try PhotoEditor.render(PhotoDecoder.decode(url), edits: recipe.edits, lutOverride:lutOverride, previewMaxDimension: maximumDimension))
         }
         var edits = recipe.edits
-        if let asset = edits.baseAsset { return try process(readImage(EditStorage.asset(asset)), edits:edits, maximumDimension:maximumDimension, lutOverride:lutOverride, stopBeforeTool:stopBeforeTool) }
+        if let asset = edits.baseAsset {
+            var base = try readImage(EditStorage.asset(asset))
+            if recipe.sourceMode == .raw, let denoised = edits.advanced?.rawDenoise {
+                // The denoised sensor data already carries the white balance it was decoded with; apply only the change since.
+                if denoised.temperature != edits.temperature || denoised.tint != edits.tint {
+                    let g = denoised.gains(to:edits.temperature,tint:edits.tint)
+                    base = base.applyingFilter("CIColorMatrix",parameters:["inputRVector":CIVector(x:g.red,y:0,z:0,w:0),"inputGVector":CIVector(x:0,y:g.green,z:0,w:0),"inputBVector":CIVector(x:0,y:0,z:g.blue,w:0)])
+                }
+                edits.temperature = 6500; edits.tint = 0; edits.neutralBalance = NeutralBalance()
+                // process() would reload the base from disk; give it the white-balanced image instead.
+                edits.baseAsset = nil
+            }
+            return try process(base, edits:edits, maximumDimension:maximumDimension, lutOverride:lutOverride, stopBeforeTool:stopBeforeTool)
+        }
         let input = try source(url, mode:recipe.sourceMode, raw:recipe.raw,halfSize:maximumDimension.map{$0<=2048} ?? false)
         if recipe.sourceMode == .raw { edits.temperature = 6500; edits.tint = 0; edits.neutralBalance = NeutralBalance() }
         return try process(input, edits:edits, maximumDimension:maximumDimension, lutOverride:lutOverride, stopBeforeTool:stopBeforeTool)

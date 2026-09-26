@@ -30,8 +30,11 @@ def setup():
     (ROOT/'ready.json').write_text(json.dumps({'version':1, 'models': MANIFEST}))
     say('Local AI tools are ready.')
 
+MODEL_FOR = {'skymask': 'sky', 'upscale': 'detail'}
+
 def session(kind):
     import onnxruntime as ort
+    kind = MODEL_FOR.get(kind, kind)
     path = ROOT/'models'/MANIFEST[kind][0]['name']
     options = ort.SessionOptions(); options.intra_op_num_threads = 4
     options.log_severity_level = 3
@@ -46,6 +49,15 @@ def run(args):
     image = Image.open(args.input).convert('RGB')
     w, h = image.size
     model = session(args.tool)
+    if args.tool in ('skymask', 'depth', 'upscale', 'denoise', 'detail'):
+        from float_bridge import tiled, sky_mask, depth_map
+        bounded = np.asarray(image, dtype=np.float32)/255
+        if args.tool == 'skymask': sky_mask(bounded, model, w, h).save(args.output)
+        elif args.tool == 'depth': depth_map(bounded, model, w, h).save(args.output)
+        else:
+            result = tiled(bounded, model, args.tool, say, scale=2 if args.tool == 'upscale' else 1)
+            Image.fromarray((np.clip(result, 0, 1)*255+.5).astype('uint8')).save(args.output)
+        say('Done'); return
     if args.tool == 'sky':
         small = np.asarray(image.resize((320,320),Image.Resampling.BILINEAR),dtype=np.float32)/255
         small = (small - np.array([.485,.456,.406])) / np.array([.229,.224,.225])
@@ -76,31 +88,10 @@ def run(args):
         restored=Image.fromarray(pred).resize(patch.size,Image.Resampling.LANCZOS)
         patch=Image.composite(restored,patch,pmask)
         image.paste(patch,box[:2]); image.save(args.output)
-    else:
-        # Overlapped tiles bound memory. Keep full source dimensions: the detail model's
-        # learned 4x output is downsampled to sharpen/restoratively enhance existing pixels.
-        tile=256; border=32
-        arr=np.asarray(image); output=np.empty_like(arr)
-        total=((w+tile-1)//tile)*((h+tile-1)//tile); done=0
-        for y in range(0,h,tile):
-            for x in range(0,w,tile):
-                x0,y0=max(0,x-border),max(0,y-border); x1,y1=min(w,x+tile+border),min(h,y+tile+border)
-                patch=arr[y0:y1,x0:x1]; ph,pw=patch.shape[:2]
-                # SCUNet's window hierarchy is most reliable on multiples of 64.
-                padded=np.pad(patch,((0,(-ph)%64),(0,(-pw)%64),(0,0)),mode='reflect')
-                inputs=padded.astype(np.float32).transpose(2,0,1)[None]/255
-                prediction=model.run(None,{model.get_inputs()[0].name: inputs})[0][0]
-                rendered=Image.fromarray((np.clip(prediction.transpose(1,2,0),0,1)*255).astype('uint8'))
-                if args.tool=='detail': rendered=rendered.resize((padded.shape[1],padded.shape[0]),Image.Resampling.LANCZOS)
-                data=np.asarray(rendered)[:ph,:pw]
-                endx,endy=min(w,x+tile),min(h,y+tile)
-                output[y:endy,x:endx]=data[y-y0:endy-y0,x-x0:endx-x0]
-                done+=1; say(f'Processing {done} of {total} tiles')
-        Image.fromarray(output).save(args.output)
     say('Done')
 
 if __name__=='__main__':
-    parser=argparse.ArgumentParser(); parser.add_argument('tool',choices=['setup','sky','erase','denoise','detail'])
+    parser=argparse.ArgumentParser(); parser.add_argument('tool',choices=['setup','sky','skymask','erase','denoise','detail','upscale','depth'])
     for flag in ['input','output','mask','sky']: parser.add_argument('--'+flag)
     args=parser.parse_args()
     try:

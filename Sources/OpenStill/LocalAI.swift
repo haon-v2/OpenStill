@@ -6,6 +6,17 @@ final class LocalAI {
     var isRunning: Bool { process != nil }
     static var root: URL { EditStorage.root.appendingPathComponent("AI") }
     static var python: URL { root.appendingPathComponent("runtime/bin/python3") }
+    /// Whether setup downloaded the models for a tool (tools added in newer versions need setup to run again).
+    static func hasModel(_ kind: String) -> Bool {
+        guard let data = try? Data(contentsOf: root.appendingPathComponent("ready.json")),
+              let ready = try? JSONSerialization.jsonObject(with: data) as? [String: Any], let models = ready["models"] as? [String: Any] else { return false }
+        return models[kind] != nil
+    }
+    /// Tools listed in this version's model manifest that the last setup didn't download.
+    static var missingModels: [String] {
+        guard ready, let data = try? Data(contentsOf: script.deletingLastPathComponent().appendingPathComponent("models.json")), let manifest = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [] }
+        return manifest.keys.filter { !hasModel($0) }.sorted()
+    }
     static var ready: Bool { FileManager.default.isExecutableFile(atPath: python.path) && FileManager.default.fileExists(atPath: root.appendingPathComponent("ready.json").path) }
     static var script: URL {
         if let resource = Bundle.main.resourceURL?.appendingPathComponent("AI/engine.py"), FileManager.default.fileExists(atPath: resource.path) { return resource }
@@ -24,6 +35,10 @@ final class LocalAI {
         } else {
             guard Self.ready else { completion(.failure(NSError(domain: "OpenStill", code: 1, userInfo: [NSLocalizedDescriptionKey: "Choose Set up local AI tools first. The one-time download is about 350 MB."]))); return }
             executable = Self.python
+            let model = ["skymask": "sky", "depth": "depth", "upscale": "detail", "rawdenoise": "denoise"][tool] ?? tool
+            if !Self.hasModel(model) {
+                completion(.failure(NSError(domain: "OpenStill", code: 1, userInfo: [NSLocalizedDescriptionKey: "This tool needs a model added in this version of OpenStill. Choose Set up local AI tools again to download it."]))); return
+            }
         }
         let task = Process(); task.executableURL = executable; task.arguments = [Self.script.path, tool] + arguments
         let pipe = Pipe(); task.standardOutput = pipe; task.standardError = pipe

@@ -85,7 +85,7 @@ extension ViewerController {
         else { return }
         saveVersionRecord(record)
     }
-    private func saveVersionRecord(_ record:PhotoRecord) {
+    func saveVersionRecord(_ record:PhotoRecord) {
         do { try EditStorage.records.update(record.id) { saved in var replacement=record;replacement.rating=saved.rating;replacement.flag=saved.flag;saved=replacement }; select(selected, preservingSelection:true);shootWindow?.refresh() }
         catch { info.status(error.localizedDescription) }
     }

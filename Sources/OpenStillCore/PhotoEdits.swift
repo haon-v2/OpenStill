@@ -66,6 +66,7 @@ public struct PhotoEdits: Codable, Equatable {
             if let profile = e.advanced!.profile { let clean = profile.sanitized; e.advanced!.profile = clean == ProfileSettings() ? nil : clean }
             if let calibration = e.advanced!.calibration { let clean = calibration.sanitized; e.advanced!.calibration = clean.hasEffect ? clean : nil }
             if let options = e.advanced!.rawOptions { let clean = options.sanitized; e.advanced!.rawOptions = clean.isDefault ? nil : clean }
+            if let blur = e.advanced!.lensBlur { e.advanced!.lensBlur = blur.sanitized }
             if let transform = e.advanced!.transform { let clean = transform.sanitized; e.advanced!.transform = clean == TransformSettings() ? nil : clean }
             e.monochrome = clamp(e.monochrome,0,1); e.blacks = clamp(e.blacks,-1,1); e.whites = clamp(e.whites,-1,1)
             e.straighten = clamp(e.straighten,-20,20); e.lutAmount = clamp(e.lutAmount,0,1); e.sunLength = clamp(e.sunLength,0,1)
@@ -213,6 +214,8 @@ public enum PhotoEditor {
         if modern && (e.profile.hasEffect || e.calibration.hasEffect) {
             image = try CameraProfiles.apply(image,profile:e.profile,calibration:e.calibration).cropped(to:originalExtent)
         }
+        if stopBeforeTool == "Lens blur" { return image }
+        if modern, e.lensBlur.hasEffect { image = try masked(image,try LensBlur.apply(image,settings:e.lensBlur,geometry:geometry,lens:e.optics,modern:modern),"Lens blur") }
         var before = image
         if stopBeforeTool == "Enhance" { return image }
         if e.autoEnhance {

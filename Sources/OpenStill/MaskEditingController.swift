@@ -67,6 +67,7 @@ extension ViewerController {
         let key = parts[1], command = parts[2]
         let wasVisible = maskVisible && activeMaskKey == key
         if activeMaskKey != key { finishMaskEditing(); maskSession.activate(key) }
+        if command.hasPrefix("ai.") { aiMaskCommand(command, key: key); return }
         var edits = currentEdits
         switch command {
         case "componentChanged":
