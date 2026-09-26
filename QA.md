@@ -160,3 +160,27 @@ Automated fixtures are generated and contain no user photographs. The real S9 fi
   - similar-photo grouping.
 - Not yet verified by hand on a Mac: a real camera card (mounting, ejecting, large RAW files), and similar-photo grouping on real bursts.
 
+## AI masks, Lens blur and AI worker — September 26, 2026
+
+- Added:
+  - Vision mask components: subject, background, people, person 1–4, face, eyes, eyebrows, lips and skin;
+  - worker sky masks, depth maps (Depth Anything V2 Small) and depth-range mask components;
+  - the Lens blur tool, with the photo's depth data, an AI estimate or the subject as the depth source;
+  - feathered tile blending, 2× super resolution as a new version, and RAW-stage denoise that keeps edits live;
+  - a prompt to run setup again when a new model is needed.
+- Automated tests:
+  - The new AIMaskTests suite covers:
+    - depth-range coverage, inversion, and following rotation;
+    - Lens blur sharpness inside and outside the focus band, and identity at zero;
+    - Lens blur in the pipeline and in saved edits, and sanitizing;
+    - convex hull, depth stretching and the skin-tone range;
+    - "nothing found" on empty photos, and JPEGs without depth data;
+    - RAW denoise keeping edits and relative white balance.
+  - `Tests/AI/test_worker.py` checks the worker with stand-in models:
+    - identical output from tiling;
+    - no seams under per-tile differences;
+    - 2× output size and content;
+    - depth stretching and sky-mask placement;
+    - the float file round trip.
+- Not yet verified by hand on a Mac: Vision masks on real portraits and groups, Lens blur on iPhone Portrait photos, and the downloaded depth, sky and Real-ESRGAN models producing good results in the app.
+

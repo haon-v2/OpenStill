@@ -7,7 +7,8 @@ OpenStill source code is MIT licensed. AI weights are downloaded separately and 
 | Sky selection | [Sky Segmentation and Post-processing](https://github.com/xiongzhu666/Sky-Segmentation-and-Post-processing); [ONNX distribution](https://huggingface.co/JianyuanWang/skyseg) | MIT, `sky.txt` |
 | Object removal | [LaMa](https://github.com/advimman/lama); [OpenCV ONNX distribution](https://huggingface.co/opencv/inpainting_lama) | Apache 2.0, `erase.txt` |
 | Noise removal | [SCUNet](https://github.com/cszn/SCUNet); [ONNX distribution](https://huggingface.co/Heliosoph/scunet-onnx) | Apache 2.0, `denoise.txt` |
-| Detail restoration | [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN); [ONNX distribution](https://huggingface.co/Heliosoph/realesrgan-onnx) | BSD 3-Clause, `detail.txt` |
+| Detail restoration, 2× super resolution | [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN); [ONNX distribution](https://huggingface.co/Heliosoph/realesrgan-onnx) | BSD 3-Clause, `detail.txt` |
+| Depth estimation | [Depth Anything V2](https://github.com/DepthAnything/Depth-Anything-V2) (Small); [ONNX distribution](https://huggingface.co/onnx-community/depth-anything-v2-small) | Apache 2.0, `depth.txt` |
 
 Exact download revisions, file sizes, and SHA-256 digests are recorded in `Resources/AI/models.json`. OpenStill adapts inference preprocessing, tiled processing, mask composition, and output sizing in `Resources/AI/engine.py`. Original weights are not trained or modified by this project.
 
