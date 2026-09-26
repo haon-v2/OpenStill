@@ -26,5 +26,16 @@
             <sparkle:fullReleaseNotesLink>https://github.com/haon-v2/OpenStill/releases/tag/v0.0.2</sparkle:fullReleaseNotesLink>
             <enclosure url="https://github.com/haon-v2/OpenStill/releases/download/v0.0.2/OpenStill-0.0.2.zip" sparkle:edSignature="HaMKBD1/WnoH1qymcmT28idRwP8iCfS830sDgw3Pw5DuUTqX9C+T6tGZgOt/TXXwIBJxZ5zvINKai5HULQy8Dg==" length="31033107" type="application/octet-stream"/>
         </item>
+        <item>
+            <title>OpenStill 0.0.3</title>
+            <description><![CDATA[<h3>What’s new in 0.0.3</h3><ul><li>Select with AI: subject, background, people, individual people, face, eyes, eyebrows, lips, skin, sky and depth masks</li><li>Lens Blur: depth-driven background blur from camera depth, AI depth or the subject</li><li>AI RAW denoise that keeps every edit adjustable, and 2× super resolution</li><li>Smoother local AI results with no tile seams</li><li>Import from a memory card or folder with renaming, backups, presets and duplicate detection</li><li>Find exact and near-duplicate photos</li><li>Read and write XMP sidecars, and import Camera Raw settings</li><li>Import a Lightroom Classic catalog: folders, ratings, labels, keywords, collections and develop settings</li></ul>]]></description>
+            <pubDate>Sat, 26 Sep 2026 07:58:28 GMT</pubDate>
+            <sparkle:version>19</sparkle:version>
+            <sparkle:shortVersionString>0.0.3</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <sparkle:fullReleaseNotesLink>https://github.com/haon-v2/OpenStill/releases/tag/v0.0.3</sparkle:fullReleaseNotesLink>
+            <enclosure url="https://github.com/haon-v2/OpenStill/releases/download/v0.0.3/OpenStill-0.0.3.zip" sparkle:edSignature="5ePhXQdT2z8IoOR6NH7+gmFm1Oq2slEg56abxomjX3eGVd33/xSoJC3DMjd3wU+Zo9TbCGXsxfLSkSX8p7TXDQ==" length="31367330" type="application/octet-stream"/>
+        </item>
     </channel>
 </rss>
