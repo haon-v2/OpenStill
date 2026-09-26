@@ -160,6 +160,8 @@ public final class PhotoRecordStore {
     private let lock = NSRecursiveLock()
     /// The SQLite index next to the records. Nil only if the file can't be opened; lookups then fall back to scanning.
     public let catalog: LibraryCatalog?
+    /// Whether saving a changed rating, flag, label or metadata also writes the photo's `.xmp` sidecar.
+    public var writesSidecars: () -> Bool = { XMPSidecar.autoWrite }
     public init(root: URL) { self.root = root; catalog = try? LibraryCatalog(url: root.appendingPathComponent("Catalog.sqlite")) }
     /// Indexes records saved before the catalog existed, once.
     private func migrateIfNeeded(_ catalog: LibraryCatalog) {
@@ -207,7 +209,8 @@ public final class PhotoRecordStore {
         guard record.isValid else { throw WorkflowError.invalidDocument }
         try FileManager.default.createDirectory(at: records, withIntermediateDirectories: true)
         let destination = url(record.id)
-        if let previous = try? decode(destination) {
+        let previous = try? decode(destination)
+        if let previous {
             let directory = snapshot(record.id, 0).deletingLastPathComponent()
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             for i in stride(from: 8, through: 0, by: -1) {
@@ -217,6 +220,10 @@ public final class PhotoRecordStore {
         }
         try JSONEncoder().encode(record).write(to: destination, options: .atomic)
         try? catalog?.updateRecord(record)
+        let fields = XMPMetadata(record: record)
+        if writesSidecars(), previous.map({ XMPMetadata(record: $0) != fields }) ?? fields.isSet {
+            try? XMPSidecar.write(record, for: URL(fileURLWithPath: record.sourcePath))
+        }
     }
     public func record(for source: URL, legacy: EditDocument? = nil) throws -> PhotoRecord {
         lock.lock(); defer { lock.unlock() }
@@ -257,7 +264,9 @@ public final class PhotoRecordStore {
             var lens = LensLibrary.shared.suggested(for:source)
             if lens.profileID != nil { lens.enabled = true; var edits = PhotoEdits(); edits.lens = lens; initial.document.commit(edits,title:"Matched RAW lens corrections") }
         }
-        let record = PhotoRecord(source: source, fingerprint: fingerprint, version: initial)
+        var record = PhotoRecord(source: source, fingerprint: fingerprint, version: initial)
+        // Ratings, labels and metadata from Lightroom, Bridge or the camera (sidecar first, then embedded XMP).
+        if let xmp = XMPSidecar.read(source), xmp.hasLibraryMetadata { xmp.apply(to: &record) }
         try save(record); return indexed(record)
     }
 }
