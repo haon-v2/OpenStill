@@ -15,7 +15,7 @@ import simd
     func texture(_ size: CGSize, radius: Double = 1.5, offset: CGPoint = .zero) -> CIImage {
         let noise = CIFilter(name: "CIRandomGenerator")!.outputImage!.transformed(by: CGAffineTransform(translationX: -offset.x, y: -offset.y)).applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: radius])
         let v = CIVector(x: 4, y: 4, z: 4, w: 0)
-        return noise.applyingFilter("CIColorMatrix", parameters: ["inputRVector": v, "inputGVector": v, "inputBVector": v, "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1), "inputBiasVector": CIVector(x: -5.5, y: -5.5, z: -5.5, w: 0)])
+        return noise.applyingFilter("CIColorMatrix", parameters: ["inputRVector": v, "inputGVector": v, "inputBVector": v, "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 0), "inputBiasVector": CIVector(x: -5.5, y: -5.5, z: -5.5, w: 1)])
             .applyingFilter("CIColorClamp").cropped(to: CGRect(origin: .zero, size: size))
     }
     /// Whole image, top row first: p[(row * w + x) * 4].
