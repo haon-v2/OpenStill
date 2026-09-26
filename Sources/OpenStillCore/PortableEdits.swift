@@ -31,7 +31,7 @@ public enum PortableEdits {
             for step in version.document.steps {
                 let e=step.edits
                 if let crop=e.crop{guard [crop.x,crop.y,crop.width,crop.height].allSatisfy({$0.isFinite}),crop.width>0,crop.height>0 else{throw WorkflowError.invalidPackage}}
-                for name in [e.baseAsset,e.overlayAsset,e.advanced?.lutAsset,e.advanced?.aiBackgroundAsset,e.advanced?.profile?.dcpAsset].compactMap({$0}){try collect(name)}
+                for name in [e.baseAsset,e.overlayAsset,e.advanced?.lutAsset,e.advanced?.aiBackgroundAsset,e.advanced?.profile?.dcpAsset,e.advanced?.lensBlur?.depthAsset].compactMap({$0}){try collect(name)}
                 for mask in e.advanced?.masks.values ?? Dictionary<String,AdjustmentMask>().values{try walk(mask,visit:collect)}
             }
         }
@@ -74,7 +74,7 @@ public enum PortableEdits {
         func name(_ old:String?)->String?{old.map{mapping[$0] ?? $0}}
         func mask(_ old:AdjustmentMask)->AdjustmentMask{var m=old;m.asset=name(m.asset);m.components=m.components?.map{var c=$0;c.selection=mask(c.selection);return c};return m}
         e.baseAsset=name(e.baseAsset);e.overlayAsset=name(e.overlayAsset)
-        if var advanced=e.advanced{advanced.lutAsset=name(advanced.lutAsset);advanced.aiBackgroundAsset=name(advanced.aiBackgroundAsset);if var profile=advanced.profile{profile.dcpAsset=name(profile.dcpAsset);advanced.profile=profile};advanced.masks=advanced.masks.mapValues(mask);e.advanced=advanced}
+        if var advanced=e.advanced{advanced.lutAsset=name(advanced.lutAsset);advanced.aiBackgroundAsset=name(advanced.aiBackgroundAsset);if var profile=advanced.profile{profile.dcpAsset=name(profile.dcpAsset);advanced.profile=profile};if var blur=advanced.lensBlur{blur.depthAsset=name(blur.depthAsset);advanced.lensBlur=blur};advanced.masks=advanced.masks.mapValues(mask);e.advanced=advanced}
         return e
     }
     /// Explicit import appends new IDs and preserves every pre-existing version and rating.

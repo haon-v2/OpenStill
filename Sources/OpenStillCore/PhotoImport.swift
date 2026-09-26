@@ -207,7 +207,7 @@ public enum PhotoImport {
         var e = preset.sanitized
         e.baseAsset = current.baseAsset; e.overlayAsset = current.overlayAsset; e.crop = current.crop; e.rotation = current.rotation; e.flip = current.flip
         e.ensureAdvanced(); e.straighten = current.straighten
-        e.advanced!.masks = current.advanced?.masks ?? [:]; e.advanced!.transform = current.advanced?.transform
+        e.advanced!.masks = current.advanced?.masks ?? [:]; e.advanced!.transform = current.advanced?.transform; e.advanced!.lensBlur = current.advanced?.lensBlur; e.advanced!.rawDenoise = current.advanced?.rawDenoise
         e.advanced!.lens = current.advanced?.lens ?? e.advanced!.lens
         e.advanced!.aiBackgroundAsset = nil; e.advanced!.aiFeatureKey = nil; e.advanced!.lutAsset = nil; e.advanced!.lutName = nil; e.advanced!.lutID = nil
         return e

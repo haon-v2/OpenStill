@@ -161,6 +161,7 @@ extension ViewerController {
         guard let source = currentSource, let original = renderedPhoto?.image, !localAI.isRunning, !aiPreparing else { return }
         if comparing && name != "compare" { comparing = false; renderEdits() }
         if name.hasPrefix("mask:") { maskCommand(name); return }
+        if name.hasPrefix("lensBlur:") { lensBlurCommand(name); return }
         if name.hasPrefix("libraryLUT:"), let item = info.libraryLUT(id:String(name.dropFirst(11))) { applyLibraryLUT(item); return }
         if name.hasPrefix("lut:") { applyLUT(URL(fileURLWithPath:String(name.dropFirst(4))).lastPathComponent); return }
         if ["crop","eraseBrush","placeSun","reset","cancelTool"].contains(name) { maskVisible = false; maskToken = UUID() }
@@ -257,7 +258,7 @@ extension ViewerController {
     private func savePreset() {
         guard let window = view.window else { return }
         var preset = currentEdits
-        preset.ensureAdvanced(); preset.advanced!.masks = [:]; preset.advanced!.rawWhiteBalance = nil; preset.straighten = 0; preset.advanced!.lutAsset = nil; preset.advanced!.lutName = nil; preset.advanced!.lutID = nil; preset.advanced!.aiBackgroundAsset = nil; preset.advanced!.aiFeatureKey = nil; preset.advanced!.transform = nil
+        preset.ensureAdvanced(); preset.advanced!.masks = [:]; preset.advanced!.rawWhiteBalance = nil; preset.straighten = 0; preset.advanced!.lutAsset = nil; preset.advanced!.lutName = nil; preset.advanced!.lutID = nil; preset.advanced!.aiBackgroundAsset = nil; preset.advanced!.aiFeatureKey = nil; preset.advanced!.transform = nil; preset.advanced!.lensBlur = nil; preset.advanced!.rawDenoise = nil
         preset.baseAsset = nil; preset.overlayAsset = nil; preset.crop = nil; preset.rotation = 0; preset.flip = false
         let panel = NSSavePanel(); panel.title = "Save preset"; panel.nameFieldStringValue = "My preset.openstillpreset"; panel.allowedContentTypes = [UTType(filenameExtension: "openstillpreset") ?? .json]
         panel.beginSheetModal(for: window) { [weak self] response in
@@ -276,7 +277,7 @@ extension ViewerController {
                 preset.baseAsset = self.currentEdits.baseAsset; preset.overlayAsset = self.currentEdits.overlayAsset
                 preset.crop = self.currentEdits.crop; preset.rotation = self.currentEdits.rotation; preset.flip = self.currentEdits.flip
                 preset.ensureAdvanced(); preset.straighten = self.currentEdits.straighten
-                preset.advanced!.masks = self.currentEdits.advanced?.masks ?? [:]; preset.advanced!.transform = self.currentEdits.advanced?.transform
+                preset.advanced!.masks = self.currentEdits.advanced?.masks ?? [:]; preset.advanced!.transform = self.currentEdits.advanced?.transform; preset.advanced!.lensBlur = self.currentEdits.advanced?.lensBlur; preset.advanced!.rawDenoise = self.currentEdits.advanced?.rawDenoise
                 preset.advanced!.aiBackgroundAsset = self.currentEdits.advanced?.aiBackgroundAsset; preset.advanced!.aiFeatureKey = self.currentEdits.advanced?.aiFeatureKey
                 preset.advanced!.lutAsset = self.currentEdits.advanced?.lutAsset; preset.advanced!.lutName = self.currentEdits.advanced?.lutName; preset.advanced!.lutID = self.currentEdits.advanced?.lutID; preset.lutAmount = self.currentEdits.lutAmount
                 self.changeEdits(preset, title: url.deletingPathExtension().lastPathComponent, commit: true)
@@ -291,7 +292,8 @@ extension ViewerController {
     }
     private func setupAI() {
         guard !localAI.isRunning, !aiPreparing else { return }
-        info.status("Setting up local AI tools. Downloading about 350 MB of models…", busy: true)
+        let missing = LocalAI.missingModels
+        info.status(missing.isEmpty ? "Setting up local AI tools. Downloading about 450 MB of models…" : "Downloading new AI models: " + missing.joined(separator: ", ") + "…", busy: true)
         localAI.run(tool: "setup", status: { [weak self] text in self?.info.status(text, busy: true) }) { [weak self] result in
             switch result {
             case .success: self?.info.status("Local AI tools are ready. Photos stay on this Mac.")
@@ -302,7 +304,7 @@ extension ViewerController {
     private func runAI(_ tool: String, sky: URL? = nil) {
         guard let source = currentSource, renderedPhoto != nil, !localAI.isRunning, !aiPreparing else { return }
         guard LocalAI.ready else { info.status("Choose Set up local AI tools first (one-time download, about 350 MB)."); return }
-        let keys = ["sky":"Sky replacement", "erase":"Erase", "denoise":"Noise removal", "detail":"Detail restoration"]
+        let keys = ["sky":"Sky replacement", "erase":"Erase", "denoise":"Noise removal", "detail":"Detail restoration", "upscale":"Super resolution", "rawdenoise":"Noise removal"]
         guard let key = keys[tool] else { return }
         let edits = currentEdits, size = editSourceSize()
         let adjustmentMask = edits.advanced?.masks[key]
@@ -311,6 +313,8 @@ extension ViewerController {
         let renderer = photoRecord?.active.renderer ?? .legacy
         let sourceMode = photoRecord?.active.sourceMode ?? .original
         let rawSettings = photoRecord?.active.raw ?? RawSettings()
+        if tool == "rawdenoise" && sourceMode != .raw { info.status("RAW denoise works on photos developed from RAW. Use Remove noise for other photos."); return }
+        if tool == "rawdenoise" && edits.baseAsset != nil { info.status("This version already has an AI result. Start from a version without one to denoise the RAW data."); return }
         aiPreparing = true; editWork?.cancel(); editToken = UUID()
         let token = editToken
         info.status("Preparing full-resolution photo for local AI…", busy: true)
@@ -318,7 +322,8 @@ extension ViewerController {
             var temporaryFiles: [URL] = []
             let prepared = Result { () -> (URL, URL, URL?, URL?) in
                 let input = try EditStorage.newAsset(extension:"osfloat"); temporaryFiles.append(input)
-                let recipe = RenderRecipe(renderer:renderer, sourceMode:sourceMode, raw:rawSettings, edits:edits)
+                // RAW denoise works on the decoded sensor data only (white balance and RAW options), so every edit stays adjustable.
+                let recipe = RenderRecipe(renderer:renderer, sourceMode:sourceMode, raw:rawSettings, edits:tool == "rawdenoise" ? RawDenoiseBase.decodeOnly(edits) : edits)
                 let incoming=try ModernRenderer.render(source:source, recipe:recipe)
                 try FloatImageBridge.write(incoming, to:input)
                 let output = try EditStorage.newAsset(extension:"osfloat")
@@ -346,10 +351,11 @@ extension ViewerController {
                     for file in cleanupFiles { try? FileManager.default.removeItem(at:file) }; self.info.status(error.localizedDescription)
                 case .success(let (input,output,maskURL,skyURL)):
                     var arguments = ["--input",input.path,"--output",output.path]
+                    let workerTool = tool == "rawdenoise" ? "denoise" : tool
                     if tool == "erase", let maskURL { arguments += ["--mask",maskURL.path] }
                     if let skyURL { arguments += ["--sky",skyURL.path] }
                     self.info.status("Running local \(tool)… You can cancel below.",busy:true)
-                    self.localAI.run(tool:tool,arguments:arguments,status: { [weak self] text in
+                    self.localAI.run(tool:workerTool,arguments:arguments,status: { [weak self] text in
                         guard self?.currentSource == source else { return }; self?.info.status(text,busy:true)
                     }) { [weak self] result in
                         if let skyURL { try? FileManager.default.removeItem(at:skyURL) }
@@ -361,6 +367,26 @@ extension ViewerController {
                         switch result {
                         case .success:
                             if self.photoRecord?.active.renderer == .legacy { self.photoRecord?.upgrade(); self.editDocument = self.photoRecord!.active.document }
+                            if tool == "rawdenoise" {
+                                // Keep every edit live on top of the denoised sensor data.
+                                try? FileManager.default.removeItem(at:input)
+                                var next = self.currentEdits; next.baseAsset = output.lastPathComponent; next.ensureAdvanced()
+                                next.advanced!.rawDenoise = RawDenoiseBase(temperature:edits.temperature, tint:edits.tint)
+                                self.maskVisible = false; self.canvas.clearTool(); self.changeEdits(next,title:"AI RAW denoise",commit:true); self.select(self.selected, preservingSelection:true)
+                                return
+                            }
+                            if tool == "upscale" {
+                                // A new version at twice the size; the current version is kept as it was.
+                                try? FileManager.default.removeItem(at:input)
+                                guard var record = self.photoRecord else { return }
+                                record.duplicateVersion(named:"Super resolution 2×")
+                                var next = PhotoEdits(); next.baseAsset = output.lastPathComponent
+                                var document = EditDocument(fingerprint:record.active.document.fingerprint); document.commit(next,title:"AI super resolution 2×")
+                                record.updateDocument(document)
+                                self.maskVisible = false; self.canvas.clearTool(); self.saveVersionRecord(record)
+                                self.info.status("Created the version “Super resolution 2×” at twice the size. The previous version is unchanged.")
+                                return
+                            }
                             var next = PhotoEdits(); next.baseAsset = output.lastPathComponent; next.ensureAdvanced()
                             next.advanced!.aiBackgroundAsset = input.lastPathComponent; next.advanced!.aiFeatureKey = key
                             if let maskURL {

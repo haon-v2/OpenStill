@@ -144,10 +144,14 @@ final class EditorPanel: GlassChrome {
         tool("Noise removal  AI", symbol: "waveform.path", in: tools) { content in
             self.help("Local SCUNet denoising. Full-resolution photos can take several minutes.", to: content)
             self.action("Remove noise", "ai:denoise", to: content)
+            self.action("Denoise RAW data (keeps edits)", "ai:rawdenoise", to: content)
+            self.help("For RAW photos: denoises the decoded sensor data, so every slider and mask stays adjustable. White balance changes afterwards are applied relative to the denoised image; RAW decoding options are fixed.", to: content)
         }
         tool("Detail restoration  AI", symbol: "viewfinder", in: tools) { content in
             self.help("Restore detail with Real-ESRGAN while keeping the original dimensions. Review fine textures at 100%.", to: content)
             self.action("Restore detail", "ai:detail", to: content)
+            self.action("Super resolution 2×", "ai:upscale", to: content)
+            self.help("Doubles the width and height with Real-ESRGAN as a new version; the current version is kept.", to: content)
         }
         addTitle("ESSENTIALS", to: tools)
         tool("Profile & calibration", symbol: "camera.aperture", in: tools) { content in
@@ -163,6 +167,18 @@ final class EditorPanel: GlassChrome {
             self.slider("Blue primary hue", path: \.calibrationBlueHue, range: -1...1, in: content)
             self.slider("Blue primary saturation", path: \.calibrationBlueSaturation, range: -1...1, in: content)
             self.help("Hue moves each primary around the color wheel: red toward yellow, green toward cyan, blue toward magenta. Neutral grays stay neutral.", to: content)
+        }
+        tool("Lens blur", symbol: "scope", in: tools) { content in
+            self.help("Blurs the photo by distance, like a wide-aperture lens. First choose where the depth comes from.", to: content)
+            self.action("Use the photo’s depth data", "lensBlur:camera", to: content)
+            self.action("Estimate depth (local AI)", "lensBlur:ai", to: content)
+            self.action("Keep the subject sharp", "lensBlur:subject", to: content)
+            self.slider("Blur amount", path: \.lensBlurAmount, range: 0...1, in: content)
+            self.slider("Focus distance", path: \.lensBlurFocus, range: 0...1, in: content)
+            self.slider("Focus range", path: \.lensBlurRange, range: 0...1, in: content)
+            self.toggle("Blur the foreground too", path: \.lensBlurForeground, in: content)
+            self.help("Focus distance 1 is the nearest part of the scene, 0 the farthest. Portrait-mode iPhone photos carry depth data; other photos can use the local AI estimate or keep the subject sharp.", to: content)
+            self.action("Remove lens blur", "lensBlur:remove", to: content)
         }
         tool("Develop", symbol: "sun.max", in: tools, expanded: false) { content in
             self.action("Auto", "autoTone", to:content)
@@ -362,6 +378,7 @@ final class EditorPanel: GlassChrome {
     }
     @objc private func toggleLUTMask() { command?("finishMask");lutMask?.isHidden.toggle();lutMask?.resetInteraction() }
     func selectedMaskComponent(key:String)->UUID? { maskPanels[key]?.selectedID }
+    func selectMaskComponent(key:String,id:UUID) { maskPanels[key]?.selectComponent(id) }
     func maskInteraction(key:String,kind:String?,subtract:Bool,visible:Bool) { maskPanels[key]?.interaction(kind:kind,subtract:subtract,visible:visible) }
     func resetMaskInteractions() { for panel in maskPanels.values { panel.resetInteraction() } }
     func resizeBrush(key:String,delta:Double) { maskPanels[key]?.resizeBrush(delta) }

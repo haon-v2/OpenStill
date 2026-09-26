@@ -67,6 +67,14 @@ extension AdjustmentMask {
                 guard let combined=MaskComponents.combine?.apply(extent:bounds,arguments:[prior,coverage,opacity,mode]) else {throw EditError.render}
                 result=combined;first=false
             }
+        } else if kind == "depthRange" {
+            // A depth map in source orientation, restricted to a near–far band, then carried through geometry like an object mask.
+            var depth = self; depth.kind = "depthMap"; depth.inverted = false; depth.feather = 0; depth.strokes = []
+            let map = try depth.image(size:geometry.sourceSize)
+            let range = (range ?? RangeSelection()).sanitized
+            guard let band = MaskComponents.range?.apply(extent:map.extent,arguments:[map,CIVector(x:0,y:0,z:0),0.0,range.softness,range.low,range.high,1.0]) else { throw EditError.render }
+            result = geometry.apply(modern ? try LensCorrections.apply(band,settings:lens,mask:true):band)
+            if feather > 0 {result=result.clampedToExtent().applyingFilter("CIGaussianBlur",parameters:[kCIInputRadiusKey:min(bounds.width,bounds.height)*max(0,min(1,feather))*0.012]).cropped(to:bounds)}
         } else if kind == "colorRange" || kind == "luminanceRange" {
             let range=(range ?? RangeSelection()).sanitized
             let space=CGColorSpace(name:CGColorSpace.extendedSRGB)!
@@ -88,7 +96,7 @@ extension AdjustmentMask {
         return result.cropped(to:bounds)
     }
 }
-private enum MaskComponents {
+enum MaskComponents {
     static let combine=CIColorKernel(source:"""
     kernel vec4 combineCoverage(__sample prior,__sample selection,float opacity,float mode) {
         float a=clamp(prior.r,0.0,1.0),b=clamp(selection.r,0.0,1.0)*opacity;
