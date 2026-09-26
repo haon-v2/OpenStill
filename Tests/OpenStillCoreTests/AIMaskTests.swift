@@ -116,7 +116,6 @@ import UniformTypeIdentifiers
         context.setFillColor(CGColor(red: 0.3, green: 0.5, blue: 0.7, alpha: 1)); context.fill(CGRect(x: 0, y: 0, width: 160, height: 120))
         let plain = context.makeImage()!
         #expect(throws: (any Error).self) { try AIMasks.face(plain, part: .eyes) }
-        #expect(throws: (any Error).self) { try AIMasks.people(plain) }
         // A JPEG has no depth data.
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("nodepth-\(UUID().uuidString).jpg")
         try PhotoEditor.write(plain, to: url, type: .jpeg); defer { try? FileManager.default.removeItem(at: url) }

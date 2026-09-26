@@ -31,6 +31,21 @@ jobs:
           [ $status -eq 0 ] || grep -v "warning:\|^ *|\|^ *\^" build.log | tail -60
           grep -E "warning:" build.log | grep -E "AIMask|LensBlur|AIMaskController|EditingController|MaskComponent|MaskEditing|LocalAI|EditorPanel|ModernRenderer|AdjustmentMasks|SelectiveControls|VersionPanel" | grep -v "init(source:)" | sort -u | head -40
           exit $status
+      - name: AI mask tests alone
+        run: |
+          set +e
+          export PKG_CONFIG_PATH="$PWD/.build/native/lib/pkgconfig"
+          perl -e 'alarm shift; exec @ARGV' 420 bash scripts/test.sh --filter AIMaskTests --no-parallel > ai.log 2>&1
+          status=$?
+          grep -E "Test .*(started|passed|failed)|✘|recorded an issue|error:" ai.log | tail -40
+          echo "--- started but not finished ---"
+          python3 - <<'PY'
+          import re
+          text = open('ai.log').read()
+          started = set(re.findall(r'Test (\w+\(\)) started', text)); done = set(re.findall(r'Test (\w+\(\)) (?:passed|failed)', text))
+          print(sorted(started - done))
+          PY
+          exit $status
       - name: Tests
         run: |
           set +e
@@ -38,7 +53,7 @@ jobs:
           perl -e 'alarm shift; exec @ARGV' 900 bash scripts/test.sh > test.log 2>&1
           status=$?
           grep -E "✘|error:|recorded an issue|Test run with|time limit" test.log | head -120
-          if [ $status -ne 0 ]; then echo "--- last test output ---"; grep -E "started|passed|failed" test.log | tail -25; fi
+          if [ $status -ne 0 ]; then echo "--- started but not finished ---"; python3 -c "import re;t=open('test.log').read();s=set(re.findall(r'Test (\\w+\\(\\)) started',t));d=set(re.findall(r'Test (\\w+\\(\\)) (?:passed|failed)',t));print(sorted(s-d))"; fi
           exit $status
       - name: App bundle
         run: bash scripts/build-app.sh > app.log 2>&1 || { tail -60 app.log; exit 1; }
