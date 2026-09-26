@@ -1,0 +1,31 @@
+name: Validate M5
+on:
+  push:
+    branches: [claude/gifted-lovelace-pbg8wv]
+jobs:
+  validate:
+    runs-on: macos-26
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build tools
+        run: brew install meson ninja pkg-config cmake || true
+      - name: Native dependencies
+        run: bash scripts/build-native.sh > native.log 2>&1 || { tail -80 native.log; exit 1; }
+      - name: Build
+        run: |
+          export PKG_CONFIG_PATH="$PWD/.build/native/lib/pkgconfig"
+          swift build > build.log 2>&1; status=$?
+          grep -E "error:" build.log | head -60
+          grep -E "warning:" build.log | grep -E "PhotoImport|Duplicates|ImportWindow|DuplicatesWindow|ShootWindow|ViewerController|AppDelegate" | sort -u | head -40
+          exit $status
+      - name: Tests
+        run: |
+          set +e
+          export PKG_CONFIG_PATH="$PWD/.build/native/lib/pkgconfig"
+          bash scripts/test.sh > test.log 2>&1
+          status=$?
+          grep -E "✘|error:|recorded an issue|Test run with" test.log | head -120
+          exit $status
+      - name: App bundle
+        run: bash scripts/build-app.sh > app.log 2>&1 || { tail -60 app.log; exit 1; }

@@ -66,6 +66,27 @@ OpenStill keeps a local SQLite catalog (`Catalog.sqlite`, next to your edit reco
 
 Moved or deleted files drop out of collections until they're found again.
 
+## Importing from a card
+
+**File → Import Photos… (⇧⌘I)** copies photos from a camera card, or any folder, into your photo folders.
+- **Source.** Cards and other removable drives are listed automatically, with ones holding a `DCIM` folder first; **Choose folder…** picks any folder. Subfolders are included and hidden files skipped.
+- **Already imported.** Photos whose contents are already in your library (same size and SHA-256) are marked and unchecked. Check or uncheck any photo; with several rows selected, one checkbox changes them all.
+- **Folders and names.** The folder template (for example `{yyyy}/{yyyy}-{MM}-{dd}`) and name template (for example `{date}_{name}`) use `{yyyy} {MM} {dd} {date} {time} {name} {index} {camera}`, with a live example. Dates come from the capture time recorded by the camera. An existing file is never replaced; a clash gets `-1`, `-2`…
+- **Second copy.** Optionally write a backup copy, with the same folders and names, to another drive.
+- **Apply on import.** A metadata preset, extra keywords, and a develop preset (`.openstillpreset`) applied to each photo's first version. A develop preset doesn't change crop, rotation or lens corrections.
+- **Verified.** Every copy is written to a temporary file, read back, and compared with the original's SHA-256 before it gets its final name. A copy that doesn't match is removed and reported. XMP sidecars come along with their photos. Nothing on the card is ever changed or deleted.
+- **Eject** the card when the import finishes without errors (optional).
+
+Imported photos open in the library.
+
+## Duplicates
+
+**Library → Actions → Find duplicates…** looks through the selected photos (or every photo shown):
+- **Exact copies**: files with byte-for-byte identical contents, found by size and SHA-256.
+- **Similar photos**: bursts, small edits and re-exports, compared with Apple's Vision image feature prints on this Mac. **Match** sets how close photos must be.
+
+In each group ★ marks the photo to keep: the highest rated, then a pick, then the largest file. **Flag extras as rejects** flags the others so you can review them with the Rejects filter. Duplicates are never deleted. Double-click a photo, or use **Show in Finder**, to see it in Finder.
+
 ## XMP sidecars and Lightroom
 
 OpenStill reads and writes `.xmp` sidecars, the files Lightroom, Bridge and Camera Raw keep next to photos (`IMG_0001.CR2` → `IMG_0001.xmp`). Your photos themselves are never changed.
