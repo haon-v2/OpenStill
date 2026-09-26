@@ -145,7 +145,7 @@ extension ViewerController {
         guard let original = renderedPhoto?.image, let source = currentSource, !aiPreparing, !localAI.isRunning else { return }
         let choice = String(name.dropFirst("lensBlur:".count))
         func apply(_ asset: String, _ origin: String, _ message: String) {
-            var edits = currentEdits, blur = edits.lensBlur
+            var edits = currentEdits; var blur = edits.lensBlur
             blur.depthAsset = asset; blur.depthSource = origin
             if blur.amount == 0 { blur.amount = 0.5 }
             if origin == "subject" { blur.focus = 1; blur.range = 0.3 }
