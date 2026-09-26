@@ -15,5 +15,15 @@
             <sparkle:fullReleaseNotesLink>https://github.com/haon-v2/OpenStill/releases/tag/v0.0.1</sparkle:fullReleaseNotesLink>
             <enclosure url="https://github.com/haon-v2/OpenStill/releases/download/v0.0.1/OpenStill-0.0.1.zip" sparkle:edSignature="TH+LfNqQJAcjGSU8hrXk+v9v1AqNMDgU9yo2G4PQ+HC0irh2KB7R94PshyhlCIaphlz8ALLh4oIDoYj2tcS6DA==" length="30726138" type="application/octet-stream"/>
         </item>
+        <item>
+            <title>OpenStill 0.0.2</title>
+            <pubDate>Sat, 26 Sep 2026 02:27:08 GMT</pubDate>
+            <sparkle:version>18</sparkle:version>
+            <sparkle:shortVersionString>0.0.2</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <sparkle:fullReleaseNotesLink>https://github.com/haon-v2/OpenStill/releases/tag/v0.0.2</sparkle:fullReleaseNotesLink>
+            <enclosure url="https://github.com/haon-v2/OpenStill/releases/download/v0.0.2/OpenStill-0.0.2.zip" sparkle:edSignature="HaMKBD1/WnoH1qymcmT28idRwP8iCfS830sDgw3Pw5DuUTqX9C+T6tGZgOt/TXXwIBJxZ5zvINKai5HULQy8Dg==" length="31033107" type="application/octet-stream"/>
+        </item>
     </channel>
 </rss>
