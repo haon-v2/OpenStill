@@ -73,7 +73,8 @@ public enum ModernRenderer {
             if recipe.sourceMode == .raw, let denoised = edits.advanced?.rawDenoise {
                 // The denoised sensor data already carries the white balance it was decoded with; apply only the change since.
                 if denoised.temperature != edits.temperature || denoised.tint != edits.tint {
-                    base = base.applyingFilter("CITemperatureAndTint",parameters:["inputNeutral":CIVector(x:denoised.temperature,y:denoised.tint),"inputTargetNeutral":CIVector(x:edits.temperature,y:edits.tint)])
+                    // Core Image's neutral/target order is the reverse of a RAW white balance setting: a higher setting warms the photo.
+                    base = base.applyingFilter("CITemperatureAndTint",parameters:["inputNeutral":CIVector(x:edits.temperature,y:edits.tint),"inputTargetNeutral":CIVector(x:denoised.temperature,y:denoised.tint)])
                 }
                 edits.temperature = 6500; edits.tint = 0; edits.neutralBalance = NeutralBalance()
             }

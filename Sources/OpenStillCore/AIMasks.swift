@@ -204,19 +204,28 @@ public enum AIMasks {
         guard let disparity = CIImage(contentsOf: url, options: options) ?? CIImage(contentsOf: url, options: [.auxiliaryDepth: true, .applyOrientationProperty: true]).map({ $0.applyingFilter("CIDepthToDisparity") }) else { return nil }
         return try? normalized(disparity, size: target)
     }
-    /// Stretches a disparity map to 0…1 using its own minimum and maximum.
+    /// Stretches a disparity map to 0…1 using its own minimum and maximum (computed on the CPU for exactness).
     public static func normalized(_ disparity: CIImage, size target: CGSize) throws -> CGImage {
-        let extent = disparity.extent
-        let minMax = disparity.applyingFilter("CIAreaMinMax", parameters: [kCIInputExtentKey: CIVector(cgRect: extent)])
-        var pixels = [Float](repeating: 0, count: 8)
-        context.render(minMax, toBitmap: &pixels, rowBytes: 32, bounds: CGRect(x: 0, y: 0, width: 2, height: 1), format: .RGBAf, colorSpace: nil)
-        let low = pixels[0], high = max(pixels[4], low + 1e-4)
-        let scale = 1 / (high - low)
-        let stretched = disparity.applyingFilter("CIColorMatrix", parameters: [
-            "inputRVector": CIVector(x: CGFloat(scale), y: 0, z: 0, w: 0), "inputGVector": CIVector(x: CGFloat(scale), y: 0, z: 0, w: 0), "inputBVector": CIVector(x: CGFloat(scale), y: 0, z: 0, w: 0),
-            "inputBiasVector": CIVector(x: CGFloat(-low * scale), y: CGFloat(-low * scale), z: CGFloat(-low * scale), w: 1)
-        ]).applyingFilter("CIColorClamp")
-        return try grayscale(stretched, size: target)
+        let w = max(1, Int(target.width)), h = max(1, Int(target.height)), bounds = CGRect(x: 0, y: 0, width: w, height: h)
+        let e = disparity.extent
+        guard e.width > 0, e.height > 0, !e.isInfinite else { throw EditError.render }
+        let scaled = disparity.transformed(by: CGAffineTransform(translationX: -e.minX, y: -e.minY).concatenating(CGAffineTransform(scaleX: CGFloat(w) / e.width, y: CGFloat(h) / e.height))).cropped(to: bounds)
+        var rgba = [Float](repeating: 0, count: w * h * 4)
+        context.render(scaled, toBitmap: &rgba, rowBytes: w * 16, bounds: bounds, format: .RGBAf, colorSpace: nil)
+        var low = Float.greatestFiniteMagnitude, high = -Float.greatestFiniteMagnitude
+        for i in stride(from: 0, to: rgba.count, by: 4) where rgba[i].isFinite { low = min(low, rgba[i]); high = max(high, rgba[i]) }
+        guard low <= high else { throw AIMaskError.noDepth }
+        let range = max(high - low, 1e-6)
+        var bytes = [UInt8](repeating: 0, count: w * h)
+        for p in 0..<(w * h) { let v = rgba[p * 4]; bytes[p] = v.isFinite ? UInt8(max(0, min(255, ((v - low) / range * 255).rounded()))) : 0 }
+        return try grayImage(bytes, width: w, height: h)
+    }
+    /// An 8-bit grayscale image from bytes, top row first.
+    static func grayImage(_ bytes: [UInt8], width: Int, height: Int) throws -> CGImage {
+        guard let provider = CGDataProvider(data: Data(bytes) as CFData),
+              let image = CGImage(width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 8, bytesPerRow: width, space: CGColorSpaceCreateDeviceGray(),
+                                  bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue), provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent) else { throw EditError.render }
+        return image
     }
     /// A stand-in depth map when a photo has none: the subject (or people) near, everything else far, with a soft falloff.
     public static func subjectDepth(_ image: CGImage) throws -> CGImage {
