@@ -104,6 +104,8 @@ public struct PhotoRecord: Codable, Identifiable {
     public var activeVersionID: UUID
     public var rating = 0
     public var flag: PhotoFlag = .none
+    public var label: ColorLabel?
+    public var metadata: IPTCMetadata?
     public var active: EditVersion { versions.first(where: { $0.id == activeVersionID }) ?? versions[0] }
     public init(source: URL, fingerprint: String, version: EditVersion) {
         sourcePath = source.standardizedFileURL.path; contentFingerprint = fingerprint
@@ -156,7 +158,21 @@ public enum WorkflowError: LocalizedError {
 public final class PhotoRecordStore {
     public let root: URL
     private let lock = NSRecursiveLock()
-    public init(root: URL) { self.root = root }
+    /// The SQLite index next to the records. Nil only if the file can't be opened; lookups then fall back to scanning.
+    public let catalog: LibraryCatalog?
+    public init(root: URL) { self.root = root; catalog = try? LibraryCatalog(url: root.appendingPathComponent("Catalog.sqlite")) }
+    /// Indexes records saved before the catalog existed, once.
+    private func migrateIfNeeded(_ catalog: LibraryCatalog) {
+        guard catalog.value("indexedRecords") == nil else { return }
+        let files = (try? FileManager.default.contentsOfDirectory(at: records, includingPropertiesForKeys: nil)) ?? []
+        for file in files where file.pathExtension == "json" {
+            guard let id = UUID(uuidString: file.deletingPathExtension().lastPathComponent), let record = try? read(id) else { continue }
+            let source = URL(fileURLWithPath: record.sourcePath)
+            let facts = FileManager.default.fileExists(atPath: source.path) ? CatalogPhoto.read(source, id: id) : CatalogPhoto(id: id, path: record.sourcePath)
+            try? catalog.upsert(record, facts: facts)
+        }
+        try? catalog.setValue("1", for: "indexedRecords")
+    }
     private var records: URL { root.appendingPathComponent("PhotoRecords", isDirectory: true) }
     private func url(_ id: UUID) -> URL { records.appendingPathComponent(id.uuidString + ".json") }
     public static func contentHash(_ source: URL) throws -> String {
@@ -200,17 +216,28 @@ public final class PhotoRecordStore {
             try JSONEncoder().encode(previous).write(to: snapshot(record.id, 0), options: .atomic)
         }
         try JSONEncoder().encode(record).write(to: destination, options: .atomic)
+        try? catalog?.updateRecord(record)
     }
     public func record(for source: URL, legacy: EditDocument? = nil) throws -> PhotoRecord {
         lock.lock(); defer { lock.unlock() }
         let path = source.standardizedFileURL.path
+        // Fast path: the catalog knows this exact file (same path, size and modification time), so no hashing.
+        let values = try? source.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
+        if let catalog, let size = values?.fileSize, let modified = values?.contentModificationDate?.timeIntervalSince1970,
+           let id = catalog.recordID(path: path, size: Int64(size), modified: modified), let record = try? read(id), record.sourcePath == path { return record }
         let fingerprint = try Self.contentHash(source)
-        let files = (try? FileManager.default.contentsOfDirectory(at: records, includingPropertiesForKeys: nil)) ?? []
+        // Candidates share the content hash. The catalog answers directly; without one, every record is read.
+        let candidates: [UUID]
+        if let catalog { migrateIfNeeded(catalog); candidates = catalog.recordIDs(fingerprint: fingerprint) }
+        else {
+            candidates = ((try? FileManager.default.contentsOfDirectory(at: records, includingPropertiesForKeys: nil)) ?? [])
+                .filter { $0.pathExtension == "json" }.compactMap { UUID(uuidString: $0.deletingPathExtension().lastPathComponent) }
+        }
+        func indexed(_ record: PhotoRecord) -> PhotoRecord { try? catalog?.upsert(record, facts: CatalogPhoto.read(source, id: record.id)); return record }
         var matches: [PhotoRecord] = []
-        for file in files where file.pathExtension == "json" {
-            guard let id = UUID(uuidString: file.deletingPathExtension().lastPathComponent), var record = try? read(id),
-                  record.contentFingerprint == fingerprint else { continue }
-            if record.sourcePath == path { return record }
+        for id in candidates {
+            guard var record = try? read(id), record.contentFingerprint == fingerprint else { continue }
+            if record.sourcePath == path { return indexed(record) }
             var stale = false
             let resolved = record.bookmark.flatMap { try? URL(resolvingBookmarkData: $0, options: [.withoutUI, .withoutMounting], relativeTo: nil, bookmarkDataIsStale: &stale) }
             if resolved?.standardizedFileURL.path == path || !FileManager.default.fileExists(atPath: record.sourcePath) {
@@ -220,7 +247,7 @@ public final class PhotoRecordStore {
             }
         }
         // Ambiguous identical copies are not silently merged.
-        if matches.count == 1 { try save(matches[0]); return matches[0] }
+        if matches.count == 1 { try save(matches[0]); return indexed(matches[0]) }
         let mode = RawDecoder.defaultMode(for: source)
         var initial = EditVersion(name: legacy == nil ? "Original" : "Legacy", renderer: legacy == nil ? .linear2020 : .legacy,
                                   sourceMode: legacy == nil ? mode : (source.pathExtension.lowercased() == "rw2" ? .cameraLook : .original),
@@ -230,6 +257,6 @@ public final class PhotoRecordStore {
             if lens.profileID != nil { lens.enabled = true; var edits = PhotoEdits(); edits.lens = lens; initial.document.commit(edits,title:"Matched RAW lens corrections") }
         }
         let record = PhotoRecord(source: source, fingerprint: fingerprint, version: initial)
-        try save(record); return record
+        try save(record); return indexed(record)
     }
 }

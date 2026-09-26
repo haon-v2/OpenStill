@@ -13,7 +13,8 @@ public enum ExportJobState:String,Codable{case waiting,running,complete,failed,c
 public struct ExportJob:Codable,Identifiable {
     public var id=UUID(),source:URL,sourceHash:String,recipe:RenderRecipe,versionName:String,captured:Date
     public var output:URL?,state=ExportJobState.waiting,error:String?
-    public init(_ item:ShootItem){source=item.url;sourceHash=item.record.contentFingerprint;recipe=item.record.active.recipe;versionName=item.record.active.name;captured=item.captured}
+    public var metadata:IPTCMetadata?
+    public init(_ item:ShootItem){source=item.url;sourceHash=item.record.contentFingerprint;recipe=item.record.active.recipe;versionName=item.record.active.name;captured=item.captured;metadata=item.record.metadata}
 }
 public struct ExportBatch:Codable,Identifiable {
     public var id=UUID(),jobs:[ExportJob],settings:ExportSettings,directory:URL
@@ -60,7 +61,7 @@ public enum ExportWorkflow {
                     let output=try reserve(name,directory:batch.directory,protected:protected)
                     do {
                         let image=try ModernRenderer.render(source:job.source,recipe:job.recipe)
-                        try ModernRenderer.export(image,to:output,source:job.source,settings:batch.settings)
+                        try ModernRenderer.export(image,to:output,source:job.source,settings:batch.settings,metadata:batch.settings.keepMetadata ? job.metadata:nil)
                         result.jobs[i].output=output;result.jobs[i].state = .complete
                     }catch{try? FileManager.default.removeItem(at:output);throw error}
                 }

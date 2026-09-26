@@ -1,0 +1,45 @@
+# Temporary: builds and tests the M3 branch on macOS. Removed before the PR opens.
+name: Validate M3
+on:
+  push:
+    branches: [claude/gifted-lovelace-pbg8wv]
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build tools
+        run: brew install meson ninja pkg-config cmake || true
+      - name: Native dependencies
+        run: bash scripts/build-native.sh > native.log 2>&1 || { tail -80 native.log; exit 1; }
+      - name: Build
+        run: |
+          set +e
+          export PKG_CONFIG_PATH="$PWD/.build/native/lib/pkgconfig"
+          swift build > build.log 2>&1
+          status=$?
+          grep -E "error:|warning: (unused|var|initialization|will never|immutable)" build.log | sort -u | head -80
+          tail -5 build.log
+          exit $status
+      - name: Tests
+        run: |
+          set +e
+          bash scripts/test.sh > test.log 2>&1
+          status=$?
+          grep -E "✘|error:|recorded an issue|Test run with|Expectation failed" test.log | head -120
+          if [ $status -ne 0 ]; then
+            grep -oE "◇ Test [A-Za-z0-9_]+" test.log | sed 's/◇ Test //' | sort -u > started.txt
+            grep -oE "(✔|✘) Test [A-Za-z0-9_]+" test.log | sed -E 's/(✔|✘) Test //' | sort -u > finished.txt
+            echo "Unfinished tests:"; comm -23 started.txt finished.txt
+          fi
+          exit $status
+      - name: App bundle
+        run: |
+          set +e
+          bash scripts/build-app.sh > app.log 2>&1
+          status=$?
+          grep -E "error:|Built " app.log | head -40
+          [ $status -eq 0 ] || tail -60 app.log
+          exit $status
