@@ -30,7 +30,7 @@ import Testing
         e.updateLocalAdjustment(sky.id) { $0.settings.exposure = 9; $0.settings.contrast = .nan; $0.name = "   " }
         let saved = e.localAdjustments[0]
         #expect(saved.settings.exposure == 4 && saved.settings.contrast == 0 && saved.name == "Mask")
-        let copy = try #require(e.duplicateLocalAdjustment(sky.id))
+        let duplicated = e.duplicateLocalAdjustment(sky.id); let copy = try #require(duplicated)
         #expect(e.localAdjustments.count == 3 && e.advanced?.masks[copy.maskKey] != nil && copy.settings.exposure == 4)
         e.removeLocalAdjustment(sky.id)
         #expect(e.localAdjustments.count == 2 && e.advanced?.masks[sky.maskKey] == nil && e.advanced?.masks[copy.maskKey] != nil)
