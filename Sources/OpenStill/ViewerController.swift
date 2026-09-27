@@ -15,6 +15,18 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
     private let rightRail = WorkspaceRail(items: [("edit", "Edit", "slider.horizontal.3"), ("crop", "Crop and rotate", "crop"), ("retouch", "Retouch", "bandage"), ("mask", "Mask current tool", "circle.dashed"), ("presets", "Presets and LUTs", "square.stack"), ("history", "Edit history", "clock.arrow.circlepath"), ("info", "Camera and lens info", "info.circle")])
     private let workspaceMode = NSSegmentedControl(labels: ["Library", "Edit"], trackingMode: .selectOne, target: nil, action: nil)
     private let shelf = Appearance.glass()
+    /// Presets and History on the left while developing, in the Lightroom layout.
+    private let developPanel = GlassChrome()
+    private let workspaceContent = NSView()
+    private var layoutMode = WorkspaceLayout.current
+    /// The inspector tab to return to after the Lightroom layout's library showed Info.
+    private var developTab = 0
+    private var luminarConstraints: [NSLayoutConstraint] = []
+    private var lightroomConstraints: [NSLayoutConstraint] = []
+    private var sidebarAboveShelf: NSLayoutConstraint!
+    private var sidebarAboveFooter: NSLayoutConstraint!
+    private var sidebarWidth: NSLayoutConstraint!
+    private var canvasToWindowEdge: NSLayoutConstraint!
     private var libraryBrowser: ShootWindow?
     private var libraryURLs: [URL] = []
     private var folderURL: URL?
@@ -122,11 +134,12 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
             self.select(index, preservingSelection: self.collection.selectionIndexPaths.contains(IndexPath(item: index, section: 0)))
             return self.makePhotoMenu()
         }
+        applyLayout(layoutMode)
         updateControls()
     }
 
     private func setupLayout() {
-        let content = NSView()
+        let content = workspaceContent
         let surface: NSView
         if #available(macOS 26.0, *) {
             let container = NSGlassEffectContainerView()
@@ -140,7 +153,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
             surface.leadingAnchor.constraint(equalTo: view.leadingAnchor), surface.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             surface.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor), surface.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
-        for child in [leftRail, librarySidebar, center, info, rightRail, shelf] {
+        for child in [leftRail, librarySidebar, developPanel, center, info, rightRail, shelf] {
             child.translatesAutoresizingMaskIntoConstraints = false; content.addSubview(child)
         }
         for child in [canvas.hdrBackdrop, canvas, libraryHost] {
@@ -150,7 +163,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         canvas.appearance = NSAppearance(named: .darkAqua)
         for child in [canvas.hdrBackdrop, canvas, libraryHost] { child.wantsLayer = true; child.layer?.cornerRadius = 16; child.layer?.masksToBounds = true }
         libraryHost.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
-        libraryHost.isHidden = true; librarySidebar.isHidden = true
+        libraryHost.isHidden = true; librarySidebar.isHidden = true; developPanel.isHidden = true
         zoom.selectedSegment = 0
         zoom.target = self
         zoom.action = #selector(zoomChanged)
@@ -194,17 +207,32 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         centerToRail = center.leadingAnchor.constraint(equalTo: leftRail.trailingAnchor, constant: 10)
         centerToShelf = center.bottomAnchor.constraint(equalTo: shelf.topAnchor, constant: -10)
         centerToFooter = center.bottomAnchor.constraint(equalTo: footer.topAnchor, constant: -10)
+        canvasToWindowEdge = center.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -10)
+        sidebarAboveShelf = librarySidebar.bottomAnchor.constraint(equalTo: shelf.topAnchor, constant: -10)
+        sidebarAboveFooter = librarySidebar.bottomAnchor.constraint(equalTo: footer.topAnchor, constant: -10)
+        sidebarWidth = librarySidebar.widthAnchor.constraint(equalToConstant: 216)
+        // Luminar Neo: rails at both edges, the filmstrip under the photo only.
+        luminarConstraints = [
+            librarySidebar.leadingAnchor.constraint(equalTo: leftRail.trailingAnchor, constant: 10), librarySidebar.bottomAnchor.constraint(equalTo: shelf.bottomAnchor),
+            info.trailingAnchor.constraint(equalTo: rightRail.leadingAnchor, constant: -10), info.bottomAnchor.constraint(equalTo: shelf.bottomAnchor),
+            shelf.leadingAnchor.constraint(equalTo: center.leadingAnchor), shelf.trailingAnchor.constraint(equalTo: center.trailingAnchor),
+        ]
+        // Lightroom Classic: panels at the window edges, the filmstrip across the whole width beneath them.
+        lightroomConstraints = [
+            librarySidebar.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 10),
+            info.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -10), info.bottomAnchor.constraint(equalTo: librarySidebar.bottomAnchor),
+            shelf.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 10), shelf.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -10),
+        ]
         NSLayoutConstraint.activate([
             leftRail.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 10), leftRail.widthAnchor.constraint(equalToConstant: 48),
             leftRail.topAnchor.constraint(equalTo: center.topAnchor), leftRail.bottomAnchor.constraint(equalTo: shelf.bottomAnchor),
-            librarySidebar.leadingAnchor.constraint(equalTo: leftRail.trailingAnchor, constant: 10), librarySidebar.widthAnchor.constraint(equalToConstant: 216),
-            librarySidebar.topAnchor.constraint(equalTo: center.topAnchor), librarySidebar.bottomAnchor.constraint(equalTo: shelf.bottomAnchor),
+            sidebarWidth, librarySidebar.topAnchor.constraint(equalTo: center.topAnchor),
+            developPanel.leadingAnchor.constraint(equalTo: librarySidebar.leadingAnchor), developPanel.trailingAnchor.constraint(equalTo: librarySidebar.trailingAnchor),
+            developPanel.topAnchor.constraint(equalTo: librarySidebar.topAnchor), developPanel.bottomAnchor.constraint(equalTo: librarySidebar.bottomAnchor),
             centerToRail, center.topAnchor.constraint(equalTo: content.topAnchor, constant: 10), canvasToInspector, centerToShelf,
-            info.trailingAnchor.constraint(equalTo: rightRail.leadingAnchor, constant: -10), info.topAnchor.constraint(equalTo: center.topAnchor),
-            info.bottomAnchor.constraint(equalTo: shelf.bottomAnchor), info.widthAnchor.constraint(equalToConstant: 320),
+            info.topAnchor.constraint(equalTo: center.topAnchor), info.widthAnchor.constraint(equalToConstant: 320),
             rightRail.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -10), rightRail.widthAnchor.constraint(equalToConstant: 48),
             rightRail.topAnchor.constraint(equalTo: center.topAnchor), rightRail.bottomAnchor.constraint(equalTo: shelf.bottomAnchor),
-            shelf.leadingAnchor.constraint(equalTo: center.leadingAnchor), shelf.trailingAnchor.constraint(equalTo: center.trailingAnchor),
             shelf.heightAnchor.constraint(equalToConstant: 112), shelf.bottomAnchor.constraint(equalTo: footer.topAnchor, constant: -10),
             filmstrip.leadingAnchor.constraint(equalTo: shelf.contentView.leadingAnchor, constant: 4), filmstrip.trailingAnchor.constraint(equalTo: shelf.contentView.trailingAnchor, constant: -4),
             filmstrip.topAnchor.constraint(equalTo: shelf.contentView.topAnchor), filmstrip.bottomAnchor.constraint(equalTo: shelf.contentView.bottomAnchor),
@@ -221,7 +249,28 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
             spinner.centerXAnchor.constraint(equalTo: canvas.centerXAnchor),
             spinner.centerYAnchor.constraint(equalTo: canvas.centerYAnchor, constant: 48)
         ])
+        NSLayoutConstraint.activate(luminarConstraints)
+        NotificationCenter.default.addObserver(forName: .workspaceLayoutChanged, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.applyLayout(WorkspaceLayout.current) }
+        }
     }
+
+    // MARK: Layout (Lightroom Classic or Luminar Neo)
+    @objc func useLightroomLayout() { WorkspaceLayout.current = .lightroom; NotificationCenter.default.post(name: .workspaceLayoutChanged, object: nil) }
+    @objc func useLuminarLayout() { WorkspaceLayout.current = .luminar; NotificationCenter.default.post(name: .workspaceLayoutChanged, object: nil) }
+    func applyLayout(_ layout: WorkspaceLayout) {
+        layoutMode = layout
+        let lr = layout == .lightroom
+        info.movePresetsAndHistory(to: lr ? developPanel.contentView : nil)
+        // Lightroom's panels are squarer; Luminar's are soft glass.
+        for chrome in [librarySidebar, developPanel, info, shelf] as [GlassChrome] { chrome.cornerRadius = lr ? 10 : 22 }
+        for child in [canvas.hdrBackdrop, canvas, libraryHost] { child.layer?.cornerRadius = lr ? 6 : 16 }
+        workspaceMode.setLabel(layout.modeNames.library, forSegment: 0); workspaceMode.setLabel(layout.modeNames.edit, forSegment: 1)
+        workspaceMode.sizeToFit()
+        if lr, isLibrary, info.selectedTab != 3 { developTab = info.selectedTab; info.showTab(3) }
+        updateWorkspaceLayout()
+    }
+
 
     private func setupWelcome() {
         welcome.orientation = .vertical
@@ -500,11 +549,13 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
     @objc private func workspaceChanged(_ sender:NSSegmentedControl) { sender.selectedSegment == 0 ? showLibrary() : showEditor() }
     @objc func showLibrary() {
         finishMaskEditing(); canvas.clearTool()
+        if layoutMode == .lightroom, !isLibrary, info.selectedTab != 3 { developTab = info.selectedTab; info.showTab(3) }
         isLibrary = true; foldersVisible = true
         refreshLibrary(); updateWorkspaceLayout(); updateControls()
     }
     @objc func showEditor() {
         let selectedItem = isLibrary ? libraryBrowser?.selectedItems.first : nil
+        if layoutMode == .lightroom, isLibrary, info.selectedTab == 3 { info.showTab(developTab) }
         isLibrary = false; foldersVisible = false
         updateWorkspaceLayout(); updateControls()
         if let selectedItem, let browser=libraryBrowser {showShootSelection(filtered:browser.visibleURLs,url:selectedItem.url)}
@@ -525,12 +576,27 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         rightRail.select(id)
     }
     private func updateWorkspaceLayout() {
-        let inspector = infoVisible && !isLibrary
-        info.isHidden = !inspector; librarySidebar.isHidden = !foldersVisible
+        let lr = layoutMode == .lightroom
+        // Lightroom keeps a panel on each side in both modules: Info on the right of the library, adjustments while developing.
+        let inspector = infoVisible && (!isLibrary || lr)
+        let leftPanel = lr || foldersVisible
+        info.isHidden = !inspector
+        librarySidebar.isHidden = !(lr ? isLibrary : foldersVisible)
+        developPanel.isHidden = !(lr && !isLibrary)
+        leftRail.isHidden = lr; rightRail.isHidden = lr
         canvas.isHidden = isLibrary; canvas.hdrBackdrop.isHidden = isLibrary; libraryHost.isHidden = !isLibrary; shelf.isHidden = isLibrary
+        sidebarWidth.constant = lr ? 250 : 216
         // Deactivate alternatives first, preventing transient constraint conflicts.
-        NSLayoutConstraint.deactivate([canvasToInspector,canvasToEdge,centerToFolders,centerToRail,centerToShelf,centerToFooter])
-        NSLayoutConstraint.activate([inspector ? canvasToInspector : canvasToEdge, foldersVisible ? centerToFolders : centerToRail, isLibrary ? centerToFooter : centerToShelf])
+        var alternatives: [NSLayoutConstraint] = [canvasToInspector, canvasToEdge, canvasToWindowEdge, centerToFolders, centerToRail, centerToShelf, centerToFooter, sidebarAboveShelf, sidebarAboveFooter]
+        alternatives += luminarConstraints; alternatives += lightroomConstraints
+        NSLayoutConstraint.deactivate(alternatives)
+        var chosen: [NSLayoutConstraint] = lr ? lightroomConstraints : luminarConstraints
+        if lr { chosen.append(isLibrary ? sidebarAboveFooter : sidebarAboveShelf) }
+        let trailing: NSLayoutConstraint = inspector ? canvasToInspector : (lr ? canvasToWindowEdge : canvasToEdge)
+        let leading: NSLayoutConstraint = leftPanel ? centerToFolders : centerToRail
+        let bottom: NSLayoutConstraint = isLibrary ? centerToFooter : centerToShelf
+        chosen += [trailing, leading, bottom]
+        NSLayoutConstraint.activate(chosen)
         workspaceMode.selectedSegment = isLibrary ? 0 : 1
         leftRail.select(isLibrary ? "library" : "photo")
         if isLibrary { rightRail.select(nil) }
@@ -604,6 +670,8 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
             && NSApp.keyWindow === view.window
     }
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == #selector(useLightroomLayout) { menuItem.state = layoutMode == .lightroom ? .on : .off; return true }
+        if menuItem.action == #selector(useLuminarLayout) { menuItem.state = layoutMode == .luminar ? .on : .off; return true }
         if menuItem.action == #selector(trashPhoto) { return canTrashPhoto }
         if menuItem.action == #selector(sharePhoto) { return !selectedURLs.isEmpty && NSApp.keyWindow === view.window && view.window?.attachedSheet == nil }
         if menuItem.action == #selector(selectAllPhotos) { return !urls.isEmpty && NSApp.keyWindow === view.window && view.window?.attachedSheet == nil }
@@ -722,4 +790,9 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
             else { self.updateControls() }
         }
     }
+}
+
+extension Notification.Name {
+    /// Settings or the View menu switched between the Lightroom Classic and Luminar Neo layouts.
+    static let workspaceLayoutChanged = Notification.Name("OpenStillWorkspaceLayoutChanged")
 }
