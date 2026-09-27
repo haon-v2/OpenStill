@@ -5,7 +5,7 @@ import OpenStillCore
 
 /// The Book module: pages of one, two or four photos with captions, laid out automatically and changed page by page, saved as a PDF.
 final class BookWindow: OutputWindow {
-    private var document = BookEngine.load()
+    private var book = BookEngine.load()
     private let pages = NSStackView(), preview = NSImageView(), pageLabel = NSTextField(labelWithString: "")
     private lazy var paper = popup(BookDocument.papers.map(\.name))
     private lazy var template = popup(BookTemplate.allCases.map(\.title))
@@ -25,9 +25,9 @@ final class BookWindow: OutputWindow {
         side.addArrangedSubview(preview); side.addArrangedSubview(pageLabel)
         pages.orientation = .vertical; pages.alignment = .leading; pages.spacing = 8
         let scroll = NSScrollView(); scroll.hasVerticalScroller = true; scroll.drawsBackground = false
-        let document = FlippedStack(); document.translatesAutoresizingMaskIntoConstraints = false; document.addSubview(pages); pages.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([pages.topAnchor.constraint(equalTo: document.topAnchor), pages.leadingAnchor.constraint(equalTo: document.leadingAnchor), pages.trailingAnchor.constraint(equalTo: document.trailingAnchor), pages.bottomAnchor.constraint(equalTo: document.bottomAnchor)])
-        scroll.documentView = document; document.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor).isActive = true
+        let holder = FlippedStack(); holder.translatesAutoresizingMaskIntoConstraints = false; holder.addSubview(pages); pages.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([pages.topAnchor.constraint(equalTo: holder.topAnchor), pages.leadingAnchor.constraint(equalTo: holder.leadingAnchor), pages.trailingAnchor.constraint(equalTo: holder.trailingAnchor), pages.bottomAnchor.constraint(equalTo: holder.bottomAnchor)])
+        scroll.documentView = holder; holder.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor).isActive = true
         scroll.widthAnchor.constraint(equalToConstant: 470).isActive = true; scroll.heightAnchor.constraint(equalToConstant: 420).isActive = true
         row("Page size", paper); row("Layout", template)
         let auto = NSButton(title: "Auto Layout", target: self, action: #selector(autoLayout)); auto.bezelStyle = .rounded
@@ -35,28 +35,28 @@ final class BookWindow: OutputWindow {
         let actions = NSStackView(views: [auto, add]); actions.spacing = 8
         row("", actions); row("Pages", scroll)
         button("Save PDF…", #selector(savePDF), primary: true)
-        paper.selectItem(at: BookDocument.papers.firstIndex { $0.name == self.document.paper.name } ?? 0)
+        paper.selectItem(at: BookDocument.papers.firstIndex { $0.name == self.book.paper.name } ?? 0)
         let known = Set(items.map(\.id))
-        if self.document.pages.isEmpty || !self.document.pages.flatMap({ $0.photos.compactMap { $0 } }).allSatisfy(known.contains) { self.document.pages = BookEngine.autoLayout(items.map(\.id), template: .single) }
+        if self.book.pages.isEmpty || !self.book.pages.flatMap({ $0.photos.compactMap { $0 } }).allSatisfy(known.contains) { self.book.pages = BookEngine.autoLayout(items.map(\.id), template: .single) }
         status.stringValue = "\(items.count) photo\(items.count == 1 ? "" : "s"). Auto Layout fills pages in order; choose a photo for any spot to change it. The book is saved as a PDF on this Mac."
         loadThumbnails(); rebuild()
     }
     required init?(coder: NSCoder) { fatalError() }
     override func changed() {
-        document.paper = BookDocument.papers[max(0, paper.indexOfSelectedItem)]
+        book.paper = BookDocument.papers[max(0, paper.indexOfSelectedItem)]
         save(); refreshPreview()
     }
-    private func save() { try? BookEngine.save(document) }
+    private func save() { try? BookEngine.save(book) }
     @objc private func autoLayout() {
-        document.pages = BookEngine.autoLayout(items.map(\.id), template: BookTemplate.allCases[max(0, template.indexOfSelectedItem)])
+        book.pages = BookEngine.autoLayout(items.map(\.id), template: BookTemplate.allCases[max(0, template.indexOfSelectedItem)])
         selected = 0; save(); rebuild()
     }
-    @objc private func addPage() { document.pages.append(BookPage(template: BookTemplate.allCases[max(0, template.indexOfSelectedItem)])); selected = document.pages.count - 1; save(); rebuild() }
+    @objc private func addPage() { book.pages.append(BookPage(template: BookTemplate.allCases[max(0, template.indexOfSelectedItem)])); selected = book.pages.count - 1; save(); rebuild() }
     /// One row per page: its layout, a photo menu per spot, the caption, and move / remove.
     private func rebuild() {
         pages.arrangedSubviews.forEach { pages.removeArrangedSubview($0); $0.removeFromSuperview() }
         let names = items.map(\.url.lastPathComponent)
-        for (index, page) in document.pages.enumerated() {
+        for (index, page) in book.pages.enumerated() {
             let title = NSButton(title: "Page \(index + 1)", target: self, action: #selector(selectPage(_:))); title.tag = index; title.bezelStyle = .rounded; title.controlSize = .small
             if index == selected { title.state = .on; title.setButtonType(.pushOnPushOff) }
             let layout = NSPopUpButton(); layout.controlSize = .small; layout.addItems(withTitles: BookTemplate.allCases.map(\.title))
@@ -82,29 +82,29 @@ final class BookWindow: OutputWindow {
     }
     @objc private func selectPage(_ sender: NSButton) { selected = sender.tag; rebuild() }
     @objc private func pageTemplate(_ sender: NSPopUpButton) {
-        guard document.pages.indices.contains(sender.tag) else { return }
-        let old = document.pages[sender.tag]
-        document.pages[sender.tag] = BookPage(template: BookTemplate.allCases[max(0, sender.indexOfSelectedItem)], photos: old.photos)
-        document.pages[sender.tag].caption = old.caption; selected = sender.tag; save(); rebuild()
+        guard book.pages.indices.contains(sender.tag) else { return }
+        let old = book.pages[sender.tag]
+        book.pages[sender.tag] = BookPage(template: BookTemplate.allCases[max(0, sender.indexOfSelectedItem)], photos: old.photos)
+        book.pages[sender.tag].caption = old.caption; selected = sender.tag; save(); rebuild()
     }
     @objc private func pagePhoto(_ sender: NSPopUpButton) {
         let page = sender.tag / 10, slot = sender.tag % 10
-        guard document.pages.indices.contains(page), document.pages[page].photos.indices.contains(slot) else { return }
-        document.pages[page].photos[slot] = sender.indexOfSelectedItem == 0 ? nil : items[sender.indexOfSelectedItem - 1].id
+        guard book.pages.indices.contains(page), book.pages[page].photos.indices.contains(slot) else { return }
+        book.pages[page].photos[slot] = sender.indexOfSelectedItem == 0 ? nil : items[sender.indexOfSelectedItem - 1].id
         selected = page; save(); refreshPreview()
     }
     @objc private func pageCaption(_ sender: NSTextField) {
-        guard document.pages.indices.contains(sender.tag) else { return }
-        document.pages[sender.tag].caption = sender.stringValue; selected = sender.tag; save(); refreshPreview()
+        guard book.pages.indices.contains(sender.tag) else { return }
+        book.pages[sender.tag].caption = sender.stringValue; selected = sender.tag; save(); refreshPreview()
     }
     @objc private func movePage(_ sender: NSButton) {
         let index = sender.tag / 2, target = index + (sender.tag % 2 == 0 ? -1 : 1)
-        guard document.pages.indices.contains(index), document.pages.indices.contains(target) else { return }
-        document.pages.swapAt(index, target); selected = target; save(); rebuild()
+        guard book.pages.indices.contains(index), book.pages.indices.contains(target) else { return }
+        book.pages.swapAt(index, target); selected = target; save(); rebuild()
     }
     @objc private func removePage(_ sender: NSButton) {
-        guard document.pages.indices.contains(sender.tag) else { return }
-        document.pages.remove(at: sender.tag); selected = max(0, min(selected, document.pages.count - 1)); save(); rebuild()
+        guard book.pages.indices.contains(sender.tag) else { return }
+        book.pages.remove(at: sender.tag); selected = max(0, min(selected, book.pages.count - 1)); save(); rebuild()
     }
     /// Small renders for the page preview.
     private func loadThumbnails() {
@@ -117,13 +117,13 @@ final class BookWindow: OutputWindow {
         }
     }
     private func refreshPreview() {
-        pageLabel.stringValue = document.pages.isEmpty ? "No pages" : "Page \(selected + 1) of \(document.pages.count) · \(document.paper.name)"
-        guard document.pages.indices.contains(selected) else { preview.image = nil; return }
-        let page = document.pages[selected], size = NSSize(width: document.paper.width, height: document.paper.height)
-        preview.image = NSImage(size: size, flipped: false) { [document, thumbnails] rect in
+        pageLabel.stringValue = book.pages.isEmpty ? "No pages" : "Page \(selected + 1) of \(book.pages.count) · \(book.paper.name)"
+        guard book.pages.indices.contains(selected) else { preview.image = nil; return }
+        let page = book.pages[selected], size = NSSize(width: book.paper.width, height: book.paper.height)
+        preview.image = NSImage(size: size, flipped: false) { [book, thumbnails] rect in
             NSColor.white.setFill(); rect.fill()
             guard let context = NSGraphicsContext.current?.cgContext else { return true }
-            let cells = BookEngine.cells(page.template, document: document, caption: !page.caption.isEmpty)
+            let cells = BookEngine.cells(page.template, document: book, caption: !page.caption.isEmpty)
             for (cell, id) in zip(cells, page.photos) {
                 guard let id, let image = thumbnails[id] else { NSColor(white: 0.9, alpha: 1).setFill(); cell.fill(); continue }
                 context.saveGState(); context.clip(to: cell)
@@ -131,29 +131,29 @@ final class BookWindow: OutputWindow {
             }
             if !page.caption.isEmpty {
                 let text = NSAttributedString(string: page.caption, attributes: [.font: NSFont(name: "Helvetica", size: 11) ?? .systemFont(ofSize: 11), .foregroundColor: NSColor(white: 0.2, alpha: 1)])
-                text.draw(at: NSPoint(x: (rect.width - text.size().width) / 2, y: document.margin))
+                text.draw(at: NSPoint(x: (rect.width - text.size().width) / 2, y: book.margin))
             }
             return true
         }
     }
     @objc private func savePDF() {
-        guard let window, !document.pages.isEmpty else { status.stringValue = "Add pages first."; return }
-        let panel = NSSavePanel(); panel.allowedContentTypes = [.pdf]; panel.nameFieldStringValue = document.title + ".pdf"
+        guard let window, !book.pages.isEmpty else { status.stringValue = "Add pages first."; return }
+        let panel = NSSavePanel(); panel.allowedContentTypes = [.pdf]; panel.nameFieldStringValue = book.title + ".pdf"
         panel.beginSheetModal(for: window) { [weak self] response in
             guard let self, response == .OK, let url = panel.url else { return }
             self.busy = true; self.status.stringValue = "Rendering the book…"
-            let document = self.document, lookup = self.byID
+            let book = self.book, lookup = self.byID
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
                 let result = Result { () -> Int in
                     var images: [UUID: CGImage] = [:]
                     // About 300 dpi for the largest spot on the page.
-                    let edge = Int(max(document.paper.width, document.paper.height) / 72 * 300)
-                    for id in Set(document.pages.flatMap { $0.photos.compactMap { $0 } }) {
+                    let edge = Int(max(book.paper.width, book.paper.height) / 72 * 300)
+                    for id in Set(book.pages.flatMap { $0.photos.compactMap { $0 } }) {
                         guard let item = lookup[id] else { continue }
                         images[id] = try autoreleasepool { try ModernRenderer.display(ModernRenderer.render(source: item.url, recipe: item.record.active.recipe.sdr, maximumDimension: edge), profile: .sRGB) }
                     }
-                    try BookEngine.pdf(document, images: images, to: url)
-                    return document.pages.count
+                    try BookEngine.pdf(book, images: images, to: url)
+                    return book.pages.count
                 }
                 DispatchQueue.main.async {
                     switch result {

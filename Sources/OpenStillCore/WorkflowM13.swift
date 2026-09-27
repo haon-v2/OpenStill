@@ -45,7 +45,7 @@ public enum EditIn {
         // The copy carries the original's rating, label and keywords.
         _ = try? store.update(copy.id) { r in r.rating = item.record.rating; r.label = item.record.label; r.metadata = item.record.metadata }
         let existing = store.catalog?.stacks().first { $0.value.contains(item.id) }?.value ?? [item.id]
-        try? store.catalog?.createStack([copy.id] + existing.filter { $0 != copy.id })
+        _ = try? store.catalog?.createStack([copy.id] + existing.filter { $0 != copy.id })
         return output
     }
 }
