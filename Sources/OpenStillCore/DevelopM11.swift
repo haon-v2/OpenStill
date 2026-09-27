@@ -61,7 +61,7 @@ public struct ParametricCurve: Codable, Equatable, Sendable {
         return s
     }
     /// Each region pushes a smooth bump over its range (overlapping its neighbours, like Lightroom's zones).
-    /// End points stay fixed and the bumps are small enough that the curve keeps rising.
+    /// End points stay fixed. At most two regions overlap and each bump's slope is at most 0.15π, so the curve keeps rising.
     public func value(at x: Double) -> Double {
         let s = sanitized
         guard x >= 0 && x <= 1 else { return x }
@@ -71,8 +71,7 @@ public struct ParametricCurve: Codable, Equatable, Sendable {
             let lo = i == 0 ? 0 : (edges[i - 1] + edges[i]) / 2, hi = i == 3 ? 1 : (edges[i + 1] + edges[i + 2]) / 2
             guard x > lo, x < hi else { continue }
             let t = (x - lo) / (hi - lo), bump = sin(Double.pi * t) * sin(Double.pi * t)
-            let room = min(1, 2 * (amounts[i] > 0 ? 1 - x : x))
-            y += amounts[i] * bump * 0.2 * (hi - lo) * room
+            y += amounts[i] * bump * 0.15 * (hi - lo)
         }
         return min(1, max(0, y))
     }
@@ -405,12 +404,13 @@ enum EyeFixes {
         float inside = 1.0 - smoothstep(0.75, 1.0, r);
         if (inside <= 0.0) { return pixel; }
         if (p.x < 0.5) {
-            float redness = c.r - max(c.g, c.b);
-            float amount = inside * smoothstep(0.02, 0.15, redness);
+            // Core Image works in linear light: skin is under about twice as red as green/blue, a red pupil far more.
+            float ratio = c.r / max(max(c.g, c.b), 0.005);
+            float amount = inside * smoothstep(2.5, 4.0, ratio);
             float neutral = min(c.g, c.b) * (1.0 - 0.7 * p.z);
             c.rgb = mix(c.rgb, vec3(neutral), amount);
         } else {
-            vec3 dark = vec3(0.02 + 0.08 * (1.0 - p.z));
+            vec3 dark = vec3(0.003 + 0.02 * (1.0 - p.z));
             c.rgb = mix(c.rgb, dark, inside);
             if (p.w > 0.5) {
                 float glint = 1.0 - smoothstep(0.08, 0.16, length(d - vec2(-0.3, 0.3)));
