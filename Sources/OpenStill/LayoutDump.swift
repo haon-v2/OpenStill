@@ -5,6 +5,9 @@ import OpenStillCore
 enum LayoutDump {
     static func runIfRequested(window: NSWindow?) {
         guard let path = ProcessInfo.processInfo.environment["OPENSTILL_LAYOUT_DUMP"] else { return }
+        if ProcessInfo.processInfo.environment["OPENSTILL_DUMP_MODULE"] == "library" {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4) { (window?.contentViewController as? ViewerController)?.showLibrary() }
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + 8) {
             guard let window, let root = window.contentView else { exit(2) }
             var out = "window \(window.frame) appearance \(window.effectiveAppearance.name.rawValue)\n"

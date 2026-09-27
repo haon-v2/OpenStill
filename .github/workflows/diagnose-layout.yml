@@ -27,9 +27,9 @@ jobs:
       - name: Run and screenshot
         run: |
           set +e
-          for variant in lightroom luminar; do
-            defaults write org.openstill.viewer OpenStillWorkspaceLayout $variant
-            OPENSTILL_LAYOUT_DUMP=/tmp/dump-$variant dist/OpenStill.app/Contents/MacOS/OpenStill /tmp/photos &
+          for variant in lightroom library; do
+            defaults write org.openstill.viewer OpenStillWorkspaceLayout lightroom
+            OPENSTILL_DUMP_MODULE=$variant OPENSTILL_LAYOUT_DUMP=/tmp/dump-$variant dist/OpenStill.app/Contents/MacOS/OpenStill /tmp/photos &
             pid=$!
             sleep 7
             wait $pid
