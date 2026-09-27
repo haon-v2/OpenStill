@@ -186,10 +186,38 @@ Sharing copies are kept in OpenStill's temporary sharing folder so other apps ca
 
 **Settings → Layout** (or **View → Lightroom Classic Layout** ⌃⌘1 / **Luminar Neo Layout** ⌃⌘2) switches how the window is arranged. Your photos, edits and shortcuts stay the same.
 - **Luminar Neo** (the default) puts the photo first. There are icon rails at both edges and one tool panel on the right, with the filmstrip under the photo. The workspaces are called **Catalog** and **Edit**. It suits quick edits.
-- **Lightroom Classic** has panels on both sides.
-  - **Library:** folders and collections are on the left, and photo info is on the right.
-  - **Develop:** Presets and History are stacked on the left, with the histogram and adjustments on the right.
-  - The filmstrip runs across the whole window, and the panels have squarer corners.
+- **Lightroom Classic** follows Lightroom Classic's window, with flat dark-gray panels and square corners:
+  - **Module picker** across the top: the identity plate on the left, **Library | Develop | Map | Slideshow | Print | Web** on the right. Map, Slideshow, Print and Web open their windows for the selected photos (⌥⌘3, ⌥⌘5, ⌥⌘6, ⌥⌘7). OpenStill has no Book module.
+  - **Left panel:**
+    - The **Navigator** sits at the top: the whole photo, with a frame around the zoomed-in area. Click or drag in it to move around, or use **FIT / 100% / 200%**.
+    - Library has **Catalog, Folders, Collections** and **Publish Services**, with **Import… / Export…** at the bottom.
+    - Develop has **Presets, Versions** and **History**, with **Copy… / Paste**. Versions take the place of Lightroom's Snapshots and are OpenStill's named alternatives.
+  - **Right panel:**
+    - Library has **Histogram, Keywording** and **Metadata** for the photo selected in the grid, with **Sync Metadata… / Sync Settings…**.
+    - Develop has the **Histogram** with the camera settings under it, then the **Crop / Remove / Masking** tool strip. Below that are **Basic** (Treatment, HDR, Profile, White Balance, Tone, Presence), **Tone Curve, HSL / Color, Color Grading, Detail, Lens Corrections, Transform, Effects, Lens Blur** and **Calibration**. OpenStill's own tools (Structure, Glow, Sunrays, Sky Replacement, Layers, Local AI) come after them.
+    - At the bottom of Develop are **Previous**, which copies the last photo's settings but not its crop, retouching, lens or transform, and **Reset**.
+  - **Panels:**
+    - Headers open and close sections. Option-click a header, or Control-click it and choose **Solo Mode**, so opening one section closes the rest. **Expand All / Collapse All** are in the same menu.
+    - The triangles at each window edge show and hide that panel. Your panels and sections are remembered.
+  - **Filmstrip:** it runs across the bottom in both Library and Develop. Its bar shows the grid button, back / forward, and the source, e.g. "Folder : Trip 124 photos / 1 selected / IMG_0001.CR3".
+  - **Toolbar:** Develop's toolbar under the photo has Loupe, Before / After and the clipping warning.
+  - **Lightroom's keys:**
+
+    | Key | Action |
+    | --- | --- |
+    | G / D | Library grid / Develop |
+    | R | Crop |
+    | Q | Remove |
+    | Shift-W | Masking |
+    | L | Lights Out: dim, then off, then on |
+    | T | Toolbar |
+    | Tab | Side panels |
+    | Shift-Tab | All panels |
+    | F5 / F6 / F7 / F8 | Module picker / filmstrip / left panel / right panel |
+
+    You can change them all in **Settings → Shortcuts → Workspace**.
+  - **Masking works OpenStill's way.** A mask belongs to one adjustment, so the Masking tool strip asks which adjustment the mask limits (Develop, Clarity, Color grading…) and then offers brush, linear, radial and AI selections for it. Lightroom instead makes masks with their own set of sliders.
+  - **Look and behavior are close to Lightroom Classic, not a copy.** The panel names, order and keys follow it, and the controls are OpenStill's own. There are no Adobe icons or artwork, and slider scales are OpenStill's (for example, Contrast runs 0.5–1.5), not Lightroom's −100 to +100.
 
 **Settings → Shortcuts** lists every command and its shortcut:
 - **What you can change:** every menu command, plus the single keys used in the library grid (ratings, labels, flags, open) and on the photo (clipping, before/after, compare, next and previous, Trash, brush size). A search box finds commands by name or by keys, e.g. “export” or “⌘E”.

@@ -48,6 +48,8 @@ extension ViewerController {
         info.resetMaskInteractions()
         editWork?.cancel(); editToken = UUID(); comparing = false; canvas.clearTool();retouchSession.reset();canvas.retouchSource=nil
         canvas.beforeImage = nil; canvas.clippingOverlay = nil
+        if let old = preparedSource, old != source { previousEdits = currentEdits }
+        preparedSource = source
         do { photoRecord = try EditStorage.record(source) }
         catch { photoRecord = nil; info.status("Couldn’t open saved versions: " + error.localizedDescription) }
         editDocument = photoRecord?.active.document ?? EditStorage.load(source); currentEdits = editDocument.current
@@ -152,6 +154,7 @@ extension ViewerController {
         } else { editingCommand("export") }
     }
     func editingCommand(_ name: String) {
+        if name.hasPrefix("lr:") { lightroomCommand(name); return }
         if name.hasPrefix("recovery:"),let value=Int(name.dropFirst(9)){var edits=currentEdits;edits.ensureAdvanced();edits.advanced?.rawRecovery=min(9,max(0,value));changeEdits(edits,title:"RAW highlight recovery",commit:true);return}
         if name == "finishMask" {
             if canvas.tool == .sun { canvas.clearTool() }
@@ -192,6 +195,11 @@ extension ViewerController {
         case "compareSplit": toggleSplitCompare()
         case "toggleClipping": showClipping.toggle(); info.setClippingOverlay(showClipping); renderEdits()
         case "autoTone": autoTone()
+        case "previousSettings":
+            // Lightroom's Previous: the last photo's settings, without its crop, retouching, lens and transform.
+            guard let previous = previousEdits else { info.status("Edit another photo first. Previous copies its settings to this one."); return }
+            do { changeEdits(try BatchEdits.merging(previous, into: edits, options: BatchOptions(), geometryCompatible: false), title: "Previous settings", commit: true) }
+            catch { info.status(error.localizedDescription) }
         case "reset": changeEdits(PhotoEdits(), title: "Reset all edits", commit: true); canvas.clearTool()
         case "crop":
             // Start from the current full crop; the new rectangle is composed with the existing crop on Apply.

@@ -12,6 +12,7 @@ private final class ShootCollection:NSCollectionView {
     }
     /// Rating, label, flag and open keys come from Settings → Shortcuts.
     override func keyDown(with event:NSEvent){
+        if Shortcuts.performWorkspace(event){return}
         guard let id=Shortcuts.command(for:event,in:.library) else{super.keyDown(with:event);return}
         switch id{
         case let id where id.hasPrefix("library.rate"):mark?(Int(id.dropFirst("library.rate".count)) ?? 0,nil)
@@ -296,6 +297,36 @@ final class ShootWindow:NSWindowController,NSCollectionViewDataSource,NSCollecti
     @objc private func slideshow(){guard !outputItems.isEmpty else{message.stringValue="Open photos for a slideshow.";return};present(SlideshowWindow(items:outputItems))}
     @objc private func webGallery(){guard !outputItems.isEmpty else{message.stringValue="Open photos for a gallery.";return};present(GalleryWindow(items:outputItems))}
     @objc private func publishPhotos(){present(PublishWindow(items:selectedItems,library:all))}
+    // MARK: Lightroom layout: module picker and panel buttons
+    /// Opens Map, Slideshow, Print or Web for the selected photos (or all shown photos).
+    func openModule(_ module:LightroomModule){
+        switch module{case .map:showMap();case .slideshow:slideshow();case .print:printPhotos();case .web:webGallery();case .library,.develop:break}
+    }
+    func openPublish(){publishPhotos()}
+    /// Selects this photo in the grid, e.g. when it's clicked in the Lightroom filmstrip.
+    func select(url:URL){
+        guard let i=shown.firstIndex(where:{$0.url==url}) else{return}
+        let path=IndexPath(item:i,section:0);grid.selectionIndexPaths=[path];grid.scrollToItems(at:[path],scrollPosition:.centeredVertically);selectionChanged?()
+    }
+    func openMetadataEditor(){editMetadata()}
+    func exportSelected(){exportSelection()}
+    /// Sync Settings: the first selected photo's adjustments go to the other selected photos, after review.
+    func syncSettings(){
+        let chosen=selectedItems;guard chosen.count>1,let source=chosen.first else{message.stringValue="Select the source photo, then ⌘-click the photos to sync.";return}
+        Self.copied=source;pasteAdjustments()
+    }
+    /// Copy… in Develop. Returns a status line.
+    func copySettings(from url:URL)->String{
+        guard let item=all.first(where:{$0.url==url}) else{return "The library is still reading this photo. Try again in a moment."}
+        Self.copied=item;return "Copied settings from \(url.lastPathComponent). Choose another photo, then Paste."
+    }
+    /// Paste in Develop: reviews and applies the copied settings to this photo. Returns a status line.
+    func pasteSettings(to url:URL)->String{
+        guard let source=Self.copied else{return "Copy settings from a photo first."}
+        let targets=all.filter{$0.url==url && $0.id != source.id};guard !targets.isEmpty else{return source.url==url ? "Choose a different photo to paste onto." : "The library is still reading this photo. Try again in a moment."}
+        let panel=BatchPanel(source:source,targets:targets);batchPanel=panel;panel.completed = {[weak self] in self?.refresh();self?.recordsChanged?()};panel.showWindow(nil);panel.window?.makeKeyAndOrderFront(nil)
+        return "Review the settings to paste from \(source.url.lastPathComponent)."
+    }
     /// Shows only these photos (from People, Map or Timeline) until Show all photos.
     func focus(on ids:Set<UUID>,title:String){
         focused=(ids,title);applyFilter(preserving:[]);(browserView.window ?? window)?.makeKeyAndOrderFront(nil)

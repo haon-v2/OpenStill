@@ -109,6 +109,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let windowMenu = menu("Window")
         add(windowMenu, "Minimize", #selector(NSWindow.performMiniaturize(_:)), "m")
         add(windowMenu, "Zoom", #selector(NSWindow.performZoom(_:)))
+        // Lightroom Classic's module shortcuts and panel keys (F5–F8).
+        windowMenu.addItem(.separator())
+        add(windowMenu, "Map", #selector(ViewerController.showMapModule), "3", target: viewer, modifiers: [.command, .option])
+        add(windowMenu, "Slideshow", #selector(ViewerController.showSlideshowModule), "5", target: viewer, modifiers: [.command, .option])
+        add(windowMenu, "Print", #selector(ViewerController.showPrintModule), "6", target: viewer, modifiers: [.command, .option])
+        add(windowMenu, "Web", #selector(ViewerController.showWebModule), "7", target: viewer, modifiers: [.command, .option])
+        windowMenu.addItem(.separator())
+        add(windowMenu, "Show / Hide Module Picker", #selector(ViewerController.toggleModulePicker), String(UnicodeScalar(NSF5FunctionKey)!), target: viewer, modifiers: [])
+        add(windowMenu, "Show / Hide Filmstrip", #selector(ViewerController.toggleFilmstripPanel), String(UnicodeScalar(NSF6FunctionKey)!), target: viewer, modifiers: [])
+        add(windowMenu, "Show / Hide Left Panel", #selector(ViewerController.toggleLeftPanel), String(UnicodeScalar(NSF7FunctionKey)!), target: viewer, modifiers: [])
+        add(windowMenu, "Show / Hide Right Panel", #selector(ViewerController.toggleRightPanel), String(UnicodeScalar(NSF8FunctionKey)!), target: viewer, modifiers: [])
         NSApp.windowsMenu = windowMenu
     }
     @objc private func showSettings() { settings.showWindow(nil); settings.window?.center(); settings.window?.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true) }

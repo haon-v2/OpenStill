@@ -126,6 +126,28 @@ class GlassChrome: NSView {
             else { surface.layer?.cornerRadius = cornerRadius }
         }
     }
+    /// A solid color instead of glass, for Lightroom Classic's flat panels. Nil restores the glass.
+    var flatColor: NSColor? {
+        didSet {
+            if let flatColor {
+                if contentView.superview !== self {
+                    if #available(macOS 26.0, *), let glass = surface as? NSGlassEffectView { glass.contentView = nil }
+                    contentView.removeFromSuperview(); contentView.translatesAutoresizingMaskIntoConstraints = false; addSubview(contentView)
+                    NSLayoutConstraint.activate([contentView.leadingAnchor.constraint(equalTo:leadingAnchor), contentView.trailingAnchor.constraint(equalTo:trailingAnchor), contentView.topAnchor.constraint(equalTo:topAnchor), contentView.bottomAnchor.constraint(equalTo:bottomAnchor)])
+                }
+                surface.isHidden = true; wantsLayer = true; layer?.backgroundColor = flatColor.cgColor
+            } else if contentView.superview === self {
+                contentView.removeFromSuperview()
+                if #available(macOS 26.0, *), let glass = surface as? NSGlassEffectView {
+                    contentView.translatesAutoresizingMaskIntoConstraints = true; glass.contentView = contentView
+                } else {
+                    surface.addSubview(contentView)
+                    NSLayoutConstraint.activate([contentView.leadingAnchor.constraint(equalTo:surface.leadingAnchor), contentView.trailingAnchor.constraint(equalTo:surface.trailingAnchor), contentView.topAnchor.constraint(equalTo:surface.topAnchor), contentView.bottomAnchor.constraint(equalTo:surface.bottomAnchor)])
+                }
+                surface.isHidden = false; layer?.backgroundColor = nil
+            }
+        }
+    }
     override init(frame frameRect: NSRect) {
         if #available(macOS 26.0, *) {
             let glass = NSGlassEffectView()

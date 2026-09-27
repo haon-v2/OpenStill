@@ -42,6 +42,15 @@ import OpenStillCore
             ("editor.brushSmaller", "Smaller mask brush", KeyCombo("[")), ("editor.brushLarger", "Larger mask brush", KeyCombo("]")),
         ]
         for (id, title, combo) in editor { map.register(ShortcutCommand(id: id, title: title, group: "Photo and filmstrip", scope: .editor, defaultCombo: combo)) }
+        // Lightroom Classic's single keys: they work in the library grid and on the photo.
+        let workspace: [(String, String, KeyCombo?)] = [
+            ("workspace.grid", "Library grid (G)", KeyCombo("g")), ("workspace.develop", "Develop (D)", KeyCombo("d")),
+            ("workspace.crop", "Crop tool (R)", KeyCombo("r")), ("workspace.remove", "Remove / retouch tool (Q)", KeyCombo("q")),
+            ("workspace.masking", "Masking (Shift-W)", KeyCombo("w", shift: true)),
+            ("workspace.lightsOut", "Lights Out: dim, off, on (L)", KeyCombo("l")), ("workspace.toolbar", "Show or hide the toolbar (T)", KeyCombo("t")),
+            ("workspace.sidePanels", "Show or hide side panels (Tab)", KeyCombo("tab")), ("workspace.allPanels", "Show or hide all panels (Shift-Tab)", KeyCombo("tab", shift: true)),
+        ]
+        for (id, title, combo) in workspace { map.register(ShortcutCommand(id: id, title: title, group: "Workspace", scope: .workspace, defaultCombo: combo)) }
         map.changed = {
             MainActor.assumeIsolated {
                 for id in menuItems.keys { apply(id) }
@@ -53,6 +62,14 @@ import OpenStillCore
     /// The command a key press triggers in the library grid or on the photo.
     static func command(for event: NSEvent, in scope: ShortcutScope) -> String? {
         combo(from: event).flatMap { map.command(for: $0, in: scope)?.id }
+    }
+
+    /// Handles Lightroom-style workspace keys (panels, modules, tools); set by the main window.
+    static var workspace: ((String) -> Bool)?
+    /// True when the key was a workspace key and was handled.
+    static func performWorkspace(_ event: NSEvent) -> Bool {
+        guard let id = command(for: event, in: .workspace) else { return false }
+        return workspace?(id) ?? false
     }
 
     /// −1 or 1 when the key is the View menu's Previous or Next Photo shortcut, for views that get the key before the menu does.

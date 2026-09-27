@@ -76,7 +76,14 @@ public struct KeyCombo: Codable, Hashable, Sendable {
 }
 
 /// Where a shortcut works. Menu shortcuts work everywhere; single-key shortcuts only while the library grid or the photo has focus.
-public enum ShortcutScope: String, Codable, Sendable { case menu, library, editor }
+/// Workspace keys (panels, lights out, switching modules) work in both the library grid and on the photo.
+public enum ShortcutScope: String, Codable, Sendable {
+    case menu, library, editor, workspace
+    /// Whether the same keys in both places would clash.
+    public func overlaps(_ other: ShortcutScope) -> Bool {
+        self == other || self == .menu || other == .menu || self == .workspace || other == .workspace
+    }
+}
 
 public struct ShortcutCommand: Identifiable, Equatable, Sendable {
     public var id: String
@@ -125,7 +132,7 @@ public final class ShortcutMap {
     public func conflicts(for combo: KeyCombo, assigningTo id: String) -> [ShortcutCommand] {
         guard let scope = command(id)?.scope else { return [] }
         return commands.filter { other in
-            other.id != id && self.combo(for: other.id) == combo && (other.scope == scope || other.scope == .menu || scope == .menu)
+            other.id != id && self.combo(for: other.id) == combo && other.scope.overlaps(scope)
         }
     }
     /// Sets a shortcut (nil removes it). Commands it clashes with lose theirs.

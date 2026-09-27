@@ -194,8 +194,26 @@ final class PhotoCanvas: NSView {
         scale(by: max(0.1, 1 + event.magnification), around: convert(event.locationInWindow, from: nil))
     }
 
+    /// The color around the photo. Lightroom Classic's layout uses its medium-dark gray.
+    var backdrop = NSColor(calibratedWhite: 0.055, alpha: 1) { didSet { needsDisplay = true } }
+    /// The part of the photo on screen, 0–1 from the bottom left; nil when the whole photo shows.
+    var visibleFraction: CGRect? {
+        let rect = imageRect
+        guard image != nil, rect.width > 0, rect.height > 0 else { return nil }
+        let shown = rect.intersection(bounds)
+        guard !shown.isNull, shown.width < rect.width - 1 || shown.height < rect.height - 1 else { return nil }
+        return CGRect(x: (shown.minX-rect.minX)/rect.width, y: (shown.minY-rect.minY)/rect.height, width: shown.width/rect.width, height: shown.height/rect.height)
+    }
+    /// Pans so this point of the photo (0–1 from the bottom left) is in the middle, as clicking Lightroom's Navigator does.
+    func center(on point: CGPoint) {
+        let size = photoSize
+        guard image != nil, size.width > 0 else { return }
+        offset = PhotoGeometry.clampedOffset(CGPoint(x: size.width*(0.5-point.x), y: size.height*(0.5-point.y)), image: size, viewport: bounds.size)
+        needsDisplay = true; viewportChanged?()
+    }
+
     override func draw(_ dirtyRect: NSRect) {
-        NSColor(calibratedWhite: 0.055, alpha: 1).setFill()
+        backdrop.setFill()
         bounds.fill()
         if let image, let context = NSGraphicsContext.current?.cgContext {
             context.saveGState()
@@ -477,6 +495,7 @@ final class PhotoCanvas: NSView {
             sunPlaced?(sunPosition,true); return
         }
         // Keys come from Settings → Shortcuts (← and → are the View menu's Previous/Next Photo).
+        if Shortcuts.performWorkspace(event) { return }
         switch Shortcuts.command(for: event, in: .editor) {
         case "editor.brushSmaller" where tool == .maskBrush: resizeMaskBrush?(-1)
         case "editor.brushLarger" where tool == .maskBrush: resizeMaskBrush?(1)
