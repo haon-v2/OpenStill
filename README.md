@@ -245,7 +245,7 @@ Sharing copies are kept in OpenStill's temporary sharing folder so other apps ca
 
     You can change them all in **Settings → Shortcuts → Workspace**.
   - **Masking works like Lightroom's.** **New mask** (Brush, Linear, Radial, Subject, Sky, Background, People, Object, Color / Luminance / Depth range) adds a mask with its own Exposure, Contrast, Highlights, Shadows, Whites, Blacks, Temperature, Tint, Saturation, Clarity, Texture, Dehaze, Sharpness and Noise sliders. Add as many as you like; each one changes only its own area. Rename, duplicate, invert, hide or delete a mask from its list. Below the list you can still limit a whole tool (Develop, Clarity, Color grading…) to a mask, as before.
-  - **Return finishes a tool.** In Crop, Remove, Red Eye and Masking, Return (or **Done**) applies the crop or ends painting and closes the panel. Escape closes it too.
+  - **Return finishes a tool.** In Crop, Remove, Red Eye and Masking, Return (or **Done**) applies the crop or ends painting and closes the panel. Escape closes it too. In the Luminar layout, Return takes a tool's Masking tab back to its adjustments, and closes the Masks tool or a tool you were drawing with.
   - **Look and behavior are close to Lightroom Classic, not a copy.** The panel names, order and keys follow it, and the controls are OpenStill's own. There are no Adobe icons or artwork, and slider scales are OpenStill's (for example, Contrast runs 0.5–1.5), not Lightroom's −100 to +100.
 
 **Settings → Shortcuts** lists every command and its shortcut:

@@ -15,12 +15,14 @@ extension ViewerController {
     func finishToolAndClose() {
         guard !isLibrary else { return }
         let open = layoutMode == .lightroom ? info.lightroomToolOpen : nil
+        let active = canvas.tool != .browse
         switch canvas.tool {
         case .crop: editingCommand("applyCrop")
         case .browse: break
         default: finishMaskEditing(); canvas.clearTool()
         }
-        guard open != nil || canvas.tool != .browse else { return }
+        let closedLuminar = layoutMode == .luminar && info.finishLuminarTool(canvasToolWasActive: active)
+        guard open != nil || active || closedLuminar else { return }
         closeLightroomTool()
         info.status("Done. Edits are saved on this Mac.")
     }

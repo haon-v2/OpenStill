@@ -533,6 +533,18 @@ final class EditorPanel: GlassChrome {
         }
         focusTool(header)
     }
+    /// Luminar layout, Return: a tool showing its Masking tab goes back to its adjustments; otherwise the open tool collapses
+    /// when a canvas tool was in use or it is the Masks tool. Returns whether anything closed.
+    func finishLuminarTool(canvasToolWasActive: Bool) -> Bool {
+        guard activeTab == 0 else { return false }
+        if let workspace = workspaces.first(where: { $0.0.selectedSegment == 1 && $0.0.superview.map { !$0.isHidden } == true }) {
+            workspace.0.selectedSegment = 0; workspaceChanged(workspace.0); return true
+        }
+        guard let index = toolBodies.firstIndex(where: { !$0.isHidden }), canvasToolWasActive || headers[index].title == "Masks" else { return false }
+        toolBodies[index].isHidden = true
+        (headers[index] as? ToolHeaderButton)?.expanded = false
+        return true
+    }
     func openCurrentMask() {
         if activeTab == 1 { if lutMask?.isHidden == true {toggleLUTMask()}; return }
         let current = headers.enumerated().first { entry in !toolBodies[entry.offset].isHidden && workspaces.contains(where: { $0.0.superview === toolBodies[entry.offset] }) }?.element.title
@@ -688,7 +700,7 @@ extension EditorPanel {
         lrStrip.choose = { [weak self] id in self?.command?("finishMask"); self?.showDrawer(id); self?.lightroomTool?(id) }
         lrDrawer.orientation = .vertical; lrDrawer.alignment = .leading; lrDrawer.spacing = 8
         lrDrawer.edgeInsets = NSEdgeInsets(top: 6, left: 14, bottom: 12, right: 14)
-        column.pin(lrDrawer)
+        column.top(lrDrawer)
         let crop = LRStack(), remove = LRStack(), masking = LRStack(), redeye = LRStack()
         for box in [crop, remove, redeye, masking] { box.orientation = .vertical; box.alignment = .leading; box.spacing = 8; fullWidth(box, in: lrDrawer); box.isHidden = true }
         drawerViews = ["crop": crop, "remove": remove, "redeye": redeye, "masking": masking]
@@ -843,6 +855,7 @@ extension EditorPanel {
     private func showDrawer(_ id: String?) {
         for (key, view) in drawerViews { view.isHidden = key != id }
         lrDrawer.isHidden = id == nil
+        if id != nil { DispatchQueue.main.async { [weak self] in self?.lrColumns[.develop]?.scrollToTop() } }
         if id == "masking" { borrowMask() } else { returnMask() }
     }
     @objc private func maskTargetChanged() { returnMask(); borrowMask() }

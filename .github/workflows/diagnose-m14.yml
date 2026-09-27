@@ -27,13 +27,13 @@ jobs:
       - name: Run and screenshot
         run: |
           set +e
-          for variant in "masking|develop|||tool:masking;new:radial" "maskreturn|develop|||tool:masking;new:radial;return" "crop|develop|||tool:crop" "cropreturn|develop|||tool:crop;return" "remove|develop|||tool:remove" "redeye|develop|||tool:redeye;escape" "basic|develop|Basic||" "library|library|Quick Develop,Keyword List||"; do
-            IFS='|' read name module open filterbar actions <<< "$variant"
-            defaults write org.openstill.viewer OpenStillWorkspaceLayout lightroom
+          for variant in "masking|develop|||tool:masking;new:radial|lightroom" "masktwo|develop|||tool:masking;new:radial;new:linear|lightroom" "maskreturn|develop|||tool:masking;new:radial;return|lightroom" "maskescape|develop|||tool:masking;escape|lightroom" "crop|develop|||tool:crop|lightroom" "cropreturn|develop|||tool:crop;return|lightroom" "remove|develop|||tool:remove|lightroom" "redeye|develop|||tool:redeye|lightroom" "basic|develop|Basic|||lightroom" "library|library|Quick Develop,Keyword List|||lightroom" "luminarmasks|develop|||luminar:Masks;new:radial|luminar" "luminarreturn|develop|||luminar:Masks;new:radial;return|luminar"; do
+            IFS='|' read name module open filterbar actions layout <<< "$variant"
+            defaults write org.openstill.viewer OpenStillWorkspaceLayout $layout
             fb=""; [ -n "$filterbar" ] && fb=1
             env ${fb:+OPENSTILL_DUMP_FILTERBAR=1} OPENSTILL_DUMP_ACTIONS="$actions" OPENSTILL_DUMP_MODULE="$module" OPENSTILL_DUMP_OPEN="$open" OPENSTILL_LAYOUT_DUMP=/tmp/dump-$name dist/OpenStill.app/Contents/MacOS/OpenStill /tmp/photos &
             pid=$!
-            sleep 10
+            sleep 14
             wait $pid
             for f in /tmp/dump-$name.png; do
               [ -f $f ] || { echo "missing $f"; continue; }

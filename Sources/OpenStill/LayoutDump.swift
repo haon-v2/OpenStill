@@ -42,7 +42,7 @@ enum LayoutDump {
         // Develop actions, one every half second: "tool:masking", "new:radial", "return", "escape", "command:<name>".
         if let steps = ProcessInfo.processInfo.environment["OPENSTILL_DUMP_ACTIONS"], !steps.isEmpty {
             for (i, step) in steps.split(separator: ";").map(String.init).enumerated() {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 6 + Double(i) * 0.6) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 9 + Double(i) * 0.8) {
                     guard let viewer = window?.contentViewController as? ViewerController else { return }
                     if step.hasPrefix("tool:") { let id = String(step.dropFirst(5)); viewer.info.showLightroomTool(id); if id == "crop" { viewer.editingCommand("crop") } }
                     else if step.hasPrefix("new:") { viewer.editingCommand("maskLayer:new:" + step.dropFirst(4)) }
@@ -53,7 +53,7 @@ enum LayoutDump {
                 }
             }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 11) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 14) {
             guard let window, let root = window.contentView else { exit(2) }
             var out = "window \(window.frame) appearance \(window.effectiveAppearance.name.rawValue)\n"
             func walk(_ v: NSView, _ depth: Int) {
