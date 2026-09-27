@@ -35,7 +35,7 @@ jobs:
             pid=$!
             sleep 14
             wait $pid
-            for f in /tmp/dump-$name.png; do
+            for f in /tmp/dump-$name.png /tmp/dump-$name-capture.png; do
               [ -f $f ] || { echo "missing $f"; continue; }
               sips -Z 1100 -s format jpeg -s formatOptions 60 $f --out $f.jpg >/dev/null
               echo "BEGIN $f"; base64 -i $f.jpg | tr -d '\n'; echo; echo "END $f"

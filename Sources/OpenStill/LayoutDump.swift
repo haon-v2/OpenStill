@@ -67,6 +67,22 @@ enum LayoutDump {
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 14) {
             guard let window = LayoutDump.logo?.window ?? window, let root = window.contentView else { exit(2) }
+            if LayoutDump.logo != nil {
+                // Glass panels don't draw in cacheDisplay: list what's visible instead, and try a real window capture.
+                func visible(_ v: NSView) -> Bool { var x: NSView? = v; while let c = x { if c.isHidden { return false }; x = c.superview }; return true }
+                func list(_ v: NSView) {
+                    if visible(v), v is NSControl || v is NSScrollView || v is NSImageView {
+                        let f = v.convert(v.bounds, to: nil)
+                        let text = (v as? NSTextField)?.stringValue ?? (v as? NSButton)?.title ?? (v as? NSPopUpButton)?.titleOfSelectedItem ?? (v as? NSSegmentedControl).map { c in (0..<c.segmentCount).map { c.label(forSegment: $0) ?? "" }.joined(separator: "|") + " sel=\(c.selectedSegment)" } ?? ""
+                        print("VIEW \(path) \(type(of: v)) \(Int(f.minX)),\(Int(f.minY)) \(Int(f.width))x\(Int(f.height)) enabled=\((v as? NSControl)?.isEnabled ?? true) “\(text.prefix(70))”")
+                    }
+                    v.subviews.forEach(list)
+                }
+                list(root); fflush(stdout)
+                let capture = Process(); capture.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+                capture.arguments = ["-x", "-o", "-l", String(window.windowNumber), path + "-capture.png"]
+                try? capture.run(); capture.waitUntilExit()
+            }
             var out = "window \(window.frame) appearance \(window.effectiveAppearance.name.rawValue)\n"
             func walk(_ v: NSView, _ depth: Int) {
                 let f = v.convert(v.bounds, to: nil)
