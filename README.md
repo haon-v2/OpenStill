@@ -33,7 +33,7 @@ The filmstrip scrolls horizontally and lets you select any photo directly. Navig
 
 ## Move to Trash
 
-Press **Delete** while browsing, use **File → Move to Trash… (⌘Delete)**, or right-click the photo or a filmstrip thumbnail. Right-clicking a thumbnail selects that photo first. A confirmation names the exact file and its folder; **Cancel** is the default. Only the selected original is moved, leaving paired RAW/JPEG files and sidecars alone. Trash is available when exactly one photo is selected; select a single thumbnail before deleting.
+Press **Delete** while browsing, use **File → Move to Trash… (⌘Delete)**, or right-click the photo or a filmstrip thumbnail. Right-clicking a thumbnail selects that photo first. A confirmation names the exact file and its folder; **Move to Trash** is the default button, so Delete then Return trashes the photo, and Escape cancels. In the library grid, Delete asks the same way for all the selected photos. Only the selected original is moved, leaving paired RAW/JPEG files and sidecars alone. In the viewer, Trash works on one photo at a time.
 
 After confirmation, OpenStill uses macOS Trash and advances to a remaining photo. You can recover the file from Finder's Trash. If the device is read-only or does not support Trash, OpenStill shows an error and never falls back to permanent deletion. No files are removed from the viewer until the Trash operation succeeds. Holding Delete does not repeatedly trigger deletion.
 
@@ -244,7 +244,8 @@ Sharing copies are kept in OpenStill's temporary sharing folder so other apps ca
     | F5 / F6 / F7 / F8 | Module picker / filmstrip / left panel / right panel |
 
     You can change them all in **Settings → Shortcuts → Workspace**.
-  - **Masking works OpenStill's way.** A mask belongs to one adjustment, so the Masking tool strip asks which adjustment the mask limits (Develop, Clarity, Color grading…) and then offers brush, linear, radial and AI selections for it. Lightroom instead makes masks with their own set of sliders.
+  - **Masking works like Lightroom's.** **New mask** (Brush, Linear, Radial, Subject, Sky, Background, People, Object, Color / Luminance / Depth range) adds a mask with its own Exposure, Contrast, Highlights, Shadows, Whites, Blacks, Temperature, Tint, Saturation, Clarity, Texture, Dehaze, Sharpness and Noise sliders. Add as many as you like; each one changes only its own area. Rename, duplicate, invert, hide or delete a mask from its list. Below the list you can still limit a whole tool (Develop, Clarity, Color grading…) to a mask, as before.
+  - **Return finishes a tool.** In Crop, Remove, Red Eye and Masking, Return (or **Done**) applies the crop or ends painting and closes the panel. Escape closes it too.
   - **Look and behavior are close to Lightroom Classic, not a copy.** The panel names, order and keys follow it, and the controls are OpenStill's own. There are no Adobe icons or artwork, and slider scales are OpenStill's (for example, Contrast runs 0.5–1.5), not Lightroom's −100 to +100.
 
 **Settings → Shortcuts** lists every command and its shortcut:
@@ -333,6 +334,7 @@ The Lightroom-desktop-inspired workspace has a slim local-library rail on the le
 - Profile & calibration: start from **Standard**, **Neutral**, **Vivid**, **Portrait**, **Landscape** or **Monochrome**, OpenStill's own looks, or **Import DCP profile…** to use a DNG Camera Profile you already have. **Profile amount** blends from none (0) to twice the look (2). OpenStill applies a DCP's hue/saturation map, look table and tone curve in linear ProPhoto RGB; its color matrices are not used because RAW files are decoded with LibRaw's camera matrices. Profiles work on about two stops of light above white; anything brighter is clipped at that point. **Calibration** moves the red, green and blue primaries around the color wheel (red toward yellow, green toward cyan, blue toward magenta) and changes their saturation, with a shadows green/magenta tint. Neutral grays stay neutral.
 - RAW decoding (in Profile & calibration, for RAW sources): choose the demosaic method (AHD by default, or AAHD, DCB, DHT, VNG, PPG, or fast bilinear), LibRaw's wavelet noise reduction, color-noise median passes and hot-pixel (FBDD) reduction. Each change decodes the RAW again.
 - Develop: exposure, contrast, highlights, shadows, whites, blacks, temperature, and tint. **Auto** reads the photo's tonal range and sets exposure, contrast, highlights, shadows, whites, blacks and vibrance as one undoable step you can keep refining. (Whites and Blacks are shared with Black & white and follow its mask.)
+- Smart Contrast: the Contrast slider pivots on the photo's own middle tone instead of a fixed gray. Soft shoulders keep highlights and shadows from clipping, lowering it flattens midtones without milky blacks, it changes brightness only so colors don't shift, and higher settings add a little local contrast. Photos whose contrast was set before Smart Contrast keep their look until you move the slider again.
 - Dehaze: positive removes atmospheric haze using a dark-channel estimate; negative adds haze.
 - Clarity: broad midtone contrast (negative softens). Texture: medium-sized detail such as skin, foliage or fabric (negative smooths).
 - Color grading: Shadows, Midtones, Highlights and Global wheels. Drag in a wheel to set hue and strength, set each range's luminance, and use Blending and Balance to control how the ranges overlap. Double-click a wheel to reset it.
@@ -366,6 +368,10 @@ The Lightroom-desktop-inspired workspace has a slim local-library rail on the le
 - Sunrays: Amount, Overall Look, Sunrays Length, Penetration, Sun Radius, Sun Glow Radius/Amount, Number of Sunrays, Randomize, and separate Sun/Sunrays Warmth controls, following [Luminar Neo’s documented layout](https://support.skylum.com/editing-tools/landscape-tools/sunrays). OpenStill uses its own local algorithm, not pixel-matched Skylum processing. Click **Place Sun Center**, then click or repeatedly drag inside or outside the photo; Escape finishes. Placement adds workspace margins, and arrow keys nudge the center (Shift for larger steps). Amount starts at zero. The final light blend uses the tool’s independent mask. Old saved Sunrays effects retain the legacy renderer until this tool is adjusted. New centers follow source geometry through crop, rotation, flip, and straightening; each drag is one undo step.
 - Presets: six starting looks, save/load `.openstillpreset` files, and a categorized 3D `.cube` LUT library with photo previews, intensity, and its own mask. Saved portable presets include tonal/color settings, but exclude masks, LUT asset references, geometry, and AI/image assets; loading preserves those from the current photo.
 - Edits: undo, redo, click a previous history step, compare with the original, or reset. A new change after undo replaces the redo branch.
+
+### Masks
+
+**Masks** (Luminar) and **Masking** (Lightroom) make mask layers: each new mask has its own set of sliders, so you can brighten the sky and darken the ground with two masks. The sections below describe the selection tools every mask uses.
 
 ### Per-feature masks
 

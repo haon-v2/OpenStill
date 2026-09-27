@@ -408,3 +408,22 @@ Automated fixtures are generated and contain no user photographs. The real S9 fi
   - Auto Sync with a filmstrip selection.
   - Sky presets with local AI installed.
 
+
+## Mask layers, Return closes tools, Smart Contrast, Delete to Trash — September 27, 2026
+
+- **Added / fixed:**
+  - Mask layers: any number of masks, each with its own 14 sliders; rename, duplicate, invert, hide and delete. Per-tool masks still work.
+  - Return (or Done) finishes Crop, Remove, Red Eye and Masking and closes the panel completely; Escape closes it too.
+  - Smart Contrast replaces the plain contrast curve for new edits; older edits keep their look until Contrast is moved.
+  - haon-v2/OpenStill#16: Delete then Return moves the photo to Trash (Move to Trash is the default button, Escape cancels). Delete in the library grid trashes the selected photos after the same confirmation.
+- **Automated tests (MasksContrastM14Tests):**
+  - Mask layers add, duplicate and remove with their masks, sanitize their sliders, and round-trip; older edits decode with none.
+  - Two layers change only their own areas; hidden, neutral and unmasked layers do nothing.
+  - Layer sliders render (exposure, saturation, temperature).
+  - Batch copies layers only when masks are copied.
+  - Smart Contrast is neutral at 1, never clips or reverses a ramp, keeps hue, and pivots on the photo's brightness.
+  - Older edits keep the legacy contrast until Contrast changes; Quick Develop contrast switches to Smart Contrast.
+- **UI snapshots on macOS 26 CI:** each Lightroom tool drawer open and after Return; a new mask layer; the Luminar Masks tool; the library.
+- **Not yet verified by hand on a Mac:**
+  - Painting a brush mask layer on a real photo.
+  - Delete then Return in the Library grid with several photos selected.
