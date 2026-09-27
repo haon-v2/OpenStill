@@ -433,3 +433,12 @@ Automated fixtures are generated and contain no user photographs. The real S9 fi
 - **Not yet verified by hand on a Mac:**
   - Painting a brush mask layer on a real photo.
   - Delete then Return in the Library grid with several photos selected.
+
+## Logo designer modes and prompt — September 27, 2026
+
+- **Changed:**
+  - The watermark logo designer has three separate modes: **Design your own** (manual, no AI), **Generate with AI** (a multi-line prompt, the optional local model, **Edit in Design your own**) and **Import**.
+  - The identity plate can use a saved logo (**Use Saved Logo**).
+- **Automated tests (LogoPromptTests):** the prompt reaches the model as data and is limited to 500 characters; the instructions keep the exact name and tagline in OpenStill's hands; bad model output is refused.
+- **Paused:** the AI assistant (OpenStill MCP) work is kept on its own branch until its repository exists.
+- **Not yet verified by hand on a Mac:** generating with a prompt using the local model; Use Saved Logo on the identity plate.
