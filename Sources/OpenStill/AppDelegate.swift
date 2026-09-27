@@ -99,7 +99,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         add(view, "Edit Photograph", #selector(ViewerController.showEditor), "e", target: viewer, modifiers: [.command, .option])
         view.addItem(.separator())
         add(view, "Lightroom Classic Layout", #selector(ViewerController.useLightroomLayout), "1", target: viewer, modifiers: [.command, .control])
-        add(view, "Luminar Neo Layout", #selector(ViewerController.useLuminarLayout), "2", target: viewer, modifiers: [.command, .control])
+        add(view, "EZ Layout", #selector(ViewerController.useLuminarLayout), "2", target: viewer, modifiers: [.command, .control])
         view.addItem(.separator())
         add(view, "Zoom In", #selector(ViewerController.zoomIn), "+", target: viewer)
         add(view, "Zoom Out", #selector(ViewerController.zoomOut), "-", target: viewer)

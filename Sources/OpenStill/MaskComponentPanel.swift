@@ -20,14 +20,17 @@ final class MaskComponentPanel:NSStackView {
     private let aiActions=NSPopUpButton(frame:.zero,pullsDown:true)
     private static let aiChoices:[(String,String)]=[("Subject","subject"),("Background","background"),("People","people"),("Person 1","person.1"),("Person 2","person.2"),("Person 3","person.3"),("Person 4","person.4"),("Face","face"),("Eyes","eyes"),("Eyebrows","eyebrows"),("Lips","lips"),("Skin","skin"),("Sky (local AI)","sky"),("Depth range","depth")]
     private static var clipboard:AdjustmentMask?
+    /// Rows about the selected component, hidden while the mask has none so no empty controls show.
+    private var componentRows:[NSView]=[]
     override init(frame:NSRect){
         super.init(frame:frame);orientation = .vertical;alignment = .leading;spacing=8
         picker.target=self;picker.action = #selector(select);picker.setAccessibilityLabel("Named mask components");row(picker)
         name.placeholderString="Mask name";name.setAccessibilityLabel("Mask component name");name.target=self;name.action = #selector(rename);row(name)
         visible.target=self;visible.action = #selector(toggle);visible.font = .systemFont(ofSize:11)
         operation.addItems(withTitles:["Add","Subtract","Intersect"]);operation.target=self;operation.action = #selector(combine);operation.setAccessibilityLabel("Combine mask component")
-        row(NSStackView(views:[visible,NSView(),operation]))
+        let combine=NSStackView(views:[visible,NSView(),operation]);row(combine)
         let label=NSTextField(labelWithString:"Component opacity");label.font = .systemFont(ofSize:10);row(label)
+        componentRows=[picker,name,combine,label,opacity]
         opacity.setAccessibilityLabel("Mask component opacity");opacity.changed = { [weak self] value,final in self?.mutate("Mask opacity",final:final){$0.opacity=value/100} };row(opacity)
         componentActions.addItems(withTitles:["Component actions…","New brush","New linear gradient","New radial","New object selection","New color range","New luminance range","Duplicate component","Delete component","Invert component","Copy entire tool mask","Paste independent mask"])
         componentActions.target=self;componentActions.action = #selector(action);row(componentActions)
@@ -59,6 +62,7 @@ final class MaskComponentPanel:NSStackView {
         for c in list {picker.addItem(withTitle:(c.visible ? "":"Hidden · ")+c.name);picker.lastItem?.representedObject=c.id.uuidString}
         if let i=list.firstIndex(where:{$0.id==selectedID}){picker.selectItem(at:i)}
         let c=selected
+        for view in componentRows {view.isHidden = c == nil}
         aiActions.isEnabled=enabled;picker.isEnabled=enabled && c != nil;name.isEnabled=enabled && c != nil;visible.isEnabled=enabled && c != nil;operation.isEnabled=enabled && c != nil;opacity.isEnabled=enabled && c != nil;componentActions.isEnabled=enabled
         name.stringValue=c?.name ?? "";visible.state=c?.visible == false ? .off:.on;operation.selectItem(at:MaskCombination.allCases.firstIndex(of:c?.operation ?? .add) ?? 0);opacity.doubleValue=(c?.opacity ?? 1)*100
         let range=c?.selection.range ?? RangeSelection(),kind=c?.selection.kind

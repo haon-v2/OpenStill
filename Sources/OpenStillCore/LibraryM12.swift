@@ -247,7 +247,7 @@ public enum QuickDevelop {
         func clamp(_ v: Double, _ lo: Double, _ hi: Double) -> Double { min(hi, max(lo, v)) }
         switch step {
         case .exposure(let v): e.exposure = clamp(e.exposure + v, -4, 4)
-        case .contrast(let v): e.contrast = clamp(e.contrast + v, 0.5, 1.5)
+        case .contrast(let v): e.contrast = clamp(e.contrast + v, 0.5, 1.5); e.usesSmartContrast = true
         case .highlights(let v): e.highlights = clamp(e.highlights + v, 0, 1)
         case .shadows(let v): e.shadows = clamp(e.shadows + v, 0, 1)
         case .whites(let v): e.whites = clamp(e.whites + v, -1, 1)
@@ -255,9 +255,9 @@ public enum QuickDevelop {
         case .clarity(let v): e.clarity = clamp(e.clarity + v, -1, 1)
         case .vibrance(let v): e.vibrance = clamp(e.vibrance + v, -1, 1)
         case .saturation(let v): e.saturation = clamp(e.saturation + v, 0, 2)
-        case .temperature(let v): e.temperature = clamp(e.temperature + v, 2500, 10000)
-        case .tint(let v): e.tint = clamp(e.tint + v, -100, 100)
-        case .whiteBalance(let p): e.temperature = p.values.temperature; e.tint = p.values.tint
+        case .temperature(let v): e.temperature = clamp(e.temperature + v, 2500, 10000); e.usesCorrectedWhiteBalance = true
+        case .tint(let v): e.tint = clamp(e.tint + v, -100, 100); e.usesCorrectedWhiteBalance = true
+        case .whiteBalance(let p): e.temperature = p.values.temperature; e.tint = p.values.tint; e.usesCorrectedWhiteBalance = true
         case .autoTone: if let histogram { e = AutoTone.apply(histogram, to: e) }
         case .resetAll:
             // Like Lightroom's Reset All: the look goes, the crop and retouching stay.

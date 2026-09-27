@@ -52,6 +52,12 @@ final class EditorPanel: GlassChrome {
     private var rawSource = false
     private let retouch = RetouchPanel()
     private let pointColor = PointColorPanel()
+    /// Mask layers, each with its own sliders; shared by both layouts.
+    let maskLayers = MaskLayersPanel()
+    /// Mask tools of each mask layer live here while they aren't shown.
+    private let layerPanelStore = NSStackView()
+    private var layerMaskBorrow: Borrowed?
+    private var layerMaskKey: String?
     // Library (Lightroom layout): Quick Develop, Keyword Sets and the Keyword List.
     let quickDevelopPanel = QuickDevelopPanel()
     let keywordSetPanel = KeywordSetPanel()
@@ -254,6 +260,16 @@ final class EditorPanel: GlassChrome {
             self.addSpotControls(to: content)
         }
         tool("Red eye", symbol: "eye", in: tools) { content in self.addEyeControls(to: content) }
+        tool("Masks", symbol: "circle.lefthalf.filled", in: tools) { content in
+            self.fullWidth(self.maskLayers, in: content)
+            self.maskLayers.command = { [weak self] in self?.command?($0) }
+            self.maskLayers.changed = { [weak self] layer, title, final in
+                guard let self else { return }
+                self.states.updateLocalAdjustment(layer.id) { $0 = layer }
+                self.editChanged?(self.states, title, final)
+            }
+            self.layerPanelStore.orientation = .vertical; self.layerPanelStore.isHidden = true; self.fullWidth(self.layerPanelStore, in: content)
+        }
         tool("Erase  AI", symbol: "eraser", in: tools) { content in
             self.help("Choose Masking to select an area, then return here to remove it. AI fills it using the surrounding photograph.", to: content)
             self.action("Remove selected area", "ai:erase", to: content)
@@ -415,8 +431,8 @@ final class EditorPanel: GlassChrome {
         mask.resetInteraction()
         if let index = toolBodies.firstIndex(where: { $0 === sender.superview }) { focusTool(headers[index]) }
     }
-    private func makeMaskPanel(_ key:String) -> MaskPanel {
-        let panel = MaskPanel(key:key);maskPanels[key] = panel;maskOrder.append(key)
+    private func makeMaskPanel(_ key:String, listed:Bool = true) -> MaskPanel {
+        let panel = MaskPanel(key:key);maskPanels[key] = panel;if listed { maskOrder.append(key) }
         panel.command = { [weak self] action in self?.command?("mask:"+key+":"+action) }
         panel.maskChanged = { [weak self] mask,title,final in guard let self else{return};self.states.setMask(mask,for:key);self.editChanged?(self.states,key+" · "+title,final) }
         panel.featherChanged = { [weak self,weak panel] value,final in
@@ -431,6 +447,15 @@ final class EditorPanel: GlassChrome {
         let panel = makeMaskPanel(key);panel.isHidden = true;fullWidth(panel,in:stack);lutMask = panel
         panel.done = { [weak panel] in panel?.isHidden = true }
     }
+    /// Shows the selected mask layer's mask tools under its sliders.
+    func showLayerMask() {
+        let key = maskLayers.selectedLayer?.maskKey
+        guard key != layerMaskKey || (key != nil && layerMaskBorrow == nil) else { return }
+        if let b = layerMaskBorrow { give(b); layerMaskBorrow = nil }
+        layerMaskKey = key
+        if let key, let panel = maskPanels[key] { layerMaskBorrow = lend(panel, into: maskLayers.maskHolder, height: nil); panel.resetInteraction() }
+    }
+    func selectMaskLayer(_ id: UUID?) { maskLayers.select(id); showLayerMask() }
     @objc private func toggleLUTMask() { command?("finishMask");lutMask?.isHidden.toggle();lutMask?.resetInteraction() }
     func selectedMaskComponent(key:String)->UUID? { maskPanels[key]?.selectedID }
     func selectMaskComponent(key:String,id:UUID) { maskPanels[key]?.selectComponent(id) }
@@ -508,6 +533,18 @@ final class EditorPanel: GlassChrome {
         }
         focusTool(header)
     }
+    /// Luminar layout, Return: a tool showing its Masking tab goes back to its adjustments; otherwise the open tool collapses
+    /// when a canvas tool was in use or it is the Masks tool. Returns whether anything closed.
+    func finishLuminarTool(canvasToolWasActive: Bool) -> Bool {
+        guard activeTab == 0 else { return false }
+        if let workspace = workspaces.first(where: { $0.0.selectedSegment == 1 && $0.0.superview.map { !$0.isHidden } == true }) {
+            workspace.0.selectedSegment = 0; workspaceChanged(workspace.0); return true
+        }
+        guard let index = toolBodies.firstIndex(where: { !$0.isHidden }), canvasToolWasActive || headers[index].title == "Masks" else { return false }
+        toolBodies[index].isHidden = true
+        (headers[index] as? ToolHeaderButton)?.expanded = false
+        return true
+    }
     func openCurrentMask() {
         if activeTab == 1 { if lutMask?.isHidden == true {toggleLUTMask()}; return }
         let current = headers.enumerated().first { entry in !toolBodies[entry.offset].isHidden && workspaces.contains(where: { $0.0.superview === toolBodies[entry.offset] }) }?.element.title
@@ -523,8 +560,12 @@ final class EditorPanel: GlassChrome {
     }
     func update(_ edits: PhotoEdits, document: EditDocument?, enabled: Bool) {
         states = edits; hasPhoto = enabled
+        for layer in edits.localAdjustments where maskPanels[layer.maskKey] == nil {
+            let panel = makeMaskPanel(layer.maskKey, listed: false); layerPanelStore.addArrangedSubview(panel)
+        }
         lutBrowser.updateSelection(edits);lutBrowser.setEnabled(enabled && !busy)
         for (key,panel) in maskPanels { panel.update(edits.advanced?.masks[key],enabled:enabled && !busy) }
+        maskLayers.update(edits.localAdjustments, enabled: enabled && !busy); showLayerMask()
         mixer.update(edits.advanced?.colors,enabled:enabled && !busy)
         cropPresets.setEnabled(enabled && !busy)
         glow.update(edits.glow,enabled:enabled && !busy)
@@ -659,7 +700,7 @@ extension EditorPanel {
         lrStrip.choose = { [weak self] id in self?.command?("finishMask"); self?.showDrawer(id); self?.lightroomTool?(id) }
         lrDrawer.orientation = .vertical; lrDrawer.alignment = .leading; lrDrawer.spacing = 8
         lrDrawer.edgeInsets = NSEdgeInsets(top: 6, left: 14, bottom: 12, right: 14)
-        column.pin(lrDrawer)
+        column.top(lrDrawer)
         let crop = LRStack(), remove = LRStack(), masking = LRStack(), redeye = LRStack()
         for box in [crop, remove, redeye, masking] { box.orientation = .vertical; box.alignment = .leading; box.spacing = 8; fullWidth(box, in: lrDrawer); box.isHidden = true }
         drawerViews = ["crop": crop, "remove": remove, "redeye": redeye, "masking": masking]
@@ -670,12 +711,14 @@ extension EditorPanel {
         let removeHolder = NSView(); fullWidth(removeHolder, in: remove); slots.append((removeHolder, retouch, nil))
         help("Remove with AI: select the area with Masking, then:", to: remove); action("Remove selected area", "ai:erase", to: remove)
         addSpotControls(to: remove)
-        let target = NSTextField(labelWithString: "Mask limits:"); target.font = .systemFont(ofSize: 11); target.textColor = LRColors.dim
+        let layersHolder = NSView(); fullWidth(layersHolder, in: masking); slots.append((layersHolder, maskLayers, nil))
+        let divider = NSBox(); divider.boxType = .separator; fullWidth(divider, in: masking)
+        let target = NSTextField(labelWithString: "Or limit a whole tool:"); target.font = .systemFont(ofSize: 11); target.textColor = LRColors.dim
         maskTarget.removeAllItems(); maskTarget.addItems(withTitles: maskOrder); maskTarget.controlSize = .small; maskTarget.font = .systemFont(ofSize: 11)
         maskTarget.target = self; maskTarget.action = #selector(maskTargetChanged); maskTarget.setAccessibilityLabel("Adjustment the mask limits")
         if let develop = maskOrder.firstIndex(of: "Develop") { maskTarget.selectItem(at: develop) }
         let targetRow = NSStackView(views: [target, maskTarget]); targetRow.spacing = 6; fullWidth(targetRow, in: masking)
-        help("OpenStill masks belong to one adjustment. Choose which, then add brush, linear, radial or AI selections.", to: masking)
+        help("A tool mask limits that whole tool (for example Glow or a LUT) to an area.", to: masking)
         fullWidth(maskSlot, in: masking)
 
         section("Basic", open: true) { s in
@@ -812,6 +855,7 @@ extension EditorPanel {
     private func showDrawer(_ id: String?) {
         for (key, view) in drawerViews { view.isHidden = key != id }
         lrDrawer.isHidden = id == nil
+        if id != nil { DispatchQueue.main.async { [weak self] in self?.lrColumns[.develop]?.scrollToTop() } }
         if id == "masking" { borrowMask() } else { returnMask() }
     }
     @objc private func maskTargetChanged() { returnMask(); borrowMask() }

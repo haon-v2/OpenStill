@@ -36,8 +36,30 @@ private final class ShootCollection:NSCollectionView {
         }
     }
 }
+/// Five stars under a thumbnail: click a star to rate the photo, click its current rating again to clear it.
+final class StarRating:NSView {
+    var rating=0{didSet{needsDisplay=true;setAccessibilityValue(rating)}}
+    var changed:((Int)->Void)?
+    private let star:CGFloat=13
+    override init(frame:NSRect){super.init(frame:frame);setAccessibilityElement(true);setAccessibilityRole(.levelIndicator);setAccessibilityLabel("Rating");toolTip="Click a star to rate"}
+    required init?(coder:NSCoder){fatalError()}
+    override var intrinsicContentSize:NSSize{NSSize(width:star*5,height:15)}
+    override func acceptsFirstMouse(for event:NSEvent?)->Bool{true}
+    override func draw(_ dirtyRect:NSRect){
+        let attributes:[NSAttributedString.Key:Any]=[.font:NSFont.systemFont(ofSize:11),.foregroundColor:NSColor.secondaryLabelColor]
+        for i in 0..<5{(i<rating ? "★":"☆").draw(at:NSPoint(x:CGFloat(i)*star+1,y:(bounds.height-14)/2),withAttributes:attributes)}
+    }
+    override func mouseDown(with event:NSEvent){
+        let x=convert(event.locationInWindow,from:nil).x
+        let chosen=min(5,max(1,Int(x/star)+1))
+        changed?(chosen==rating ? 0:chosen)
+    }
+    override func accessibilityPerformIncrement()->Bool{changed?(min(5,rating+1));return true}
+    override func accessibilityPerformDecrement()->Bool{changed?(max(0,rating-1));return true}
+}
 private final class ShootCell:NSCollectionViewItem {
     let preview=NSImageView(),caption=NSTextField(labelWithString:""),rating=NSTextField(labelWithString:""),labelStrip=NSView(),badge=NSTextField(labelWithString:"")
+    let stars=StarRating()
     var requestKey:String?
     private var previewHeight:NSLayoutConstraint?
     /// Thumbnail size from the Library toolbar slider: the preview grows with the cell.
@@ -49,10 +71,10 @@ private final class ShootCell:NSCollectionViewItem {
         rating.font = .systemFont(ofSize:11);rating.textColor = .secondaryLabelColor;rating.alignment = .center
         labelStrip.wantsLayer=true;labelStrip.layer?.cornerRadius=2
         badge.font = .systemFont(ofSize:10,weight:.semibold);badge.textColor = .white;badge.drawsBackground=true;badge.backgroundColor=NSColor.black.withAlphaComponent(0.6);badge.isHidden=true
-        for child in [preview,caption,rating,labelStrip,badge]{child.translatesAutoresizingMaskIntoConstraints=false;view.addSubview(child)}
+        for child in [preview,caption,stars,rating,labelStrip,badge]{child.translatesAutoresizingMaskIntoConstraints=false;view.addSubview(child)}
         NSLayoutConstraint.activate([badge.topAnchor.constraint(equalTo:view.topAnchor,constant:8),badge.leadingAnchor.constraint(equalTo:view.leadingAnchor,constant:8)])
         NSLayoutConstraint.activate([labelStrip.topAnchor.constraint(equalTo:view.topAnchor,constant:2),labelStrip.leadingAnchor.constraint(equalTo:view.leadingAnchor,constant:10),labelStrip.trailingAnchor.constraint(equalTo:view.trailingAnchor,constant:-10),labelStrip.heightAnchor.constraint(equalToConstant:3)])
-        NSLayoutConstraint.activate([preview.topAnchor.constraint(equalTo:view.topAnchor,constant:6),preview.leadingAnchor.constraint(equalTo:view.leadingAnchor,constant:6),preview.trailingAnchor.constraint(equalTo:view.trailingAnchor,constant:-6),caption.topAnchor.constraint(equalTo:preview.bottomAnchor,constant:7),caption.leadingAnchor.constraint(equalTo:view.leadingAnchor,constant:5),caption.trailingAnchor.constraint(equalTo:view.trailingAnchor,constant:-5),rating.topAnchor.constraint(equalTo:caption.bottomAnchor,constant:4),rating.centerXAnchor.constraint(equalTo:view.centerXAnchor)])
+        NSLayoutConstraint.activate([preview.topAnchor.constraint(equalTo:view.topAnchor,constant:6),preview.leadingAnchor.constraint(equalTo:view.leadingAnchor,constant:6),preview.trailingAnchor.constraint(equalTo:view.trailingAnchor,constant:-6),caption.topAnchor.constraint(equalTo:preview.bottomAnchor,constant:7),caption.leadingAnchor.constraint(equalTo:view.leadingAnchor,constant:5),caption.trailingAnchor.constraint(equalTo:view.trailingAnchor,constant:-5),stars.topAnchor.constraint(equalTo:caption.bottomAnchor,constant:3),stars.centerXAnchor.constraint(equalTo:view.centerXAnchor),rating.centerYAnchor.constraint(equalTo:stars.centerYAnchor),rating.leadingAnchor.constraint(equalTo:stars.trailingAnchor,constant:4)])
     }
     /// The stack badge: "3" on a closed stack's top photo, "2/3" inside an open one.
     func showStack(position:Int,count:Int,open:Bool){
@@ -69,7 +91,8 @@ private final class ShootCell:NSCollectionViewItem {
     override var isSelected:Bool{didSet{view.layer?.borderWidth=isSelected ? 1.5:0;view.layer?.borderColor=Appearance.accent.cgColor;view.layer?.backgroundColor=isSelected ? Appearance.accent.withAlphaComponent(0.12).cgColor:NSColor.clear.cgColor}}
     func configure(_ item:ShootItem){
         caption.stringValue=item.url.lastPathComponent
-        rating.stringValue=String(repeating:"★",count:item.record.rating)+String(repeating:"☆",count:5-item.record.rating)+(item.record.flag == .pick ? "  Pick":item.record.flag == .reject ? "  Reject":"")
+        stars.rating=item.record.rating
+        rating.stringValue=item.record.flag == .pick ? "Pick":item.record.flag == .reject ? "Reject":""
         let label=item.record.colorLabel
         labelStrip.isHidden=label == .none;labelStrip.layer?.backgroundColor=ShootCell.color(label).cgColor
         var help=caption.stringValue;let meta=item.record.iptc
@@ -109,6 +132,8 @@ final class ShootWindow:NSWindowController,NSCollectionViewDataSource,NSCollecti
     var keywordsChanged:(()->Void)?
     /// ⌥1–⌥9: the Keywording panel's keyword set.
     var keywordSetKey:((Int)->Void)?
+    /// Delete in the grid: the viewer confirms, then moves the selected photos to the Trash.
+    var trashRequested:(([ShootItem])->Void)?
     private let grid=ShootCollection(),scroll=NSScrollView(),message=NSTextField(labelWithString:"Reading photographs…")
     private let minimum=NSPopUpButton(frame:.zero,pullsDown:false),flag=NSPopUpButton(frame:.zero,pullsDown:false),sort=NSPopUpButton(frame:.zero,pullsDown:false),labelFilter=NSPopUpButton(frame:.zero,pullsDown:false)
     /// Label filter choices: nil = all, then each label, then unlabeled.
@@ -453,11 +478,22 @@ final class ShootWindow:NSWindowController,NSCollectionViewDataSource,NSCollecti
             applyFilter(preserving:Set(selected.map(\.id)));recordsChanged?()
         }catch{message.stringValue=error.localizedDescription}
     }
+    /// A click on a thumbnail's stars rates that photo, whether or not it is selected.
+    private func rate(_ id:UUID,_ value:Int){
+        do{
+            let updated=try ShootWorkflow.mark(id,rating:value,flag:nil,label:nil)
+            if let i=all.firstIndex(where:{$0.id==id}){all[i].record=updated}
+            applyFilter(preserving:Set(selectedItems.map(\.id)));recordsChanged?()
+            message.stringValue=value==0 ? "Rating cleared.":"Rated \(value) star\(value==1 ? "":"s")."
+        }catch{message.stringValue=error.localizedDescription}
+    }
     @objc private func openSelected(){guard let first=selectedItems.first else{message.stringValue="Select a photograph to edit.";return};edit?(shown.map(\.url),first.url)}
     @objc private func compareSelected(){let items=selectedItems;guard items.count==2 else{message.stringValue="Select exactly two photographs to compare.";return};let comparison=ComparisonWindow(items:items);comparisons.append(comparison);comparison.showWindow(nil);comparison.window?.makeKeyAndOrderFront(nil)}
     func collectionView(_ collectionView:NSCollectionView,numberOfItemsInSection section:Int)->Int{shown.count}
     func collectionView(_ collectionView:NSCollectionView,itemForRepresentedObjectAt indexPath:IndexPath)->NSCollectionViewItem{
         let cell=collectionView.makeItem(withIdentifier:NSUserInterfaceItemIdentifier("shoot"),for:indexPath) as! ShootCell
+        let id=shown[indexPath.item].id
+        cell.stars.changed={[weak self] value in self?.rate(id,value)}
         let item=shown[indexPath.item],request=RenderRequest(photo:item.record,profile:.displayP3,maximumDimension:420)
         let key="\(request.photoID)|\(request.sourceFingerprint)|\(request.sourceMode)|\(request.versionID)|\(request.revision)|\(request.profile)"
         cell.configure(item);cell.requestKey=key;cell.sizePreview()
@@ -590,6 +626,7 @@ extension ShootWindow {
         case "library.compare":setViewMode(.compare)
         case "library.survey":setViewMode(.survey)
         case "library.filterBar":toggleFilterBar()
+        case "library.trash":trashRequested?(selectedItems)
         case "library.stack":toggleStacks()
         case "library.stackTop":moveToStackTop()
         case let id where id.hasPrefix("library.keywordSet"):keywordSetKey?(Int(id.dropFirst("library.keywordSet".count)) ?? 0)

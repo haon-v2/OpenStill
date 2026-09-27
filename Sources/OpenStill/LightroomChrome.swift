@@ -196,6 +196,8 @@ final class LRPanelColumn: LRFill {
     }
     /// A view that stays at the top without a section header, e.g. the Develop tool strip.
     func pin(_ view: NSView) { fixed.addArrangedSubview(view); view.widthAnchor.constraint(equalTo: fixed.widthAnchor).isActive = true }
+    /// A view at the top of the scrolling part, e.g. a tool drawer: tall contents scroll instead of stretching the window.
+    func top(_ view: NSView) { scrolling.insertArrangedSubview(view, at: 0); view.widthAnchor.constraint(equalTo: scrolling.widthAnchor).isActive = true }
     /// Lightroom's flat bottom buttons, e.g. Import… / Export… or Previous / Reset.
     func setButtons(_ buttons: [(String, () -> Void)]) {
         footer.arrangedSubviews.forEach { $0.removeFromSuperview() }
@@ -203,6 +205,11 @@ final class LRPanelColumn: LRFill {
         footer.isHidden = buttons.isEmpty
     }
     func refreshSections() { sections.forEach { $0.refresh() } }
+    func scrollToTop() {
+        layoutSubtreeIfNeeded()
+        let y = scrolling.isFlipped ? 0 : max(0, scrolling.bounds.height - scroll.contentView.bounds.height)
+        scroll.contentView.scroll(to: NSPoint(x: 0, y: y)); scroll.reflectScrolledClipView(scroll.contentView)
+    }
 }
 
 /// A flat gray Lightroom button.

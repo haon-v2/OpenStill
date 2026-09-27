@@ -121,6 +121,8 @@ final class PhotoCanvas: NSView {
     var openURLs: (([URL]) -> Void)?
     var openPanel: (() -> Void)?
     var escape: (() -> Void)?
+    /// Return: finish the current tool (apply the crop, end mask painting) and close its panel.
+    var confirm: (() -> Void)?
     var requestTrash: (() -> Void)?
     var photoMenu: (() -> NSMenu?)?
     var message = "" { didSet { needsDisplay = true } }
@@ -528,6 +530,7 @@ final class PhotoCanvas: NSView {
         case "editor.previousAlt", "editor.previousSpace": navigate?(-1)
         case "editor.nextAlt", "editor.nextSpace": navigate?(1)
         case "editor.escape": escape?()
+        case "editor.done": confirm?()
         default: if let step = Shortcuts.menuStep(for: event) { navigate?(step) } else { super.keyDown(with: event) }
         }
     }
