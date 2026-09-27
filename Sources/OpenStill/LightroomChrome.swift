@@ -29,7 +29,7 @@ class LRFill: NSView {
     var color: NSColor { didSet { needsDisplay = true } }
     init(_ color: NSColor) { self.color = color; super.init(frame: .zero) }
     required init?(coder: NSCoder) { fatalError() }
-    override func draw(_ dirtyRect: NSRect) { color.setFill(); dirtyRect.fill() }
+    override func draw(_ dirtyRect: NSRect) { guard color.alphaComponent > 0 else { return }; color.setFill(); dirtyRect.fill() }
 }
 
 // MARK: - Collapsible sections
@@ -71,20 +71,21 @@ final class LRSection: NSView {
     func refresh() { body.isHidden = !isOpen; header.open = isOpen; header.solo = LightroomState.shared.panels.solo.contains(group) }
     private func headerClicked(option: Bool) {
         if option { toggleSolo(); return }
-        let keys = siblings().map(\.key)
-        LightroomState.shared.update { $0.setExpanded(key, !isOpen, siblings: keys) }
+        let keys = siblings().map(\.key), open = !isOpen, key = key
+        LightroomState.shared.update { $0.setExpanded(key, open, siblings: keys) }
         for section in siblings() { section.refresh() }; refresh()
         toggled?()
     }
     @objc private func toggleSolo() {
-        let keys = siblings().map(\.key)
+        let keys = siblings().map(\.key), group = group, key = key
         LightroomState.shared.update { $0.toggleSolo(group, keep: key, siblings: keys) }
         for section in siblings() { section.refresh() }; refresh(); toggled?()
     }
     @objc private func expandAll() { setAll(true) }
     @objc private func collapseAll() { setAll(false) }
     private func setAll(_ open: Bool) {
-        LightroomState.shared.update { panels in for section in siblings() { panels.expanded[section.key] = open } }
+        let keys = siblings().map(\.key)
+        LightroomState.shared.update { panels in for key in keys { panels.expanded[key] = open } }
         for section in siblings() { section.refresh() }; toggled?()
     }
     private func headerMenu() -> NSMenu {

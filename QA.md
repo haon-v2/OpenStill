@@ -279,3 +279,30 @@ Automated fixtures are generated and contain no user photographs. The real S9 fi
 - **Not yet verified by hand on a Mac:**
   - Both layouts in the library and while editing.
   - Recording shortcuts, including ⌘ combos that already belong to a menu.
+
+## Lightroom Classic layout, rebuilt — September 27, 2026
+
+- **Added (Lightroom Classic layout only):**
+  - Module picker: Library | Develop | Map | Slideshow | Print | Web.
+  - Navigator, with FIT / 100% / 200% and click-to-move.
+  - Collapsible panels in Lightroom's order and names, with solo mode and Expand / Collapse All.
+  - Develop's Crop / Remove / Masking tool strip; the Masking drawer picks which adjustment the mask limits.
+  - Library's Histogram, Keywording and Metadata follow the grid selection.
+  - Bottom buttons: Import… / Export…, Copy… / Paste, Previous / Reset, Sync Metadata… / Sync Settings….
+  - The filmstrip bar with source info, the filmstrip in Library too, the Develop toolbar, and the edge triangles.
+  - Lights Out, flat dark-gray panels, no window toolbar.
+  - Workspace keys G, D, R, Q, Shift-W, L, T, Tab and Shift-Tab (changeable in Settings), and the Window menu's F5–F8 and ⌥⌘3/5/6/7.
+  - Previous also works from the Luminar layout's editing commands.
+- **Automated tests (LightroomWorkspaceTests):**
+  - The module list.
+  - Tab and Shift-Tab panel toggling.
+  - Solo mode.
+  - Saving and reloading panel state, including corrupt data.
+  - The Lights Out cycle.
+  - Workspace key conflicts with library and photo keys.
+  - Previous copying settings without crop.
+- **Not yet verified by hand on a Mac:**
+  - Every panel with a real photo, in both modules.
+  - Switching layouts back and forth.
+  - Crop / Masking drawers, Lights Out, Sync and Copy / Paste.
+  - Panel memory after relaunching.

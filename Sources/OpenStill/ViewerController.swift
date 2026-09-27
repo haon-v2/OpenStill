@@ -954,7 +954,11 @@ extension ViewerController {
             guard lr else { return false }
             LightroomState.shared.update { $0.toolbarHidden.toggle() }; updateWorkspaceLayout()
         case "workspace.sidePanels", "workspace.allPanels":
-            if lr { LightroomState.shared.update { id == "workspace.allPanels" ? $0.toggleAllPanels() : $0.toggleSidePanels() }; updateWorkspaceLayout() }
+            if lr {
+                let all = id == "workspace.allPanels"
+                LightroomState.shared.update { panels in if all { panels.toggleAllPanels() } else { panels.toggleSidePanels() } }
+                updateWorkspaceLayout()
+            }
             else { toggleInspector() }
         default: return false
         }
