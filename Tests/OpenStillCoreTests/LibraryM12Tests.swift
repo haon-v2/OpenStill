@@ -97,7 +97,7 @@ import Testing
         e = QuickDevelop.apply(.contrast(-1), to: e); #expect(e.contrast == 0.5)
         e = QuickDevelop.apply(.whiteBalance(.tungsten), to: e); #expect(e.temperature == 2850)
         e = QuickDevelop.apply(.clarity(0.2), to: e); #expect(abs(e.clarity - 0.2) < 1e-9)
-        e.crop = CGRect(x: 0.1, y: 0.1, width: 0.5, height: 0.5)
+        e.crop = EditRect(CGRect(x: 0.1, y: 0.1, width: 0.5, height: 0.5))
         let reset = QuickDevelop.apply(.resetAll, to: e)
         #expect(reset.exposure == 0 && reset.contrast == 1 && reset.crop == e.crop)
         #expect(QuickDevelop.apply(.autoTone, to: PhotoEdits(), histogram: nil) == PhotoEdits().sanitized)
