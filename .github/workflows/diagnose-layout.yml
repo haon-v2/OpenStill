@@ -27,17 +27,15 @@ jobs:
       - name: Run and screenshot
         run: |
           set +e
-          defaults write org.openstill.viewer OpenStillWorkspaceLayout lightroom
-          for variant in glass noglass; do
-            if [ $variant = noglass ]; then export OPENSTILL_NO_GLASS_CONTAINER=1; fi
+          for variant in lightroom luminar; do
+            defaults write org.openstill.viewer OpenStillWorkspaceLayout $variant
             OPENSTILL_LAYOUT_DUMP=/tmp/dump-$variant dist/OpenStill.app/Contents/MacOS/OpenStill /tmp/photos &
             pid=$!
             sleep 7
-            screencapture -x /tmp/screen-$variant.png; echo "screencapture $?"
             wait $pid
-            for f in /tmp/screen-$variant.png /tmp/dump-$variant.png; do
+            for f in /tmp/dump-$variant.png; do
               [ -f $f ] || { echo "missing $f"; continue; }
-              sips -Z 360 -s format jpeg -s formatOptions 40 $f --out $f.jpg >/dev/null
+              sips -Z 900 -s format jpeg -s formatOptions 60 $f --out $f.jpg >/dev/null
               echo "BEGIN $f"; base64 -i $f.jpg | tr -d '\n'; echo; echo "END $f"
             done
           done

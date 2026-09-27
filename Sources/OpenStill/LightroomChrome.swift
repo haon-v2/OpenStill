@@ -27,9 +27,13 @@ final class LRStack: NSStackView { override var isFlipped: Bool { true } }
 /// A plain view with a solid background color.
 class LRFill: NSView {
     var color: NSColor { didSet { needsDisplay = true } }
-    init(_ color: NSColor) { self.color = color; super.init(frame: .zero) }
+    init(_ color: NSColor) {
+        self.color = color; super.init(frame: .zero)
+        // Since macOS 14 views don't clip their drawing, and the dirty rect can reach past the view; stay inside it.
+        if #available(macOS 14.0, *) { clipsToBounds = true }
+    }
     required init?(coder: NSCoder) { fatalError() }
-    override func draw(_ dirtyRect: NSRect) { guard color.alphaComponent > 0 else { return }; color.setFill(); dirtyRect.fill() }
+    override func draw(_ dirtyRect: NSRect) { guard color.alphaComponent > 0 else { return }; color.setFill(); bounds.intersection(dirtyRect).fill() }
 }
 
 // MARK: - Collapsible sections
