@@ -2,6 +2,7 @@ import Foundation
 import CoreImage
 import ImageIO
 import UniformTypeIdentifiers
+import Metal
 
 extension ExportProfile {
     public var colorSpace: CGColorSpace {
@@ -30,7 +31,7 @@ public enum ModernRenderer {
     public static func sensorClipping(_ source:URL) -> Double? { sensorCache.object(forKey:(source.path+EditStorage.fingerprint(source)) as NSString)?.doubleValue }
     public static func clearSourceCache() { sourceCache.removeAllObjects() }
     public static let workingSpace = CGColorSpace(name: CGColorSpace.extendedLinearITUR_2020)!
-    public static let context = CIContext(options: [.workingColorSpace: workingSpace, .workingFormat: CIFormat.RGBAf, .cacheIntermediates: false])
+    public static let context = RenderContexts.make([.workingColorSpace: workingSpace, .workingFormat: CIFormat.RGBAf, .cacheIntermediates: false])
     public static func readImage(_ url: URL) throws -> CIImage {
         if url.pathExtension == "osfloat" { return try FloatImageBridge.read(url) }
         guard let image = CIImage(contentsOf: url, options: [.applyOrientationProperty: true]), !image.extent.isEmpty else { throw PhotoReadError.unreadable }
@@ -199,10 +200,7 @@ public enum FloatImageBridge {
         var pixels = [Float](repeating: 0, count: w*h*4)
         ModernRenderer.context.render(image, toBitmap: &pixels, rowBytes: w*16, bounds: image.extent, format: .RGBAf, colorSpace: CGColorSpace(name: CGColorSpace.extendedSRGB)!)
         // Core Image bitmap output is top row first. Strip premultiplication explicitly.
-        for i in stride(from: 0, to: pixels.count, by: 4) {
-            let alpha = pixels[i+3]
-            if alpha > 0 { for c in 0..<3 { pixels[i+c] /= alpha } }
-        }
+        PixelConversion.unpremultiply(&pixels, width: w, height: h)
         var data = Data("OSF1".utf8)
         for value in [UInt32(w), UInt32(h)] { var little = value.littleEndian; withUnsafeBytes(of: &little) { data.append(contentsOf: $0) } }
         pixels.withUnsafeBytes { data.append(contentsOf: $0) }
@@ -216,12 +214,7 @@ public enum FloatImageBridge {
         guard w > 0, h > 0, w <= 65535, h <= 65535, data.count == 12+w*h*16 else { throw PhotoReadError.unreadable }
         var payload = Data(data.dropFirst(12))
         try payload.withUnsafeMutableBytes { bytes in
-            let values = bytes.bindMemory(to: Float.self)
-            for i in stride(from: 0, to: values.count, by: 4) {
-                guard values[i].isFinite, values[i+1].isFinite, values[i+2].isFinite, values[i+3].isFinite else { throw PhotoReadError.unreadable }
-                let alpha = min(1, max(0, values[i+3])); values[i+3] = alpha
-                for c in 0..<3 { values[i+c] *= alpha }
-            }
+            guard PixelConversion.premultiplyValidating(bytes.bindMemory(to: Float.self), width: w, height: h) else { throw PhotoReadError.unreadable }
         }
         return CIImage(bitmapData: payload, bytesPerRow: w*16, size: CGSize(width: w, height: h), format: .RGBAf, colorSpace: CGColorSpace(name: CGColorSpace.extendedSRGB)!)
     }

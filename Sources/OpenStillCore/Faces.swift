@@ -3,6 +3,7 @@ import CoreGraphics
 import ImageIO
 import Vision
 import SQLite3
+import Accelerate
 
 /// A face found in a photo, before it is stored.
 public struct DetectedFace: Equatable, Sendable {
@@ -96,7 +97,7 @@ public enum FaceClustering {
     public static func distance(_ a: [Float], _ b: [Float]) -> Float {
         guard a.count == b.count, !a.isEmpty else { return .infinity }
         var sum: Float = 0
-        for i in a.indices { let d = a[i] - b[i]; sum += d * d }
+        vDSP_distancesq(a, 1, b, 1, &sum, vDSP_Length(a.count))
         return sqrt(sum)
     }
     /// The normalized mean of several descriptions.

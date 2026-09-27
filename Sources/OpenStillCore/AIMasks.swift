@@ -36,7 +36,7 @@ public enum AIMaskError: LocalizedError {
 }
 
 public enum AIMasks {
-    static let context = CIContext(options: [.workingColorSpace: NSNull(), .outputColorSpace: NSNull()])
+    static let context = RenderContexts.make([.workingColorSpace: NSNull(), .outputColorSpace: NSNull()])
 
     /// An 8-bit grayscale image from a mask, scaled to `size`.
     static func grayscale(_ mask: CIImage, size: CGSize) throws -> CGImage {

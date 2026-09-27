@@ -26,7 +26,7 @@ public enum VisionEditor {
         guard instance > 0, observation.allInstances.contains(instance) else { throw VisionEditError.noObject }
         let buffer = try observation.generateScaledMaskForImage(forInstances:IndexSet(integer:instance),from:handler)
         let mask = CIImage(cvPixelBuffer:buffer)
-        guard let output = CIContext().createCGImage(mask,from:mask.extent) else { throw EditError.render }
+        guard let output = RenderContexts.utility.createCGImage(mask,from:mask.extent) else { throw EditError.render }
         return output
     }
 }
