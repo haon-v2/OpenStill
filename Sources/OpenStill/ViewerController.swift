@@ -7,7 +7,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
     private let store = PhotoStore()
     let canvas = PhotoCanvas()
     let info = EditorPanel()
-    private let collection = NavigationCollectionView()
+    let collection = NavigationCollectionView()
     private let filmstrip = NSScrollView()
     private let center = NSView()
     private let libraryHost = NSView()
@@ -18,7 +18,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
     private let shelf = Appearance.glass()
     private let workspaceContent = LRFill(.clear)
     private let footer = NSStackView()
-    private var layoutMode = WorkspaceLayout.current
+    var layoutMode = WorkspaceLayout.current
     private var luminarConstraints: [NSLayoutConstraint] = []
     private var sidebarWidth: NSLayoutConstraint!
     private var infoWidth: NSLayoutConstraint!
@@ -37,13 +37,17 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
     private var lights = LightsOut.normal
     private var libraryInspectorToken = UUID()
     private var lrPanels: LightroomPanels { LightroomState.shared.panels }
-    private var libraryBrowser: ShootWindow?
-    private var libraryURLs: [URL] = []
-    private var folderURL: URL?
+    var libraryBrowser: ShootWindow?
+    // Library tools: Auto Import, the Reference view and their windows.
+    let autoImportMonitor = AutoImportMonitor()
+    var autoImportWindow: AutoImportWindow?
+    var referenceWindow: ReferenceWindow?
+    var libraryURLs: [URL] = []
+    var folderURL: URL?
     /// The collection the library shows, when opened from the sidebar's Collections.
     private var openCollection: PhotoCollection?
     private var smartCollectionWindow: SmartCollectionWindow?
-    private var isLibrary = false
+    var isLibrary = false
     private var foldersVisible = false
     private var centerToFolders: NSLayoutConstraint!
     private var centerToRail: NSLayoutConstraint!
@@ -636,7 +640,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         urls.append(url); if !shootCatalog.isEmpty { shootCatalog.append(url) }
         collection.reloadData(); refreshLibrary(); updateControls()
     }
-    private func refreshLibrary() {
+    func refreshLibrary() {
         let catalog = shootCatalog.isEmpty ? urls : shootCatalog
         if libraryURLs == catalog, let browser = libraryBrowser { browser.refresh(); return }
         libraryBrowser?.stopBrowsing();libraryBrowser?.browserView.removeFromSuperview()
@@ -650,6 +654,9 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         }
         browser.selectionChanged = { [weak self] in self?.updateControls(); self?.updateLibraryInspector() }
         browser.merged = { [weak self] url in self?.addMergedPhoto(url) }
+        browser.renamed = { [weak self] moves in self?.followRenames(moves) }
+        browser.keywordsChanged = { [weak self] in self?.updateLibraryPanels() }
+        browser.keywordSetKey = { [weak self] i in self?.info.keywordSetPanel.applySetKeyword(i) }
         browser.recordsChanged = { [weak self] in
             guard let self,let id=self.photoRecord?.id,let latest=try? EditStorage.records.read(id) else{return}
             let changed=self.photoRecord?.active.revision != latest.active.revision || self.photoRecord?.activeVersionID != latest.activeVersionID
@@ -938,7 +945,7 @@ extension ViewerController {
         }
     }
     /// Runs `action` on the library once it has read its photos, creating it if needed.
-    fileprivate func withLibrary(attempt: Int = 0, _ action: @escaping (ShootWindow) -> Void) {
+    func withLibrary(attempt: Int = 0, _ action: @escaping (ShootWindow) -> Void) {
         if libraryBrowser == nil { refreshLibrary() }
         guard let browser = libraryBrowser else { return }
         if browser.visibleURLs.isEmpty, attempt < 15 {
@@ -953,7 +960,7 @@ extension ViewerController {
         guard view.window?.isKeyWindow == true, view.window?.attachedSheet == nil else { return false }
         let lr = layoutMode == .lightroom
         switch id {
-        case "workspace.grid": showLibrary()
+        case "workspace.grid": if isLibrary { libraryBrowser?.setViewMode(.grid) }; showLibrary()
         case "workspace.develop": if isLibrary { showEditor() }
         case "workspace.crop": openTool("crop")
         case "workspace.remove": openTool("remove")
@@ -1010,6 +1017,7 @@ extension ViewerController {
     /// The Library's right panel follows the grid selection: its histogram (from the saved preview), keywords and metadata.
     func updateLibraryInspector() {
         guard layoutMode == .lightroom, isLibrary else { return }
+        updateLibraryPanels()
         guard let item = libraryBrowser?.selectedItems.first else { info.showKeywords(nil); info.show(nil); info.updateHistogram(nil, sensor: nil); return }
         info.showKeywords(item.record.metadata?.keywords ?? [])
         if let index = urls.firstIndex(of: item.url) { collection.selectSingle(index); collection.scrollToItems(at: [IndexPath(item: index, section: 0)], scrollPosition: .centeredHorizontally) }

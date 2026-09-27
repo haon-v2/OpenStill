@@ -156,6 +156,7 @@ extension ViewerController {
     }
     func editingCommand(_ name: String) {
         if name.hasPrefix("lr:") { lightroomCommand(name); return }
+        if name.hasPrefix("lib:") { libraryCommand(name); return }
         if name.hasPrefix("recovery:"),let value=Int(name.dropFirst(9)){var edits=currentEdits;edits.ensureAdvanced();edits.advanced?.rawRecovery=min(9,max(0,value));changeEdits(edits,title:"RAW highlight recovery",commit:true);return}
         if name == "finishMask" {
             if canvas.tool == .sun { canvas.clearTool() }

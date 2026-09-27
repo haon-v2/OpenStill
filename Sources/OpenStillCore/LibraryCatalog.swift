@@ -312,6 +312,7 @@ public final class LibraryCatalog {
         """)
         try execute("INSERT OR IGNORE INTO meta(key, value) VALUES('schema', '\(Self.schemaVersion)')")
         try prepareFaces()
+        try prepareStacks()
     }
     deinit { sqlite3_close(db) }
 
