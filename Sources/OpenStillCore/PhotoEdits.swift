@@ -69,6 +69,11 @@ public struct PhotoEdits: Codable, Equatable {
             if let blur = e.advanced!.lensBlur { e.advanced!.lensBlur = blur.sanitized }
             if let hdr = e.advanced!.hdr { e.advanced!.hdr = hdr.sanitized }
             if let transform = e.advanced!.transform { let clean = transform.sanitized; e.advanced!.transform = clean == TransformSettings() ? nil : clean }
+            if let mix = e.advanced!.grayMix { e.grayMix = mix }
+            if let detail = e.advanced!.detail { e.advanced!.detail = detail.sanitized }
+            if let ca = e.advanced!.autoCA { e.advanced!.autoCA = ca.sanitized }
+            if let colors = e.advanced!.pointColors { e.pointColors = colors }
+            if let fixes = e.advanced!.eyeFixes { e.eyeFixes = fixes }
             e.monochrome = clamp(e.monochrome,0,1); e.blacks = clamp(e.blacks,-1,1); e.whites = clamp(e.whites,-1,1)
             e.straighten = clamp(e.straighten,-20,20); e.lutAmount = clamp(e.lutAmount,0,1); e.sunLength = clamp(e.sunLength,0,1)
             e.advanced!.colors = Array((e.advanced!.colors + [ColorBand](repeating:ColorBand(),count:8)).prefix(8))
@@ -92,6 +97,8 @@ public struct EditDocument: Codable {
     public var fingerprint: String
     public var steps: [EditStep] = [EditStep("Original", PhotoEdits())]
     public var cursor = 0
+    /// Named states of these edits (Lightroom's Snapshots).
+    public var snapshots: [EditSnapshot]?
     public var current: PhotoEdits { steps.isEmpty ? PhotoEdits() : steps[min(max(cursor, 0), steps.count - 1)].edits }
     public init(fingerprint: String) { self.fingerprint = fingerprint }
     public mutating func commit(_ edits: PhotoEdits, title: String) {
@@ -199,9 +206,12 @@ public enum PhotoEditor {
             let prior = try assetImage(background)
             baseImage = baseImage.applyingFilter("CIBlendWithMask",parameters:[kCIInputBackgroundImageKey:prior,kCIInputMaskImageKey:try mask.coverage(geometry:EditGeometry(size:sourceSize,edits:PhotoEdits()),lens:LensSettings(),input:prior,modern:modern)])
         }
+        if !e.eyeFixes.isEmpty { baseImage = EyeFixes.apply(baseImage, fixes: e.eyeFixes) }
         let retouched=modern && !e.retouch.isEmpty ? try Retouch.apply(baseImage,strokes:e.retouch):baseImage
-        if modern { baseImage = try LensCorrections.apply(baseImage,settings:e.optics) }
-        let retouchImage=modern && !e.retouch.isEmpty ? geometry.apply(try LensCorrections.apply(retouched,settings:e.optics)):nil
+        // Lens profile corrections, then automatic chromatic aberration removal about the photo's centre.
+        func optics(_ input: CIImage) throws -> CIImage { AutoCA.apply(try LensCorrections.apply(input,settings:e.optics), settings:e.autoCA) }
+        if modern { baseImage = try optics(baseImage) }
+        let retouchImage=modern && !e.retouch.isEmpty ? geometry.apply(try optics(retouched)):nil
         var image = geometry.apply(baseImage)
         let originalExtent = image.extent, unadjusted = image
         func masked(_ before: CIImage, _ after: CIImage, _ key: String) throws -> CIImage {
@@ -242,17 +252,23 @@ public enum PhotoEditor {
         if e.saturation != 1 { image = image.applyingFilter("CIColorControls",parameters:[kCIInputSaturationKey:e.saturation]) }
         if e.vibrance != 0 { image = image.applyingFilter("CIVibrance",parameters:[kCIInputAmountKey:e.vibrance]) }
         if let bands = e.advanced?.colors, bands.contains(where: { $0.hue != 0 || $0.saturation != 0 || ($0.lightness ?? 0) != 0 }) { image = ColorMixer.apply(image,bands:bands) }
+        if !e.pointColors.isEmpty { image = PointColors.apply(image, colors: e.pointColors) }
         image = try masked(before,image,"Color"); before = image
         if stopBeforeTool == "Color grading" { return image }
         if !e.colorGrading.isIdentity { image = try masked(before,try DevelopTools.colorGrade(image,settings:e.colorGrading),"Color grading"); before = image }
         if stopBeforeTool == "Black & white" { return image }
-        if e.monochrome > 0 { image = image.applyingFilter("CIColorControls",parameters:[kCIInputSaturationKey:1-e.monochrome]) }
+        if e.monochrome > 0 {
+            // With a Black & white mix, each color band becomes lighter or darker gray; otherwise a plain desaturation.
+            if e.grayMix != PhotoEdits.neutralGrayMix { image = GrayMix.apply(image, mix: e.grayMix, amount: e.monochrome) }
+            else { image = image.applyingFilter("CIColorControls",parameters:[kCIInputSaturationKey:1-e.monochrome]) }
+        }
         if e.blacks != 0 || e.whites != 0 {
             image = image.applyingFilter("CIToneCurve",parameters:["inputPoint0":CIVector(x:0,y:max(0,e.blacks)*0.15),"inputPoint1":CIVector(x:0.25,y:0.25+e.blacks*0.15),"inputPoint2":CIVector(x:0.5,y:0.5),"inputPoint3":CIVector(x:0.75,y:0.75+e.whites*0.15),"inputPoint4":CIVector(x:1,y:1+min(0,e.whites)*0.15)])
         }
         image = try masked(before,image,"Black & white"); before = image
         if stopBeforeTool == "Denoise" { return image }
-        if e.denoise > 0 { image = image.applyingFilter("CINoiseReduction",parameters:["inputNoiseLevel":e.denoise*0.1,kCIInputSharpnessKey:0.2]) }
+        if e.usesDetailSettings { if e.denoise > 0 || e.detail.color > 0 { image = try Detail.denoise(image, amount: e.denoise, settings: e.detail, sourceSize: sourceSize) } }
+        else if e.denoise > 0 { image = image.applyingFilter("CINoiseReduction",parameters:["inputNoiseLevel":e.denoise*0.1,kCIInputSharpnessKey:0.2]) }
         image = try masked(before,image,"Denoise"); before = image
         if stopBeforeTool == "Structure" { return image }
         if e.structure > 0 { image = image.clampedToExtent().applyingFilter("CIUnsharpMask",parameters:[kCIInputRadiusKey:max(1,Double(sourceSize.width)/200),kCIInputIntensityKey:e.structure*0.8]).cropped(to:originalExtent) }
@@ -262,7 +278,10 @@ public enum PhotoEditor {
         if stopBeforeTool == "Texture" { return image }
         if e.texture != 0 { image = try masked(before,try DevelopTools.texture(image,amount:e.texture),"Texture"); before = image }
         if stopBeforeTool == "Details" { return image }
-        if e.sharpness > 0 { image = image.applyingFilter("CISharpenLuminance",parameters:[kCIInputSharpnessKey:e.sharpness]) }
+        if e.sharpness > 0 {
+            if e.usesDetailSettings { image = try Detail.sharpen(image, amount: e.sharpness, settings: e.detail, sourceSize: sourceSize) }
+            else { image = image.applyingFilter("CISharpenLuminance",parameters:[kCIInputSharpnessKey:e.sharpness]) }
+        }
         image = try masked(before,image,"Details"); before = image
         if stopBeforeTool == "Glow" { return image }
         if e.glow.amount > 0 {

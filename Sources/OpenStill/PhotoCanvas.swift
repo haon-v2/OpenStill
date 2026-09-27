@@ -2,7 +2,7 @@ import AppKit
 import OpenStillCore
 
 final class PhotoCanvas: NSView {
-    enum Tool: Hashable { case browse, crop, erase, sun, whiteBalance, maskBrush, maskLinear, maskRadial, maskObject, maskRange, retouchSource, retouch, guide }
+    enum Tool: Hashable { case browse, crop, erase, sun, whiteBalance, maskBrush, maskLinear, maskRadial, maskObject, maskRange, retouchSource, retouch, guide, pointColor, targeted, eyeFix }
     var tool: Tool = .browse { didSet { needsDisplay = true; updateAccessibility(); reportCrop() } }
     var sunPlaced: ((CGPoint, Bool) -> Void)?
     var sunPosition = CGPoint(x:0.7,y:0.8) { didSet { needsDisplay = true; updateAccessibility() } }
@@ -20,6 +20,16 @@ final class PhotoCanvas: NSView {
     var maskOverlay: CGImage? { didSet { needsDisplay = true } }
     /// Red/blue clipping warning drawn over the photo.
     var clippingOverlay: CGImage? { didSet { needsDisplay = true } }
+    /// Visualize Spots: a black-and-white map drawn instead of the photo (never exported).
+    var spotOverlay: CGImage? { didSet { needsDisplay = true } }
+    /// Point Color eyedropper: a click picks the color there.
+    var pointColorChosen: ((CGPoint) -> Void)?
+    /// Targeted adjustment: press on the photo, then drag up or down (points of vertical travel).
+    var targetBegan: ((CGPoint) -> Void)?
+    var targetDragged: ((CGFloat, Bool) -> Void)?
+    private var targetStart: CGPoint?
+    /// Red eye / pet eye: drag an ellipse over the eye (centre, corner), both 0–1 of the photo.
+    var eyeDrawn: ((CGPoint, CGPoint) -> Void)?
     /// When set, the left side of the divider shows this "before" render of the same frame.
     var beforeImage: CGImage? { didSet { needsDisplay = true } }
     var splitPosition: CGFloat = 0.5 { didSet { needsDisplay = true } }
@@ -233,6 +243,7 @@ final class PhotoCanvas: NSView {
                 context.draw(beforeImage, in: rect); context.restoreGState()
             }
             if let clippingOverlay { context.saveGState(); context.interpolationQuality = .none; context.draw(clippingOverlay, in: rect); context.restoreGState() }
+            if let spotOverlay { context.saveGState(); context.draw(spotOverlay, in: rect); context.restoreGState() }
             if let maskOverlay, !(tool == .maskLinear && maskPath.count > 1) { context.draw(maskOverlay, in: rect) }
             if tool == .guide {
                 context.saveGState(); context.clip(to:rect)
@@ -278,7 +289,7 @@ final class PhotoCanvas: NSView {
                     context.setLineDash(phase:0,lengths:[])
                     context.move(to:a);context.addLine(to:b);context.strokePath()
                     for point in [a,b] { context.setFillColor(NSColor.white.cgColor);context.fillEllipse(in:CGRect(x:point.x-3,y:point.y-3,width:6,height:6)) }
-                } else if tool == .maskRadial {
+                } else if tool == .maskRadial || tool == .eyeFix {
                     context.strokeEllipse(in:CGRect(x:a.x-abs(b.x-a.x),y:a.y-abs(b.y-a.y),width:abs(b.x-a.x)*2,height:abs(b.y-a.y)*2))
                 } else {
                     context.beginPath(); context.move(to:a)
@@ -415,6 +426,9 @@ final class PhotoCanvas: NSView {
             case .maskObject: objectChosen?(point)
             case .maskRange: rangeChosen?(point)
             case .whiteBalance: whiteBalanceChosen?(point)
+            case .pointColor: pointColorChosen?(point)
+            case .targeted: targetStart = convert(event.locationInWindow, from: nil); targetBegan?(point)
+            case .eyeFix: maskPath = [point]
             case .browse: break
             }
             needsDisplay = true; return
@@ -435,7 +449,8 @@ final class PhotoCanvas: NSView {
                 else {cropSelection = CropGeometry.rectangle(from:start,to:point,in:photoSize,aspect:cropAspect)}
             }
             if tool == .maskBrush || tool == .retouch { maskPath.append(point) }
-            if (tool == .maskLinear || tool == .maskRadial || tool == .guide), let first = maskPath.first { maskPath = [first,point] }
+            if (tool == .maskLinear || tool == .maskRadial || tool == .guide || tool == .eyeFix), let first = maskPath.first { maskPath = [first,point] }
+            if tool == .targeted, let start = targetStart { targetDragged?(convert(event.locationInWindow, from: nil).y - start.y, false) }
             if tool == .erase, !brushPaths.isEmpty { brushPaths[brushPaths.count-1].append(point) }
             needsDisplay = true; return
         }
@@ -450,6 +465,13 @@ final class PhotoCanvas: NSView {
         if draggingSplit { draggingSplit = false; return }
         if tool == .crop {cropStart = nil; cropMoveOrigin = nil; return}
         if tool == .sun, draggingSun { draggingSun = false; moveSun(event,final:true); return }
+        if tool == .targeted, let start = targetStart {
+            targetDragged?(convert(event.locationInWindow, from: nil).y - start.y, true); targetStart = nil; return
+        }
+        if tool == .eyeFix {
+            if let first = maskPath.first, let last = maskPath.last, hypot((last.x-first.x)*imageRect.width,(last.y-first.y)*imageRect.height) > 4 { eyeDrawn?(first,last) }
+            maskPath = []; needsDisplay = true; return
+        }
         if tool == .guide {
             if let first = maskPath.first, let last = maskPath.last, hypot((last.x-first.x)*imageRect.width,(last.y-first.y)*imageRect.height) > 12 { guideDrawn?(first,last) }
             maskPath = []; needsDisplay = true

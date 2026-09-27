@@ -358,7 +358,7 @@ final class LRToolStrip: LRFill {
     init() {
         super.init(LRColors.panel)
         let row = NSStackView(); row.spacing = 22
-        for (id, symbol, label) in [("crop", "crop", "Crop overlay (R)"), ("remove", "bandage", "Remove (Q)"), ("masking", "circle.dashed", "Masking (Shift-W)")] {
+        for (id, symbol, label) in [("crop", "crop", "Crop overlay (R)"), ("remove", "bandage", "Remove (Q)"), ("redeye", "eye", "Red Eye Correction"), ("masking", "circle.dashed", "Masking (Shift-W)")] {
             let b = ToolbarIconButton(); b.identifier = .init(id); b.image = Appearance.symbol(symbol, size: 15, description: label)
             b.toolTip = label; b.setAccessibilityLabel(label); b.setButtonType(.pushOnPushOff); b.isBordered = false
             b.target = self; b.action = #selector(picked(_:)); b.widthAnchor.constraint(equalToConstant: 34).isActive = true; b.heightAnchor.constraint(equalToConstant: 28).isActive = true

@@ -4,6 +4,10 @@ import CoreImage
 public struct ToneCurves: Codable, Equatable {
     public static let identity = [0.0,0.25,0.5,0.75,1.0]
     public var master = identity, red = identity, green = identity, blue = identity
+    /// Free point curves (2–16 points), used instead of the five-sample curve of that channel when set.
+    public var masterPoints: [CurvePoint]?, redPoints: [CurvePoint]?, greenPoints: [CurvePoint]?, bluePoints: [CurvePoint]?
+    /// The parametric curve (Highlights, Lights, Darks, Shadows), applied before the point curves.
+    public var parametric: ParametricCurve?
     public init() {}
     public var isIdentity: Bool { self == ToneCurves() }
     /// The same monotonic cubic interpolation used by the image kernel.
@@ -25,7 +29,25 @@ public struct ToneCurves: Codable, Equatable {
             guard points.count == 5 else { return Self.identity }
             return points.enumerated().map { $0.element.isFinite ? min(1,max(0,$0.element)) : Self.identity[$0.offset] }
         }
-        s.master = clean(master); s.red = clean(red); s.green = clean(green); s.blue = clean(blue); return s
+        s.master = clean(master); s.red = clean(red); s.green = clean(green); s.blue = clean(blue)
+        func cleanPoints(_ points: [CurvePoint]?) -> [CurvePoint]? {
+            guard let points else { return nil }
+            let cleaned = CurvePoint.cleaned(points)
+            return cleaned == CurvePoint.identity ? nil : cleaned
+        }
+        s.masterPoints = cleanPoints(masterPoints); s.redPoints = cleanPoints(redPoints); s.greenPoints = cleanPoints(greenPoints); s.bluePoints = cleanPoints(bluePoints)
+        s.parametric = parametric?.sanitized; if s.parametric?.isIdentity == true { s.parametric = nil }
+        return s
+    }
+    /// Whether any channel uses free points or the parametric curve (rendered through per-channel lookup tables).
+    var usesExtendedCurves: Bool { masterPoints != nil || redPoints != nil || greenPoints != nil || bluePoints != nil || parametric != nil }
+    /// The final value of a channel (0 master, 1 red, 2 green, 3 blue applied after master) at x.
+    public func output(_ x: Double, channel: Int) -> Double {
+        let p = parametric.map { $0.value(at: x) } ?? x
+        let m = masterPoints.map { CurvePoint.value(at: p, points: $0) } ?? Self.value(at: p, points: master)
+        guard channel > 0 else { return m }
+        let points = [redPoints, greenPoints, bluePoints][channel - 1], samples = [red, green, blue][channel - 1]
+        return points.map { CurvePoint.value(at: m, points: $0) } ?? Self.value(at: m, points: samples)
     }
 }
 public struct NeutralBalance: Codable, Equatable {
@@ -70,6 +92,7 @@ public enum ToneTools {
         let settings = settings.sanitized
         guard !settings.isIdentity else { return image }
         let sRGB = CGColorSpace(name:CGColorSpace.extendedSRGB)!
+        if settings.usesExtendedCurves { return try PointCurves.apply(image, settings: settings) }
         guard let input = image.matchedFromWorkingSpace(to:sRGB) else { throw EditError.render }
         var args:[Any] = [input]
         for points in [settings.master,settings.red,settings.green,settings.blue] {

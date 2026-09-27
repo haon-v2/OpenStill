@@ -313,3 +313,34 @@ Automated fixtures are generated and contain no user photographs. The real S9 fi
 - **Fixed:** the Navigator stretched and squeezed Develop's Presets, Versions and History out of the left panel. It now keeps its own height.
 - **Verified on macOS 26 CI:** the app was launched with sample photos and snapshots were taken of Lightroom Develop and Library. They show the module picker, Navigator, left and right panels, photo, toolbar and filmstrip.
 - **Known:** the Library histogram stays empty until that photo's grid preview has been saved.
+
+## Develop: curves, Point Color, detail and more — September 27, 2026
+
+- **Added:**
+  - Point tone curves (RGB, Red, Green, Blue) and the parametric curve, with targeted adjustment.
+  - Point Color, with targeted adjustment for HSL / Color.
+  - B&W mix with Auto mix.
+  - Sharpening Radius / Detail / Masking; noise reduction Detail / Contrast and Color / Color detail.
+  - Remove chromatic aberration, measured per photo.
+  - Red eye and Pet eye.
+  - Visualize spots.
+  - Snapshots.
+  - Camera Raw import of point curves, parametric curves, the gray mixer and the detail sliders.
+- **Automated tests (DevelopM11Tests):**
+  - Point curves pass through their points, stay flat outside them and don't overshoot; the parametric curve stays monotonic.
+  - Old five-point curves still decode and render as before.
+  - The B&W mix changes each color's gray; Point Color moves nearby colors and leaves grays alone.
+  - Sharpening steepens edges and Masking leaves flat areas alone; old edits keep the original sharpening until a Detail slider changes.
+  - Chromatic aberration measurement finds a synthetic red / blue scale error.
+  - Red eye darkens a red pupil.
+  - Visualize spots shows edges.
+  - Snapshots add, rename, restore as one undo step and delete.
+  - Batch copy carries the new settings.
+  - Camera Raw import reads them.
+- **Not yet verified by hand on a Mac:**
+  - Adding and dragging curve points.
+  - Sampling a Point Color from a real photo.
+  - Red eye on a portrait.
+  - Targeted adjustment drags.
+  - Restoring a snapshot.
+

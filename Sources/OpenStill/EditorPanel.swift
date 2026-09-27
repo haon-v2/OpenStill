@@ -51,6 +51,9 @@ final class EditorPanel: GlassChrome {
     private let profilePanel = ProfilePanel()
     private var rawSource = false
     private let retouch = RetouchPanel()
+    private let pointColor = PointColorPanel()
+    /// Snapshots: in the History tab (Luminar) or their own left-panel section (Lightroom).
+    private let snapshotStack = EditorStack()
     var retouchSettingsChanged:((RetouchSession)->Void)?
     private var lutMask: MaskPanel?
     private let lutBrowser = LUTBrowserView()
@@ -77,7 +80,7 @@ final class EditorPanel: GlassChrome {
     fileprivate var maskOrder: [String] = []
     fileprivate var maskBorrow: Borrowed?
     fileprivate let maskSlot = NSView()
-    fileprivate let presetSlot = NSView(), historySlot = NSView(), versionSlot = NSView()
+    fileprivate let presetSlot = NSView(), historySlot = NSView(), versionSlot = NSView(), snapshotSlot = NSView()
     /// The Lightroom tool strip changed tool (crop, remove, masking or none).
     var lightroomTool: ((String?) -> Void)?
 
@@ -136,6 +139,10 @@ final class EditorPanel: GlassChrome {
             self.fullWidth(self.lens,in:content)
             self.lens.changed = { [weak self] settings,final in guard let self else{return};self.states.lens=settings;self.editChanged?(self.states,"Lens corrections",final) }
             self.lens.match = { [weak self] in self?.command?("matchLens") }
+            self.addTitle("CHROMATIC ABERRATION", to: content)
+            self.action("Remove chromatic aberration", "autoCA", to: content)
+            self.action("Turn off chromatic aberration removal", "autoCA:off", to: content)
+            self.help("Measures the red and blue color edges of this photo and lines them up with green. Works without a lens profile.", to: content)
             self.addTitle("DEFRINGE", to: content)
             self.help("Removes purple and green color fringes along high-contrast edges.", to: content)
             self.slider("Purple amount", path: \.defringePurple, range: 0...1, in: content)
@@ -230,6 +237,7 @@ final class EditorPanel: GlassChrome {
             self.curves.changed = { [weak self] curves,final in
                 guard let self else { return }; self.states.curves = curves; self.editChanged?(self.states,"Tone curves",final)
             }
+            self.action("Targeted adjustment: drag up or down on the photo", "tat:curve", to: content)
         }
         tool("Enhance", symbol: "wand.and.rays", in: tools) { content in
             self.toggle("Auto light & color", path: \.autoEnhance, in: content)
@@ -239,7 +247,9 @@ final class EditorPanel: GlassChrome {
             self.fullWidth(self.retouch,in:content)
             self.retouch.command = { [weak self] in self?.command?($0) }
             self.retouch.settingsChanged = { [weak self] in self?.retouchSettingsChanged?($0) }
+            self.addSpotControls(to: content)
         }
+        tool("Red eye", symbol: "eye", in: tools) { content in self.addEyeControls(to: content) }
         tool("Erase  AI", symbol: "eraser", in: tools) { content in
             self.help("Choose Masking to select an area, then return here to remove it. AI fills it using the surrounding photograph.", to: content)
             self.action("Remove selected area", "ai:erase", to: content)
@@ -262,6 +272,12 @@ final class EditorPanel: GlassChrome {
                 guard let self else { return };self.states.ensureAdvanced();self.states.advanced!.colors[index] = band
                 self.editChanged?(self.states,title,final)
             }
+            self.addTitle("TARGETED ADJUSTMENT",to:$0)
+            self.addTargetedColorActions(to: $0)
+            self.addTitle("POINT COLOR",to:$0)
+            self.fullWidth(self.pointColor,in:$0)
+            self.pointColor.changed = { [weak self] colors,title,final in guard let self else { return }; self.states.pointColors = colors; self.editChanged?(self.states,title,final) }
+            self.pointColor.command = { [weak self] in self?.command?($0) }
         }
         tool("Color grading", symbol: "circle.circle", in: tools) { content in
             self.fullWidth(self.grading, in: content)
@@ -280,9 +296,17 @@ final class EditorPanel: GlassChrome {
             self.slider("Monochrome strength", path: \.monochrome, range: 0...1, in: $0)
             self.slider("Blacks", path: \.blacks, range: -1...1, in: $0)
             self.slider("Whites", path: \.whites, range: -1...1, in: $0)
+            self.addTitle("B&W MIX", to: $0)
+            self.addGrayMix(to: $0)
         }
-        tool("Details", symbol: "square.dotted", in: tools) { self.slider("Sharpen", path: \.sharpness, range: 0...2, in: $0) }
-        tool("Denoise", symbol: "square.grid.3x3", in: tools) { self.slider("Noise reduction", path: \.denoise, range: 0...1, in: $0) }
+        tool("Details", symbol: "square.dotted", in: tools) { content in
+            self.slider("Sharpen", path: \.sharpness, range: 0...2, in: content)
+            self.addSharpeningDetail(to: content)
+        }
+        tool("Denoise", symbol: "square.grid.3x3", in: tools) { content in
+            self.slider("Noise reduction", path: \.denoise, range: 0...1, in: content)
+            self.addNoiseDetail(to: content)
+        }
         tool("Vignette", symbol: "circle.square", in: tools) { self.slider("Black − / White +", path: \.vignette, range: -1...1, in: $0) }
         addTitle("CREATIVE", to: tools)
         tool("Glow", symbol: "sun.haze", in: tools) { content in
@@ -510,8 +534,12 @@ final class EditorPanel: GlassChrome {
         for (slider, label, path) in sliders { slider.doubleValue = edits[keyPath: path]; label.stringValue = Self.number(edits[keyPath: path]); slider.isEnabled = enabled && !busy }
         for (button, path) in toggles { button.state = edits[keyPath: path] ? .on : .off; button.isEnabled = enabled && !busy }
         treatment.selectedSegment = edits.monochrome >= 0.5 ? 1 : 0; treatment.isEnabled = enabled && !busy
+        pointColor.update(edits.pointColors, enabled: enabled && !busy)
         for button in editButtons { button.isEnabled = (enabled && !busy) || button.identifier?.rawValue == "setupAI" || (busy && button.identifier?.rawValue == "cancelAI") }
         historyStack.arrangedSubviews.forEach { historyStack.removeArrangedSubview($0); $0.removeFromSuperview() }
+        rebuildSnapshots(document, enabled: enabled && !busy)
+        // In the Lightroom layout the snapshots have their own section on the left.
+        if lrModule != .develop { addTitle("SNAPSHOTS", to: historyStack); fullWidth(snapshotStack, in: historyStack) }
         addTitle("EDIT HISTORY", to: historyStack)
         action("Undo", "undo", to: historyStack); action("Redo", "redo", to: historyStack)
         action("Compare with original (\\)", "compare", to: historyStack)
@@ -535,6 +563,7 @@ final class EditorPanel: GlassChrome {
         cropPresets.setEnabled(hasPhoto && !busy)
         glow.setEnabled(hasPhoto && !busy)
         grading.setEnabled(hasPhoto && !busy)
+        pointColor.setEnabled(hasPhoto && !busy)
         sunrays.setEnabled(hasPhoto && !busy)
         transformPanel.setEnabled(hasPhoto && !busy)
         profilePanel.setEnabled(hasPhoto && !busy)
@@ -619,14 +648,16 @@ extension EditorPanel {
         lrDrawer.orientation = .vertical; lrDrawer.alignment = .leading; lrDrawer.spacing = 8
         lrDrawer.edgeInsets = NSEdgeInsets(top: 6, left: 14, bottom: 12, right: 14)
         column.pin(lrDrawer)
-        let crop = LRStack(), remove = LRStack(), masking = LRStack()
-        for box in [crop, remove, masking] { box.orientation = .vertical; box.alignment = .leading; box.spacing = 8; fullWidth(box, in: lrDrawer); box.isHidden = true }
-        drawerViews = ["crop": crop, "remove": remove, "masking": masking]
+        let crop = LRStack(), remove = LRStack(), masking = LRStack(), redeye = LRStack()
+        for box in [crop, remove, redeye, masking] { box.orientation = .vertical; box.alignment = .leading; box.spacing = 8; fullWidth(box, in: lrDrawer); box.isHidden = true }
+        drawerViews = ["crop": crop, "remove": remove, "redeye": redeye, "masking": masking]
+        addEyeControls(to: redeye)
         let cropHolder = NSView(); fullWidth(cropHolder, in: crop); slots.append((cropHolder, cropPresets, nil))
         slider("Angle", path: \.straighten, range: -20...20, in: crop)
         for (title, id) in [("Draw crop", "crop"), ("Apply crop", "applyCrop"), ("Auto straighten", "autoStraighten"), ("AI align horizon", "horizon"), ("Rotate clockwise", "rotate"), ("Flip horizontally", "flip"), ("Reset", "resetCrop")] { action(title, id, to: crop) }
         let removeHolder = NSView(); fullWidth(removeHolder, in: remove); slots.append((removeHolder, retouch, nil))
         help("Remove with AI: select the area with Masking, then:", to: remove); action("Remove selected area", "ai:erase", to: remove)
+        addSpotControls(to: remove)
         let target = NSTextField(labelWithString: "Mask limits:"); target.font = .systemFont(ofSize: 11); target.textColor = LRColors.dim
         maskTarget.removeAllItems(); maskTarget.addItems(withTitles: maskOrder); maskTarget.controlSize = .small; maskTarget.font = .systemFont(ofSize: 11)
         maskTarget.target = self; maskTarget.action = #selector(maskTargetChanged); maskTarget.setAccessibilityLabel("Adjustment the mask limits")
@@ -660,21 +691,27 @@ extension EditorPanel {
             slider("Vibrance", path: \.vibrance, range: -1...1, in: s.body)
             slider("Saturation", path: \.saturation, range: 0...2, in: s.body)
         }
-        section("Tone Curve") { slot(curves, in: $0) }
-        section("HSL / Color") { slot(mixer, in: $0) }
+        section("Tone Curve") { s in slot(curves, in: s); action("Targeted adjustment (drag on photo)", "tat:curve", to: s.body) }
+        section("HSL / Color") { s in
+            slot(mixer, in: s)
+            label("Targeted Adjustment", in: s); addTargetedColorActions(to: s.body)
+            label("Point Color", in: s); slot(pointColor, in: s)
+        }
+        section("B&W Mix") { s in addGrayMix(to: s.body); help("Used when Treatment is Black & White.", to: s.body) }
         section("Color Grading") { s in
             slot(grading, in: s)
             slider("Blending", path: \.gradeBlending, range: 0...1, in: s.body)
             slider("Balance", path: \.gradeBalance, range: -1...1, in: s.body)
         }
         section("Detail") { s in
-            label("Sharpening", in: s); slider("Amount", path: \.sharpness, range: 0...2, in: s.body)
-            label("Noise Reduction", in: s); slider("Luminance", path: \.denoise, range: 0...1, in: s.body)
+            label("Sharpening", in: s); slider("Amount", path: \.sharpness, range: 0...2, in: s.body); addSharpeningDetail(to: s.body)
+            label("Noise Reduction", in: s); slider("Luminance", path: \.denoise, range: 0...1, in: s.body); addNoiseDetail(to: s.body)
             action("Denoise with AI…", "ai:denoise", to: s.body); action("Denoise RAW data (keeps edits)", "ai:rawdenoise", to: s.body)
             label("Enhance", in: s); action("Restore detail (AI)", "ai:detail", to: s.body); action("Super Resolution 2×", "ai:upscale", to: s.body)
         }
         section("Lens Corrections") { s in
             slot(lens, in: s)
+            action("Remove Chromatic Aberration", "autoCA", to: s.body); action("Turn off chromatic aberration removal", "autoCA:off", to: s.body)
             label("Defringe", in: s)
             slider("Purple amount", path: \.defringePurple, range: 0...1, in: s.body)
             slider("Purple hue from (°)", path: \.defringePurpleLow, range: 180...360, in: s.body)
@@ -744,13 +781,15 @@ extension EditorPanel {
     private func buildLeftDevelop() {
         let presets = LRSection("Presets", module: .develop, side: .left, open: true)
         presets.add(presetSlot); leftDevelopColumn.add(presets)
+        let snapshots = LRSection("Snapshots", module: .develop, side: .left, open: true)
+        snapshots.add(snapshotSlot); leftDevelopColumn.add(snapshots)
         let versionsSection = LRSection("Versions", module: .develop, side: .left, open: false)
         versionsSection.add(versionSlot); leftDevelopColumn.add(versionsSection)
         let history = LRSection("History", module: .develop, side: .left, open: true)
         history.add(historySlot); leftDevelopColumn.add(history)
         leftDevelopColumn.setButtons([("Copy…", { [weak self] in self?.command?("lr:copy") }), ("Paste", { [weak self] in self?.command?("lr:paste") })])
         if let presetsDoc = presetScroll.documentView, let historyDoc = historyScroll.documentView {
-            lrSlots[.develop, default: []] += [(presetSlot, presetsDoc, nil), (versionSlot, versions, nil), (historySlot, historyDoc, nil)]
+            lrSlots[.develop, default: []] += [(presetSlot, presetsDoc, nil), (snapshotSlot, snapshotStack, nil), (versionSlot, versions, nil), (historySlot, historyDoc, nil)]
         }
     }
     private func labelView(_ text: String) -> NSTextField { let l = NSTextField(labelWithString: text); l.font = .systemFont(ofSize: 11); l.textColor = LRColors.dim; return l }
@@ -809,4 +848,77 @@ extension EditorPanel {
         for b in borrowed.reversed() { give(b) }
         borrowed = []
     }
+}
+
+// MARK: - Develop controls added in M11 (shared by both layouts)
+
+extension EditorPanel {
+    fileprivate func addGrayMix(to stack: NSStackView) {
+        let bands: [(String, WritableKeyPath<PhotoEdits, Double>)] = [("Red", \.grayMixRed), ("Orange", \.grayMixOrange), ("Yellow", \.grayMixYellow), ("Green", \.grayMixGreen),
+                                                                      ("Aqua", \.grayMixAqua), ("Blue", \.grayMixBlue), ("Purple", \.grayMixPurple), ("Magenta", \.grayMixMagenta)]
+        for (name, path) in bands { slider(name, path: path, range: -1...1, in: stack) }
+        action("Auto mix", "grayMix:auto", to: stack); action("Reset mix", "grayMix:reset", to: stack)
+    }
+    fileprivate func addSharpeningDetail(to stack: NSStackView) {
+        slider("Radius", path: \.sharpenRadius, range: 0.5...3, in: stack)
+        slider("Detail", path: \.sharpenDetail, range: 0...1, in: stack)
+        slider("Masking", path: \.sharpenMasking, range: 0...1, in: stack)
+        help("Hold Option while dragging Masking in Lightroom shows the edge mask; here, Masking 0 sharpens everything and higher values only sharpen edges.", to: stack)
+    }
+    fileprivate func addNoiseDetail(to stack: NSStackView) {
+        slider("Detail", path: \.noiseDetail, range: 0...1, in: stack)
+        slider("Contrast", path: \.noiseContrast, range: 0...1, in: stack)
+        slider("Color", path: \.colorNoise, range: 0...1, in: stack)
+        slider("Color detail", path: \.colorNoiseDetail, range: 0...1, in: stack)
+    }
+    fileprivate func addTargetedColorActions(to stack: NSStackView) {
+        action("Drag on photo: Saturation", "tat:saturation", to: stack)
+        action("Drag on photo: Hue", "tat:hue", to: stack)
+        action("Drag on photo: Luminance", "tat:luminance", to: stack)
+    }
+    fileprivate func addEyeControls(to stack: NSStackView) {
+        action("Red eye: drag over an eye", "eye:redEye", to: stack)
+        action("Pet eye: drag over an eye", "eye:petEye", to: stack)
+        slider("Pupil size", path: \.eyePupil, range: 0.2...1, in: stack)
+        slider("Darken", path: \.eyeDarken, range: 0...1, in: stack)
+        toggle("Pet eye catchlight", path: \.eyeCatchlight, in: stack)
+        action("Remove last eye", "eye:removeLast", to: stack); action("Clear all eyes", "eye:clear", to: stack)
+        help("Sliders change the last eye you corrected.", to: stack)
+    }
+    fileprivate func addSpotControls(to stack: NSStackView) {
+        action("Visualize Spots (on/off)", "spots:toggle", to: stack)
+        let label = NSTextField(labelWithString: "Spot sensitivity"); label.font = .systemFont(ofSize: 11)
+        let slider = TrackingSlider(range: 0...1); slider.doubleValue = 0.3; slider.setAccessibilityLabel("Visualize Spots sensitivity")
+        slider.change = { [weak self] v, final in if final { self?.command?("spots:threshold:\(1 - v)") } }
+        let row = NSStackView(views: [label, slider]); row.spacing = 8; fullWidth(row, in: stack)
+    }
+    /// Snapshots of the current version: New snapshot, then one row per snapshot (click to restore; Control-click to rename or delete).
+    fileprivate func rebuildSnapshots(_ document: EditDocument?, enabled: Bool) {
+        snapshotStack.orientation = .vertical; snapshotStack.alignment = .leading; snapshotStack.spacing = 4
+        snapshotStack.arrangedSubviews.forEach { snapshotStack.removeArrangedSubview($0); $0.removeFromSuperview() }
+        let add = NSButton(title: "New snapshot…", target: self, action: #selector(snapshotCommand(_:)))
+        add.identifier = .init("snapshot:add"); add.bezelStyle = .rounded; add.controlSize = .small; add.isEnabled = enabled && document != nil
+        snapshotStack.addArrangedSubview(add)
+        for snap in (document?.snapshotList ?? []).reversed() {
+            let row = NSButton(title: "◆ " + snap.name, target: self, action: #selector(snapshotCommand(_:)))
+            row.identifier = .init("snapshot:restore:" + snap.id.uuidString); row.isBordered = false; row.alignment = .left; row.font = .systemFont(ofSize: 12); row.isEnabled = enabled
+            row.toolTip = "Click to return to this snapshot · Control-click to rename or delete"
+            let menu = NSMenu()
+            for (title, verb) in [("Rename…", "rename"), ("Delete", "delete")] {
+                let item = NSMenuItem(title: title, action: #selector(snapshotMenu(_:)), keyEquivalent: ""); item.target = self; item.representedObject = "snapshot:\(verb):" + snap.id.uuidString; menu.addItem(item)
+            }
+            row.menu = menu
+            snapshotStack.addArrangedSubview(row)
+        }
+        if document?.snapshotList.isEmpty ?? true {
+            let hint = NSTextField(wrappingLabelWithString: "Save the current edit as a named snapshot to come back to later."); hint.font = .systemFont(ofSize: 10); hint.textColor = .secondaryLabelColor
+            snapshotStack.addArrangedSubview(hint)
+        }
+    }
+    @objc fileprivate func snapshotCommand(_ sender: NSButton) { if let id = sender.identifier?.rawValue { command?(id) } }
+    @objc fileprivate func snapshotMenu(_ sender: NSMenuItem) { if let id = sender.representedObject as? String { command?(id) } }
+    /// After a Point Color is picked, show its sliders.
+    func selectLastPointColor() { pointColor.selectLast() }
+    /// The tone curve channel shown (0 RGB … 3 blue), for the targeted adjustment tool.
+    var curveChannel: Int { curves.selectedChannel }
 }

@@ -8,6 +8,7 @@ extension ViewerController {
     func configureEditing() {
         info.editChanged = { [weak self] edits, title, final in self?.changeEdits(edits, title: title, commit: final) }
         info.command = { [weak self] name in self?.editingCommand(name) }
+        configureDevelopM11()
         info.chooseHistory = { [weak self] index in
             guard let self, !self.localAI.isRunning, !self.aiPreparing, self.editDocument.steps.indices.contains(index) else { return }
             self.editDocument.cursor = index
@@ -64,7 +65,7 @@ extension ViewerController {
             sun.centerX = converted.centerX; sun.centerY = converted.centerY; edits.sunSettings = sun
         }
         guard currentSource != nil, renderedPhoto != nil, !localAI.isRunning, !aiPreparing else { return }
-        if photoRecord?.active.renderer == .legacy && (!edits.curves.isIdentity || edits.neutralBalance != NeutralBalance() || edits.optics.hasEffect || edits.hdr.enabled || edits.profile.hasEffect || edits.calibration.hasEffect || !edits.retouch.isEmpty || edits.advanced?.masks.values.contains(where:{$0.components != nil || $0.range != nil}) == true) {
+        if photoRecord?.active.renderer == .legacy && (edits.autoCA.hasEffect || !edits.curves.isIdentity || edits.neutralBalance != NeutralBalance() || edits.optics.hasEffect || edits.hdr.enabled || edits.profile.hasEffect || edits.calibration.hasEffect || !edits.retouch.isEmpty || edits.advanced?.masks.values.contains(where:{$0.components != nil || $0.range != nil}) == true) {
             photoRecord?.upgrade(); editDocument = photoRecord!.active.document
         }
         currentEdits = edits; comparing = false
@@ -172,6 +173,7 @@ extension ViewerController {
         if comparing && name != "compare" { comparing = false; renderEdits() }
         if name.hasPrefix("mask:") { maskCommand(name); return }
         if name.hasPrefix("lensBlur:") { lensBlurCommand(name); return }
+        if developM11Command(name) { return }
         if name.hasPrefix("libraryLUT:"), let item = info.libraryLUT(id:String(name.dropFirst(11))) { applyLibraryLUT(item); return }
         if name.hasPrefix("lut:") { applyLUT(URL(fileURLWithPath:String(name.dropFirst(4))).lastPathComponent); return }
         if ["crop","eraseBrush","placeSun","reset","cancelTool"].contains(name) { maskVisible = false; maskToken = UUID() }
@@ -260,6 +262,7 @@ extension ViewerController {
         var e = currentEdits
         e.highlights = 1; e.shadows = 0; e.exposure = 0; e.contrast = 1; e.saturation = 1; e.vibrance = 0; e.temperature = 6500; e.tint = 0; e.monochrome = 0; e.blacks = 0; e.whites = 0; e.advanced!.colors = [ColorBand](repeating:ColorBand(),count:8); e.autoEnhance = false
         e.clarity = 0; e.texture = 0; e.dehaze = 0; e.colorGrading = ColorGrading()
+        e.grayMix = PhotoEdits.neutralGrayMix; e.pointColors = []
         switch name {
         case "Warm light": e.temperature = 7800; e.vibrance = 0.15; e.contrast = 1.05
         case "Cool shadows": e.temperature = 5200; e.shadows = 0.2; e.contrast = 1.05
@@ -274,6 +277,8 @@ extension ViewerController {
         guard let window = view.window else { return }
         var preset = currentEdits
         preset.ensureAdvanced(); preset.advanced!.masks = [:]; preset.advanced!.rawWhiteBalance = nil; preset.straighten = 0; preset.advanced!.lutAsset = nil; preset.advanced!.lutName = nil; preset.advanced!.lutID = nil; preset.advanced!.aiBackgroundAsset = nil; preset.advanced!.aiFeatureKey = nil; preset.advanced!.transform = nil; preset.advanced!.lensBlur = nil; preset.advanced!.rawDenoise = nil
+        // Eye fixes and measured chromatic aberration belong to this photo.
+        preset.advanced!.eyeFixes = nil; preset.advanced!.autoCA = nil
         preset.baseAsset = nil; preset.overlayAsset = nil; preset.crop = nil; preset.rotation = 0; preset.flip = false
         let panel = NSSavePanel(); panel.title = "Save preset"; panel.nameFieldStringValue = "My preset.openstillpreset"; panel.allowedContentTypes = [UTType(filenameExtension: "openstillpreset") ?? .json]
         panel.beginSheetModal(for: window) { [weak self] response in
@@ -293,6 +298,7 @@ extension ViewerController {
                 preset.crop = self.currentEdits.crop; preset.rotation = self.currentEdits.rotation; preset.flip = self.currentEdits.flip
                 preset.ensureAdvanced(); preset.straighten = self.currentEdits.straighten
                 preset.advanced!.masks = self.currentEdits.advanced?.masks ?? [:]; preset.advanced!.transform = self.currentEdits.advanced?.transform; preset.advanced!.lensBlur = self.currentEdits.advanced?.lensBlur; preset.advanced!.rawDenoise = self.currentEdits.advanced?.rawDenoise
+                preset.advanced!.eyeFixes = self.currentEdits.advanced?.eyeFixes; preset.advanced!.autoCA = self.currentEdits.advanced?.autoCA
                 preset.advanced!.aiBackgroundAsset = self.currentEdits.advanced?.aiBackgroundAsset; preset.advanced!.aiFeatureKey = self.currentEdits.advanced?.aiFeatureKey
                 preset.advanced!.lutAsset = self.currentEdits.advanced?.lutAsset; preset.advanced!.lutName = self.currentEdits.advanced?.lutName; preset.advanced!.lutID = self.currentEdits.advanced?.lutID; preset.lutAmount = self.currentEdits.lutAmount
                 self.changeEdits(preset, title: url.deletingPathExtension().lastPathComponent, commit: true)

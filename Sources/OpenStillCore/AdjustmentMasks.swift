@@ -119,6 +119,16 @@ public struct AdvancedEdits: Codable, Equatable {
     public var rawDenoise: RawDenoiseBase?
     /// HDR editing (highlights above SDR white).
     public var hdr: HDRSettings?
+    /// Black & white mix: how light each of the 8 color bands becomes in black and white (−1…1).
+    public var grayMix: [Double]?
+    /// Sharpening radius, detail and masking; noise reduction detail, contrast and color.
+    public var detail: DetailSettings?
+    /// Automatic lateral chromatic aberration removal, with the scales measured for this photo.
+    public var autoCA: AutoCASettings?
+    /// Point Color: colors picked from the photo and how to shift them.
+    public var pointColors: [PointColor]?
+    /// Red eye and pet eye corrections.
+    public var eyeFixes: [EyeFix]?
     public init() {}
 }
 

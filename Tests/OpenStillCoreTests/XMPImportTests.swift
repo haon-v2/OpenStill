@@ -106,7 +106,10 @@ import Testing
         #expect(close(e.vignette, -0.2) && close(e.temperature, 6850) && e.monochrome == 0)
         let crop = try #require(e.crop)
         #expect(close(crop.x, 0.1) && close(crop.y, 0.2) && close(crop.width, 0.8) && close(crop.height, 0.6))
-        #expect(e.curves.master[2] > 0.55 && close(e.curves.master[0], 0) && close(e.curves.master[4], 1))
+        // The point curve comes across exactly, not sampled.
+        let points = try #require(e.curves.masterPoints)
+        #expect(points.count == 3 && close(points[1].x, 128.0 / 255) && close(points[1].y, 150.0 / 255) && e.curves.master == ToneCurves.identity)
+        #expect(e.curves.output(128.0 / 255, channel: 0) > 0.58 && close(e.curves.output(0, channel: 0), 0) && close(e.curves.output(1, channel: 0), 1))
         #expect(result.unsupported.contains("Lens vignetting 12") && result.unsupported.contains("Future Slider (7)"))
         #expect(!result.unsupported.contains { $0.contains("Sharpen Radius") || $0.contains("Process") || $0.contains("Grayscale") })
         #expect(result.approximated.contains { $0.hasPrefix("White balance") })
