@@ -24,14 +24,22 @@ jobs:
           raw=b''.join(b'\x00'+bytes([(x*255//w),(y*255//h),120]*1 for x in range(w)) if False else b'' for y in range(h))
           " ; done; fi
           ls -la /tmp/photos
-      - name: Run and dump
+      - name: Run and screenshot
         run: |
           set +e
-          for layout in lightroom luminar; do
-            defaults write org.openstill.viewer OpenStillWorkspaceLayout $layout
-            OPENSTILL_LAYOUT_DUMP=/tmp/dump-$layout perl -e 'alarm shift; exec @ARGV' 60 dist/OpenStill.app/Contents/MacOS/OpenStill /tmp/photos
-            echo "== $layout exit $?"
-            cat /tmp/dump-$layout.txt | cut -c1-170 | head -500
+          defaults write org.openstill.viewer OpenStillWorkspaceLayout lightroom
+          for variant in glass noglass; do
+            if [ $variant = noglass ]; then export OPENSTILL_NO_GLASS_CONTAINER=1; fi
+            OPENSTILL_LAYOUT_DUMP=/tmp/dump-$variant dist/OpenStill.app/Contents/MacOS/OpenStill /tmp/photos &
+            pid=$!
+            sleep 7
+            screencapture -x /tmp/screen-$variant.png; echo "screencapture $?"
+            wait $pid
+            for f in /tmp/screen-$variant.png /tmp/dump-$variant.png; do
+              [ -f $f ] || { echo "missing $f"; continue; }
+              sips -Z 360 -s format jpeg -s formatOptions 40 $f --out $f.jpg >/dev/null
+              echo "BEGIN $f"; base64 -i $f.jpg | tr -d '\n'; echo; echo "END $f"
+            done
           done
           true
       - uses: actions/upload-artifact@v4

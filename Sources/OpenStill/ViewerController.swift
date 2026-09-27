@@ -154,7 +154,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
     private func setupLayout() {
         let content = workspaceContent
         let surface: NSView
-        if #available(macOS 26.0, *) {
+        if #available(macOS 26.0, *), ProcessInfo.processInfo.environment["OPENSTILL_NO_GLASS_CONTAINER"] == nil {
             let container = NSGlassEffectContainerView()
             container.spacing = 0
             container.contentView = content
