@@ -12,6 +12,7 @@ enum LayoutDump {
             let titles = Set(open.split(separator: ",").map(String.init))
             DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
                 guard let root = window?.contentView else { return }
+                window?.setFrame(NSRect(x: 0, y: 0, width: 1400, height: 1500), display: true)
                 var sections: [LRSection] = []
                 func find(_ v: NSView) { if let s = v as? LRSection { sections.append(s) }; v.subviews.forEach(find) }
                 find(root)
