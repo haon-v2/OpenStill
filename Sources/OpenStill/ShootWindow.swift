@@ -10,14 +10,18 @@ private final class ShootCollection:NSCollectionView {
         super.mouseDown(with:event)
         if event.clickCount==2,let clicked {selectionIndexPaths=[clicked];openSelection?()}
     }
+    /// Rating, label, flag and open keys come from Settings → Shortcuts.
     override func keyDown(with event:NSEvent){
-        if event.modifierFlags.intersection([.command,.control,.option]).isEmpty,let text=event.charactersIgnoringModifiers?.lowercased(){
-            if let number=Int(text),(0...5).contains(number){mark?(number,nil);return}
-            if let number=Int(text),let label=ColorLabel.forKey(number){setLabel?(label);return}
-            if text=="p"{mark?(nil,.pick);return};if text=="x"{mark?(nil,.reject);return};if text=="u"{mark?(nil,PhotoFlag.none);return}
-            if event.keyCode==36{openSelection?();return}
+        guard let id=Shortcuts.command(for:event,in:.library) else{super.keyDown(with:event);return}
+        switch id{
+        case let id where id.hasPrefix("library.rate"):mark?(Int(id.dropFirst("library.rate".count)) ?? 0,nil)
+        case let id where id.hasPrefix("library.label."):if let label=ColorLabel(rawValue:String(id.dropFirst("library.label.".count))){setLabel?(label)}
+        case "library.pick":mark?(nil,.pick)
+        case "library.reject":mark?(nil,.reject)
+        case "library.unflag":mark?(nil,PhotoFlag.none)
+        case "library.open":openSelection?()
+        default:super.keyDown(with:event)
         }
-        super.keyDown(with:event)
     }
 }
 private final class ShootCell:NSCollectionViewItem {
@@ -120,7 +124,7 @@ final class ShootWindow:NSWindowController,NSCollectionViewDataSource,NSCollecti
         }
         labels.setAccessibilityLabel("Set color label");marks.addArrangedSubview(labels)
         let batch=NSStackView(views:[button("Copy adjustments",#selector(copyAdjustments)),button("Paste adjustments…",#selector(pasteAdjustments)),button("Undo batch",#selector(undoBatch)),button("Export selected…",#selector(exportSelection))]);batch.spacing=10
-        let hint=NSTextField(labelWithString:"0–5 rate · 6–9 red/yellow/green/blue label · P pick · X reject · U unflag · ⌘-click selects multiple");hint.font = .systemFont(ofSize:10);hint.textColor = .secondaryLabelColor
+        let hint=NSTextField(labelWithString:Self.hintText());hint.font = .systemFont(ofSize:10);hint.textColor = .secondaryLabelColor
         let flow=NSCollectionViewFlowLayout();flow.itemSize=NSSize(width:210,height:205);flow.minimumInteritemSpacing=12;flow.minimumLineSpacing=12;flow.sectionInset=NSEdgeInsets(top:12,left:16,bottom:16,right:16)
         grid.collectionViewLayout=flow;grid.isSelectable=true;grid.allowsMultipleSelection=true;grid.dataSource=self;grid.delegate=self;grid.backgroundColors=[.clear];grid.register(ShootCell.self,forItemWithIdentifier:NSUserInterfaceItemIdentifier("shoot"))
         grid.mark = {[weak self] rating,flag in self?.mark(rating:rating,flag:flag)};grid.setLabel = {[weak self] label in self?.toggleLabel(label)};grid.openSelection = {[weak self] in self?.openSelected()}
@@ -133,6 +137,11 @@ final class ShootWindow:NSWindowController,NSCollectionViewDataSource,NSCollecti
         refresh()
     }
     required init?(coder:NSCoder){fatalError()}
+    /// The key hint under the toolbar, from the current shortcuts.
+    static func hintText()->String{
+        func key(_ id:String)->String{Shortcuts.map.combo(for:id)?.display ?? "—"}
+        return "\(key("library.rate0"))–\(key("library.rate5")) rate · \(key("library.label.red"))–\(key("library.label.blue")) labels · \(key("library.pick")) pick · \(key("library.reject")) reject · \(key("library.unflag")) unflag · ⌘-click selects multiple"
+    }
     private func button(_ title:String,_ action:Selector)->NSButton{let b=NSButton(title:title,target:self,action:action);b.bezelStyle = .rounded;return b}
     var selectedItems:[ShootItem]{grid.selectionIndexPaths.sorted{$0.item<$1.item}.compactMap{shown.indices.contains($0.item) ? shown[$0.item]:nil}}
     func refresh(){

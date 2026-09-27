@@ -182,6 +182,23 @@ For **Google Drive, Dropbox, WeTransfer, Pixieset, and Pic-Time**, choose the we
 
 Sharing copies are kept in OpenStill's temporary sharing folder so other apps can finish reading them; copies older than seven days are cleaned up when preparing another share. Source photos are never changed. Batch preparation shows progress and keeps same-named photos as separate files. If any photo cannot be prepared, sharing is disabled and the failed filename is shown; no incomplete batch is silently sent. Saving to a folder reports how many copies succeeded if a later copy fails. No Google or Dropbox developer registration is required.
 
+## Layouts and keyboard shortcuts
+
+**Settings → Layout** (or **View → Lightroom Classic Layout** ⌃⌘1 / **Luminar Neo Layout** ⌃⌘2) switches how the window is arranged. Your photos, edits and shortcuts stay the same.
+- **Luminar Neo** (the default) puts the photo first. There are icon rails at both edges and one tool panel on the right, with the filmstrip under the photo. The workspaces are called **Catalog** and **Edit**. It suits quick edits.
+- **Lightroom Classic** has panels on both sides.
+  - **Library:** folders and collections are on the left, and photo info is on the right.
+  - **Develop:** Presets and History are stacked on the left, with the histogram and adjustments on the right.
+  - The filmstrip runs across the whole window, and the panels have squarer corners.
+
+**Settings → Shortcuts** lists every command and its shortcut:
+- **What you can change:** every menu command, plus the single keys used in the library grid (ratings, labels, flags, open) and on the photo (clipping, before/after, compare, next and previous, Trash, brush size). A search box finds commands by name or by keys, e.g. “export” or “⌘E”.
+- **How to change one:** click a shortcut, then press the new keys. Delete removes it and Escape cancels.
+- **Conflicts:** if the keys already belong to another command, OpenStill asks before moving them. For example, giving Open ⌘P takes it from Print.
+- **Resetting:** each changed shortcut has a reset button, and **Restore All Defaults** puts everything back.
+- **Rules:** menu shortcuts need ⌘, ⌃ or ⌥, or a function or arrow key, so they don't get in the way of typing.
+- **Fixed keys:** slideshow keys and the arrow keys that nudge the Sunrays source point can't be changed.
+
 ## Performance
 
 - **Rendering:** all rendering goes through a few long-lived Core Image contexts on the Mac's Metal GPU. Masks, overlays and selections no longer create a new context each time.

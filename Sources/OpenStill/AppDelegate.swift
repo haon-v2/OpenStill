@@ -8,6 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         createWindow()
+        Shortcuts.registerKeys()
         buildMenu()
         NSApp.activate(ignoringOtherApps: true)
         updates.checkAtLaunch()
@@ -49,12 +50,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             main.addItem(item)
             return submenu
         }
+        /// Every command goes through the shortcut map, so its shortcut can be changed in Settings → Shortcuts.
         func add(_ menu: NSMenu, _ title: String, _ action: Selector, _ key: String = "", target: AnyObject? = nil,
                  modifiers: NSEvent.ModifierFlags = .command) {
-            let item = NSMenuItem(title: title, action: action, keyEquivalent: key)
-            item.target = target
-            item.keyEquivalentModifierMask = modifiers
-            menu.addItem(item)
+            let slug = (menu.title + "." + title).lowercased().map { $0.isLetter || $0.isNumber || $0 == "." ? String($0) : "-" }.joined()
+            menu.addItem(Shortcuts.menuItem(slug, title: title, group: menu.title == "OpenStill" ? "App" : menu.title, action: action, key: key, modifiers: modifiers, target: target))
         }
         let app = menu("OpenStill")
         add(app, "About OpenStill", #selector(showAbout), target: self)
@@ -90,6 +90,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let view = menu("View")
         add(view, "Photo Library", #selector(ViewerController.showLibrary), "g", target: viewer, modifiers: [.command, .option])
         add(view, "Edit Photograph", #selector(ViewerController.showEditor), "e", target: viewer, modifiers: [.command, .option])
+        view.addItem(.separator())
+        add(view, "Lightroom Classic Layout", #selector(ViewerController.useLightroomLayout), "1", target: viewer, modifiers: [.command, .control])
+        add(view, "Luminar Neo Layout", #selector(ViewerController.useLuminarLayout), "2", target: viewer, modifiers: [.command, .control])
         view.addItem(.separator())
         add(view, "Zoom In", #selector(ViewerController.zoomIn), "+", target: viewer)
         add(view, "Zoom Out", #selector(ViewerController.zoomOut), "-", target: viewer)

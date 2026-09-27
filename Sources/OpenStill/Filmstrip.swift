@@ -93,12 +93,11 @@ final class NavigationCollectionView: NSCollectionView {
             applyPhotoSelection()
             return
         }
-        switch event.keyCode {
-        case 51, 117:
-            if !event.isARepeat { requestTrash?() }
-        case 123, 126: navigate?(-1)
-        case 124, 125: navigate?(1)
-        default: super.keyDown(with: event)
+        switch Shortcuts.command(for: event, in: .editor) {
+        case "editor.trash": if !event.isARepeat { requestTrash?() }
+        case "editor.previousAlt", "editor.previousSpace": navigate?(-1)
+        case "editor.nextAlt", "editor.nextSpace": navigate?(1)
+        default: if let step = Shortcuts.menuStep(for: event) { navigate?(step) } else { super.keyDown(with: event) }
         }
     }
 }

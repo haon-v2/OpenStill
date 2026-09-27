@@ -442,12 +442,49 @@ final class EditorPanel: GlassChrome {
             self.toolsScroll.reflectScrolledClipView(self.toolsScroll.contentView)
         }
     }
+    /// In the Lightroom layout Presets and History live in a panel on the left, as in Develop; this panel keeps Edit and Info.
+    private(set) var sidePanel: NSView?
+    private var sideTitles: [NSTextField] = []
+    func movePresetsAndHistory(to side: NSView?) {
+        guard side !== sidePanel else { return }
+        for view in [presetScroll, historyScroll] { view.removeFromSuperview() }
+        sideTitles.forEach { $0.removeFromSuperview() }; sideTitles = []
+        sidePanel = side
+        if let side {
+            let presets = NSTextField(labelWithString: "Presets"), history = NSTextField(labelWithString: "History")
+            for (title, scroll) in [(presets, presetScroll), (history, historyScroll)] {
+                title.font = .systemFont(ofSize: 15, weight: .semibold)
+                for v in [title, scroll] as [NSView] { v.translatesAutoresizingMaskIntoConstraints = false; side.addSubview(v) }
+                scroll.isHidden = false
+            }
+            sideTitles = [presets, history]
+            NSLayoutConstraint.activate([
+                presets.topAnchor.constraint(equalTo: side.topAnchor, constant: 16), presets.leadingAnchor.constraint(equalTo: side.leadingAnchor, constant: 16),
+                presetScroll.topAnchor.constraint(equalTo: presets.bottomAnchor, constant: 6), presetScroll.leadingAnchor.constraint(equalTo: side.leadingAnchor),
+                presetScroll.trailingAnchor.constraint(equalTo: side.trailingAnchor), presetScroll.heightAnchor.constraint(equalTo: side.heightAnchor, multiplier: 0.58),
+                history.topAnchor.constraint(equalTo: presetScroll.bottomAnchor, constant: 10), history.leadingAnchor.constraint(equalTo: presets.leadingAnchor),
+                historyScroll.topAnchor.constraint(equalTo: history.bottomAnchor, constant: 6), historyScroll.leadingAnchor.constraint(equalTo: side.leadingAnchor),
+                historyScroll.trailingAnchor.constraint(equalTo: side.trailingAnchor), historyScroll.bottomAnchor.constraint(equalTo: side.bottomAnchor, constant: -10),
+            ])
+            lutBrowser.setActive(true)
+            if activeTab == 1 || activeTab == 2 { showTab(0) }
+        } else {
+            for scroll in [presetScroll, historyScroll] {
+                body.addSubview(scroll)
+                NSLayoutConstraint.activate([scroll.topAnchor.constraint(equalTo: body.topAnchor), scroll.bottomAnchor.constraint(equalTo: body.bottomAnchor),
+                                             scroll.leadingAnchor.constraint(equalTo: body.leadingAnchor), scroll.trailingAnchor.constraint(equalTo: body.trailingAnchor)])
+            }
+            showTab(activeTab)
+        }
+    }
     func showTab(_ index: Int) {
+        // With Presets and History on the left, they're always visible there; this panel stays on its tab.
+        if sidePanel != nil, index == 1 || index == 2 { sectionChanged?(index); return }
         command?("finishMask")
         activeTab = index
-        lutBrowser.setActive(index == 1)
-        for (i, view) in [toolsScroll, presetScroll, historyScroll, info].enumerated() { view.isHidden = i != index }
-        sectionTitle.stringValue = ["Edit", "Presets", "History", "Info"][index]
+        lutBrowser.setActive(index == 1 || sidePanel != nil)
+        for (i, view) in [toolsScroll, presetScroll, historyScroll, info].enumerated() where sidePanel == nil || i == 0 || i == 3 { view.isHidden = i != index }
+        sectionTitle.stringValue = [sidePanel == nil ? "Edit" : "Develop", "Presets", "History", "Info"][index]
         sectionChanged?(index)
     }
     func openTool(_ name: String, masking: Bool = false) {

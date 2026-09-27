@@ -262,3 +262,20 @@ Automated fixtures are generated and contain no user photographs. The real S9 fi
   - Pixel conversions matching the simple loops, including NaN rejection and huge values.
   - Renders reusing the shared contexts.
 - **Not done:** moving the Core Image kernels to precompiled Metal, and an MTKView canvas (see README → Performance).
+
+## Layouts and customizable shortcuts — September 27, 2026
+
+- **Added:**
+  - A Lightroom Classic layout alongside the Luminar Neo one, chosen in Settings → Layout (with illustrated cards) or from the View menu, and remembered.
+  - Every menu command and single-key shortcut can be changed in Settings → Shortcuts: a searchable list with a keycap-style recorder, conflict prompts, per-command reset and Restore All Defaults.
+  - Settings is now in three tabs: General, Layout and Shortcuts.
+- **Automated tests (ShortcutTests):**
+  - Key combos: display, spoken form, text form and JSON round trip, including rejected input.
+  - Saving, reloading, removing and resetting shortcuts.
+  - Conflicts, including the ⌘O→⌘P example and single-key scopes.
+  - Looking up a key press in the library and on the photo.
+  - Search by name, group or keys.
+  - The layout choice being remembered.
+- **Not yet verified by hand on a Mac:**
+  - Both layouts in the library and while editing.
+  - Recording shortcuts, including ⌘ combos that already belong to a menu.

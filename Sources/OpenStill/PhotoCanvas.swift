@@ -476,18 +476,18 @@ final class PhotoCanvas: NSView {
             if event.keyCode == 126 { sunPosition.y += step }
             sunPlaced?(sunPosition,true); return
         }
-        if tool == .maskBrush, let key = event.charactersIgnoringModifiers, ["[","]"].contains(key) { resizeMaskBrush?(key == "[" ? -1 : 1);return }
-        if event.modifierFlags.intersection([.command, .control, .option]).isEmpty, let key = event.charactersIgnoringModifiers?.lowercased() {
-            let action: (() -> Void)? = switch key { case "j": toggleClipping; case "y": toggleSplit; case "\\": toggleCompare; default: nil }
-            if let action { action(); return }
-        }
-        switch event.keyCode {
-        case 51, 117:
-            if !event.isARepeat { requestTrash?() }
-        case 123, 126: navigate?(-1)
-        case 124, 125, 49: navigate?(event.modifierFlags.contains(.shift) ? -1 : 1)
-        case 53: escape?()
-        default: super.keyDown(with: event)
+        // Keys come from Settings → Shortcuts (← and → are the View menu's Previous/Next Photo).
+        switch Shortcuts.command(for: event, in: .editor) {
+        case "editor.brushSmaller" where tool == .maskBrush: resizeMaskBrush?(-1)
+        case "editor.brushLarger" where tool == .maskBrush: resizeMaskBrush?(1)
+        case "editor.clipping": toggleClipping?()
+        case "editor.split": toggleSplit?()
+        case "editor.compare": toggleCompare?()
+        case "editor.trash": if !event.isARepeat { requestTrash?() }
+        case "editor.previousAlt", "editor.previousSpace": navigate?(-1)
+        case "editor.nextAlt", "editor.nextSpace": navigate?(1)
+        case "editor.escape": escape?()
+        default: if let step = Shortcuts.menuStep(for: event) { navigate?(step) } else { super.keyDown(with: event) }
         }
     }
     override func menu(for event: NSEvent) -> NSMenu? { photoMenu?() }
