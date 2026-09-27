@@ -17,7 +17,7 @@ extension ViewerController {
         let open = layoutMode == .lightroom ? info.lightroomToolOpen : nil
         let active = canvas.tool != .browse
         switch canvas.tool {
-        case .crop: editingCommand("applyCrop")
+        case .crop: finishCrop()
         case .browse: break
         default: finishMaskEditing(); canvas.clearTool()
         }
@@ -30,8 +30,14 @@ extension ViewerController {
     func closeLightroomTool() {
         guard layoutMode == .lightroom, info.lightroomToolOpen != nil else { return }
         info.showLightroomTool(nil)
-        if canvas.tool == .crop { editingCommand("applyCrop") }
+        if canvas.tool == .crop { finishCrop() }
         if canvas.tool == .eyeFix { canvas.clearTool() }
+    }
+
+    /// Applies a drawn crop; with no frame drawn (or the whole photo) it just leaves Crop.
+    private func finishCrop() {
+        if let rect = canvas.cropSelection, rect.width > 0.01, rect.height > 0.01, rect.width < 0.999 || rect.height < 0.999 { editingCommand("applyCrop") }
+        if canvas.tool == .crop { canvas.clearTool() }
     }
 
     // MARK: Mask layers
