@@ -73,7 +73,15 @@ enum LayoutDump {
                 func list(_ v: NSView) {
                     if visible(v), v is NSControl || v is NSScrollView || v is NSImageView {
                         let f = v.convert(v.bounds, to: nil)
-                        let text = (v as? NSTextField)?.stringValue ?? (v as? NSButton)?.title ?? (v as? NSPopUpButton)?.titleOfSelectedItem ?? (v as? NSSegmentedControl).map { c in (0..<c.segmentCount).map { c.label(forSegment: $0) ?? "" }.joined(separator: "|") + " sel=\(c.selectedSegment)" } ?? ""
+                        var text = ""
+                        if let field = v as? NSTextField { text = field.stringValue }
+                        else if let popup = v as? NSPopUpButton { text = popup.titleOfSelectedItem ?? "" }
+                        else if let button = v as? NSButton { text = button.title }
+                        else if let control = v as? NSSegmentedControl {
+                            var labels: [String] = []
+                            for i in 0..<control.segmentCount { labels.append(control.label(forSegment: i) ?? "") }
+                            text = labels.joined(separator: "|") + " sel=\(control.selectedSegment)"
+                        }
                         print("VIEW \(path) \(type(of: v)) \(Int(f.minX)),\(Int(f.minY)) \(Int(f.width))x\(Int(f.height)) enabled=\((v as? NSControl)?.isEnabled ?? true) “\(text.prefix(70))”")
                     }
                     v.subviews.forEach(list)
