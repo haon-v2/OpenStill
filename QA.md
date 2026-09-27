@@ -376,3 +376,35 @@ Automated fixtures are generated and contain no user photographs. The real S9 fi
   - Auto Import with a real tethering app.
   - ⌥1–9 keyword sets.
 
+## Workflow: Edit In, after export, Smart Previews, catalog, Book and more — September 27, 2026
+
+- **Added:**
+  - Edit In another app.
+  - After-export actions: Finder, an app, or a script.
+  - Smart Previews for photos on disconnected drives.
+  - Catalog backups (manual and on quit).
+  - Export and import as catalog, and moving the catalog folder.
+  - The Secondary Display window.
+  - The Book module with PDF output.
+  - Auto Sync.
+  - Adaptive presets (subject, background, sky).
+  - A custom identity plate.
+- **Automated tests (WorkflowM13Tests):**
+  - Edit In renders a TIFF copy with a unique name, carries the rating and stacks it on top.
+  - After-export scripts get the files, and settings from before the option existed still load.
+  - A Smart Preview stands in for a missing original: the record is found, and it renders and edits.
+  - Backups are dated and pruned, and the backup copy of the catalog opens.
+  - The schedule decides when a backup is due.
+  - Export as Catalog round-trips edits.
+  - Book pages lay out inside the page and save a PDF with the right page count.
+  - Auto Sync copies only what changed.
+  - Adaptive presets set their tools and masks, with the background inverted.
+  - Book is a module, and the catalog location is remembered.
+- **Not yet verified by hand on a Mac:**
+  - Edit In round trip with Photoshop or Affinity.
+  - Editing with the drive ejected.
+  - Book PDF on paper.
+  - Secondary Display on a second monitor.
+  - Auto Sync with a filmstrip selection.
+  - Sky presets with local AI installed.
+
