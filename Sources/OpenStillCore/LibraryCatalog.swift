@@ -157,6 +157,7 @@ public struct CatalogPhoto: Equatable, Sendable {
     mutating func apply(_ record: PhotoRecord) {
         id = record.id; fingerprint = record.contentFingerprint; rating = record.rating; flag = record.flag; label = record.colorLabel
         edited = record.isEdited; let m = record.iptc; title = m.title; caption = m.caption; keywords = m.keywordPaths
+        if let g = record.geotag { latitude = g.latitude; longitude = g.longitude }
     }
     /// True when free text matches the filename, title, caption, keywords, camera or lens.
     public func matches(text: String) -> Bool {
@@ -309,11 +310,12 @@ public final class LibraryCatalog {
         CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
         """)
         try execute("INSERT OR IGNORE INTO meta(key, value) VALUES('schema', '\(Self.schemaVersion)')")
+        try prepareFaces()
     }
     deinit { sqlite3_close(db) }
 
     // MARK: SQLite helpers
-    private func execute(_ sql: String) throws {
+    func execute(_ sql: String) throws {
         lock.lock(); defer { lock.unlock() }
         var error: UnsafeMutablePointer<CChar>?
         if sqlite3_exec(db, sql, nil, nil, &error) != SQLITE_OK {
@@ -321,10 +323,10 @@ public final class LibraryCatalog {
             throw CatalogError.sqlite(message)
         }
     }
-    private enum Value { case text(String), int(Int64), real(Double), null }
+    enum Value { case text(String), int(Int64), real(Double), blob(Data), null }
     private static let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
     @discardableResult
-    private func run(_ sql: String, _ values: [Value] = [], row: ((OpaquePointer) -> Void)? = nil) throws -> Int {
+    func run(_ sql: String, _ values: [Value] = [], row: ((OpaquePointer) -> Void)? = nil) throws -> Int {
         lock.lock(); defer { lock.unlock() }
         var statement: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK, let statement else { throw CatalogError.sqlite(String(cString: sqlite3_errmsg(db))) }
@@ -335,6 +337,7 @@ public final class LibraryCatalog {
             case .text(let s): sqlite3_bind_text(statement, index, s, -1, Self.transient)
             case .int(let n): sqlite3_bind_int64(statement, index, n)
             case .real(let d): sqlite3_bind_double(statement, index, d)
+            case .blob(let d): _ = d.withUnsafeBytes { sqlite3_bind_blob(statement, index, $0.baseAddress, Int32($0.count), Self.transient) }
             case .null: sqlite3_bind_null(statement, index)
             }
         }
@@ -347,14 +350,14 @@ public final class LibraryCatalog {
         }
         return rows
     }
-    private func transaction(_ body: () throws -> Void) throws {
+    func transaction(_ body: () throws -> Void) throws {
         lock.lock(); defer { lock.unlock() }
         try execute("BEGIN IMMEDIATE")
         do { try body(); try execute("COMMIT") } catch { try? execute("ROLLBACK"); throw error }
     }
-    private static func text(_ s: OpaquePointer, _ i: Int32) -> String { sqlite3_column_text(s, i).map { String(cString: $0) } ?? "" }
-    private static func real(_ s: OpaquePointer, _ i: Int32) -> Double? { sqlite3_column_type(s, i) == SQLITE_NULL ? nil : sqlite3_column_double(s, i) }
-    private func optional(_ d: Double?) -> Value { d.map { .real($0) } ?? .null }
+    static func text(_ s: OpaquePointer, _ i: Int32) -> String { sqlite3_column_text(s, i).map { String(cString: $0) } ?? "" }
+    static func real(_ s: OpaquePointer, _ i: Int32) -> Double? { sqlite3_column_type(s, i) == SQLITE_NULL ? nil : sqlite3_column_double(s, i) }
+    func optional(_ d: Double?) -> Value { d.map { .real($0) } ?? .null }
 
     public func value(_ key: String) -> String? {
         var out: String?; _ = try? run("SELECT value FROM meta WHERE key = ?", [.text(key)]) { out = Self.text($0, 0) }; return out
@@ -411,8 +414,10 @@ public final class LibraryCatalog {
     public func updateRecord(_ record: PhotoRecord) throws {
         var p = CatalogPhoto(id: record.id, path: record.sourcePath); p.apply(record)
         try transaction {
-            let changed = try run("UPDATE photos SET rating=?, flag=?, label=?, edited=?, title=?, caption=?, fingerprint=? WHERE id=? RETURNING id",
-                                  [.int(Int64(p.rating)), .text(p.flag.rawValue), .text(p.label.rawValue), .int(p.edited ? 1 : 0), .text(p.title), .text(p.caption), .text(p.fingerprint), .text(p.id.uuidString)])
+            // A location set in OpenStill replaces the file's GPS; without one the file's position stays.
+            let changed = try run("UPDATE photos SET rating=?, flag=?, label=?, edited=?, title=?, caption=?, fingerprint=?, latitude=COALESCE(?, latitude), longitude=COALESCE(?, longitude) WHERE id=? RETURNING id",
+                                  [.int(Int64(p.rating)), .text(p.flag.rawValue), .text(p.label.rawValue), .int(p.edited ? 1 : 0), .text(p.title), .text(p.caption), .text(p.fingerprint),
+                                   optional(record.geotag?.latitude), optional(record.geotag?.longitude), .text(p.id.uuidString)])
             if changed > 0 { try replaceKeywords(p.id, p.keywords) }
         }
     }

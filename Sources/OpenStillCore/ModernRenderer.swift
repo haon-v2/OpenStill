@@ -116,7 +116,7 @@ public enum ModernRenderer {
         return image.cropped(to:CGRect(x:0,y:0,width:image.extent.width.rounded(.down),height:image.extent.height.rounded(.down)))
     }
     /// Writes an export. `sdrImage` is the SDR rendition used as the base of a gain-map export (else the HDR image is tone mapped).
-    public static func export(_ image: CIImage, to destination: URL, source: URL?, settings: ExportSettings, metadata: IPTCMetadata? = nil, sdrImage: CIImage? = nil) throws {
+    public static func export(_ image: CIImage, to destination: URL, source: URL?, settings: ExportSettings, metadata: IPTCMetadata? = nil, location: GeoLocation? = nil, sdrImage: CIImage? = nil) throws {
         let settings = settings.sanitized
         if let source {
             guard source.standardizedFileURL.resolvingSymlinksInPath() != destination.standardizedFileURL.resolvingSymlinksInPath() else { throw EditError.originalDestination }
@@ -134,6 +134,8 @@ public enum ModernRenderer {
             for key in [kCGImagePropertyExifDictionary, kCGImagePropertyTIFFDictionary, kCGImagePropertyIPTCDictionary, kCGImagePropertyExifAuxDictionary] { props[key as String] = original[key as String] }
             if settings.keepGPS { props[kCGImagePropertyGPSDictionary as String] = original[kCGImagePropertyGPSDictionary as String] }
         }
+        // A location set in OpenStill replaces the camera's, under the same "keep GPS" choice.
+        if settings.keepMetadata, settings.keepGPS, let g = location?.valid { props[kCGImagePropertyGPSDictionary as String] = g.gpsProperties }
         props[kCGImagePropertyOrientation as String] = 1
         var tiff = props[kCGImagePropertyTIFFDictionary as String] as? [String: Any] ?? [:]
         tiff["Orientation"] = 1; tiff["Software"] = "OpenStill"; props[kCGImagePropertyTIFFDictionary as String] = tiff

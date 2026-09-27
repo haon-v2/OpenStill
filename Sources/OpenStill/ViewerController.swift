@@ -569,6 +569,21 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         window.imported = { [weak self] urls in guard let self, !urls.isEmpty else { return }; self.open(urls); self.showLibrary() }
         window.showWindow(nil); window.window?.makeKeyAndOrderFront(nil)
     }
+    private var tether: TetherWindow?
+    @objc func tetheredCapture() {
+        let window = tether ?? TetherWindow(); tether = window
+        window.shotArrived = { [weak self] url in self?.showTetheredShot(url) }
+        window.showWindow(nil); window.window?.makeKeyAndOrderFront(nil)
+    }
+    /// A new tethered shot opens in the editor: added to the open session folder, or the folder is opened first.
+    private func showTetheredShot(_ url: URL) {
+        if urls.contains(url) || folderURL?.standardizedFileURL.path == url.deletingLastPathComponent().standardizedFileURL.path {
+            addMergedPhoto(url)
+            if let index = urls.firstIndex(of: url) { if isLibrary { showEditor() }; select(index) }
+        } else {
+            open([url]); showEditor()
+        }
+    }
     private var lightroomImport: LightroomImportWindow?
     @objc func importLightroomCatalog() {
         let window = lightroomImport ?? LightroomImportWindow(); lightroomImport = window

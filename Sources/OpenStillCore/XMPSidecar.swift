@@ -8,6 +8,8 @@ public struct XMPMetadata: Equatable {
     public var flag: PhotoFlag?
     public var label: ColorLabel?
     public var iptc = IPTCMetadata()
+    /// `exif:GPSLatitude` / `exif:GPSLongitude`, as Lightroom writes a geotag.
+    public var location: GeoLocation?
     /// Camera Raw settings (`crs:` namespace) with simple values, by name, e.g. "Exposure2012": "+0.50".
     public var cameraRaw: [String: String] = [:]
     /// Camera Raw settings that are lists, e.g. "ToneCurvePV2012": ["0, 0", "255, 255"].
@@ -15,12 +17,12 @@ public struct XMPMetadata: Equatable {
     public init() {}
     /// Whether anything differs from an unrated, unflagged, unlabeled photo without metadata.
     public var isSet: Bool { (rating ?? 0) > 0 || (flag ?? PhotoFlag.none) != PhotoFlag.none || (label ?? ColorLabel.none) != ColorLabel.none || !iptc.isEmpty }
-    public var hasLibraryMetadata: Bool { rating != nil || flag != nil || label != nil || !iptc.isEmpty }
+    public var hasLibraryMetadata: Bool { rating != nil || flag != nil || label != nil || !iptc.isEmpty || location != nil }
     public var hasDevelopSettings: Bool { cameraRaw.keys.contains { !XMPSidecar.bookkeeping.contains($0) } || !cameraRawLists.isEmpty }
 
     /// The library fields of a record, as they are written to XMP.
     public init(record: PhotoRecord) {
-        rating = record.rating; flag = record.flag; label = record.colorLabel; iptc = record.iptc
+        rating = record.rating; flag = record.flag; label = record.colorLabel; iptc = record.iptc; location = record.geotag
     }
     /// Copies rating, flag, label and metadata into a record. Fields missing from the XMP are left alone.
     public func apply(to record: inout PhotoRecord) {
@@ -28,6 +30,7 @@ public struct XMPMetadata: Equatable {
         if let flag { record.flag = flag }
         if let label { record.colorLabel = label }
         if !iptc.isEmpty { record.iptc = record.iptc.isEmpty ? iptc : record.iptc.applying(iptc) }
+        if let location { record.geotag = location }
     }
 }
 
@@ -55,6 +58,7 @@ public enum XMPSidecar {
         static let iptc = "http://iptc.org/std/Iptc4xmpCore/1.0/xmlns/"
         static let lightroom = "http://ns.adobe.com/lightroom/1.0/"
         static let cameraRaw = "http://ns.adobe.com/camera-raw-settings/1.0/"
+        static let exif = "http://ns.adobe.com/exif/1.0/"
         static let openStill = "https://github.com/haon-v2/OpenStill/ns/1.0/"
     }
     /// Camera Raw bookkeeping values that aren't develop settings.
@@ -77,6 +81,7 @@ public enum XMPSidecar {
     static func parse(_ metadata: CGImageMetadata) -> XMPMetadata {
         var out = XMPMetadata()
         var subjects: [String] = [], hierarchy: [String] = []
+        var latitude: Double?, longitude: Double?, altitude: Double?, altitudeBelow = false
         CGImageMetadataEnumerateTagsUsingBlock(metadata, nil, nil) { _, tag in
             guard let namespace = CGImageMetadataTagCopyNamespace(tag) as String?, let name = CGImageMetadataTagCopyName(tag) as String? else { return true }
             let text = string(tag), list = strings(tag)
@@ -99,6 +104,10 @@ public enum XMPSidecar {
             case (Namespace.photoshop, "State"): out.iptc.state = text ?? ""
             case (Namespace.photoshop, "Country"): out.iptc.country = text ?? ""
             case (Namespace.iptc, "Location"): out.iptc.location = text ?? ""
+            case (Namespace.exif, "GPSLatitude"): latitude = text.flatMap(GeoLocation.parseXMPCoordinate)
+            case (Namespace.exif, "GPSLongitude"): longitude = text.flatMap(GeoLocation.parseXMPCoordinate)
+            case (Namespace.exif, "GPSAltitude"): altitude = text.flatMap(Self.rational)
+            case (Namespace.exif, "GPSAltitudeRef"): altitudeBelow = text?.trimmingCharacters(in: .whitespaces) == "1"
             case (Namespace.cameraRaw, _):
                 switch CGImageMetadataTagGetType(tag) {
                 case .string: if let text { out.cameraRaw[name] = text }
@@ -114,7 +123,14 @@ public enum XMPSidecar {
         let parts = Set(paths.flatMap { $0.components(separatedBy: " > ").map { $0.lowercased() } })
         out.iptc.keywords = paths + subjects.filter { !parts.contains($0.lowercased()) }
         out.iptc = out.iptc.sanitized
+        if let latitude, let longitude { out.location = GeoLocation(latitude: latitude, longitude: longitude, altitude: altitude.map { altitudeBelow ? -$0 : $0 }).valid }
         return out
+    }
+    /// "1234/10" or "123.4".
+    static func rational(_ text: String) -> Double? {
+        let parts = text.split(separator: "/").map { Double($0.trimmingCharacters(in: .whitespaces)) }
+        if parts.count == 2, let n = parts[0], let d = parts[1], d != 0 { return n / d }
+        return parts.count == 1 ? parts[0] : nil
     }
     /// The tags in an array value (lists and alternative text come back as arrays of tags).
     static func elements(_ value: CFTypeRef?) -> [CGImageMetadataTag] {
@@ -155,7 +171,7 @@ public enum XMPSidecar {
         let base = existing.flatMap { CGImageMetadataCreateFromXMPData($0 as CFData) }
         guard let metadata = base.flatMap({ CGImageMetadataCreateMutableCopy($0) }) ?? CGImageMetadataCreateMutable() as CGMutableImageMetadata? else { throw XMPError.unwritable }
         for (namespace, prefix) in [(Namespace.xmp, "xmp"), (Namespace.dc, "dc"), (Namespace.photoshop, "photoshop"), (Namespace.iptc, "Iptc4xmpCore"),
-                                    (Namespace.lightroom, "lr"), (Namespace.openStill, "openstill")] {
+                                    (Namespace.lightroom, "lr"), (Namespace.openStill, "openstill"), (Namespace.exif, "exif")] {
             // Fails harmlessly when the packet already declares the namespace.
             CGImageMetadataRegisterNamespaceForPrefix(metadata, namespace as CFString, prefix as CFString, nil)
         }
@@ -192,6 +208,16 @@ public enum XMPSidecar {
         set(Namespace.photoshop, "photoshop", "State", .string, text(m.state))
         set(Namespace.photoshop, "photoshop", "Country", .string, text(m.country))
         set(Namespace.iptc, "Iptc4xmpCore", "Location", .string, text(m.location))
+        // Only a location set in OpenStill is written; GPS other apps put in the sidecar is otherwise left alone.
+        if let g = xmp.location?.valid {
+            set(Namespace.exif, "exif", "GPSLatitude", .string, GeoLocation.xmpCoordinate(g.latitude, positive: "N", negative: "S"))
+            set(Namespace.exif, "exif", "GPSLongitude", .string, GeoLocation.xmpCoordinate(g.longitude, positive: "E", negative: "W"))
+            set(Namespace.exif, "exif", "GPSVersionID", .string, "2.3.0.0")
+            if let a = g.altitude {
+                set(Namespace.exif, "exif", "GPSAltitude", .string, "\(Int((abs(a) * 100).rounded()))/100")
+                set(Namespace.exif, "exif", "GPSAltitudeRef", .string, a < 0 ? "1" : "0")
+            }
+        }
         guard let data = CGImageMetadataCreateXMPData(metadata, nil) as Data? else { throw XMPError.unwritable }
         return data
     }
