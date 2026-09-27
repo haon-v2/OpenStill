@@ -67,6 +67,7 @@ final class ShootWindow:NSWindowController,NSCollectionViewDataSource,NSCollecti
     var collectionsChanged:(()->Void)?
     private var metadataWindow:MetadataWindow?
     private var duplicatesWindow:DuplicatesWindow?
+    private var outputWindows:[OutputWindow]=[]
     private let queue=OperationQueue(),cache=NSCache<NSString,NSImage>()
     private let search = NSSearchField()
     private var preferredURL: URL?
@@ -97,7 +98,7 @@ final class ShootWindow:NSWindowController,NSCollectionViewDataSource,NSCollecti
         if embedded {
             let more = NSPopUpButton(frame:.zero,pullsDown:true)
             more.addItem(withTitle:"Actions")
-            for (title, action) in [("Edit selected",#selector(openSelected)),("Compare two",#selector(compareSelected)),("Edit metadata…",#selector(editMetadata)),("Write metadata to XMP",#selector(writeXMP)),("Read metadata from XMP",#selector(readXMP)),("Import Camera Raw edits from XMP",#selector(importCameraRaw)),("Add to collection…",#selector(addToCollection)),("Find duplicates…",#selector(findDuplicates)),("Merge to HDR…",#selector(mergeHDR)),("Merge to panorama…",#selector(mergePanorama)),("Focus stack…",#selector(mergeFocusStack)),("Remove from this collection",#selector(removeFromCollection)),("Copy adjustments",#selector(copyAdjustments)),("Paste adjustments…",#selector(pasteAdjustments)),("Undo batch",#selector(undoBatch)),("Export selected…",#selector(exportSelection)),("Refresh",#selector(refreshAction))] {
+            for (title, action) in [("Edit selected",#selector(openSelected)),("Compare two",#selector(compareSelected)),("Edit metadata…",#selector(editMetadata)),("Write metadata to XMP",#selector(writeXMP)),("Read metadata from XMP",#selector(readXMP)),("Import Camera Raw edits from XMP",#selector(importCameraRaw)),("Add to collection…",#selector(addToCollection)),("Find duplicates…",#selector(findDuplicates)),("Merge to HDR…",#selector(mergeHDR)),("Merge to panorama…",#selector(mergePanorama)),("Focus stack…",#selector(mergeFocusStack)),("Remove from this collection",#selector(removeFromCollection)),("Copy adjustments",#selector(copyAdjustments)),("Paste adjustments…",#selector(pasteAdjustments)),("Undo batch",#selector(undoBatch)),("Export selected…",#selector(exportSelection)),("Print…",#selector(printPhotos)),("Slideshow…",#selector(slideshow)),("Web gallery…",#selector(webGallery)),("Publish…",#selector(publishPhotos)),("Refresh",#selector(refreshAction))] {
                 let item=NSMenuItem(title:title,action:action,keyEquivalent:"");item.target=self;more.menu?.addItem(item)
             }
             top=NSStackView(views:[minimum,flag,labelFilter,sort,NSView(),more])
@@ -275,6 +276,13 @@ final class ShootWindow:NSWindowController,NSCollectionViewDataSource,NSCollecti
         }
         if let window=browserView.window ?? window{alert.beginSheetModal(for:window,completionHandler:run)}else{run(alert.runModal())}
     }
+    /// The selected photos, or every photo shown when nothing is selected.
+    private var outputItems:[ShootItem]{selectedItems.isEmpty ? shown:selectedItems}
+    private func present(_ window:OutputWindow){outputWindows.removeAll{$0.window?.isVisible != true};outputWindows.append(window);window.showWindow(nil);window.window?.makeKeyAndOrderFront(nil)}
+    @objc private func printPhotos(){guard !outputItems.isEmpty else{message.stringValue="Open photos to print.";return};present(PrintWindow(items:outputItems))}
+    @objc private func slideshow(){guard !outputItems.isEmpty else{message.stringValue="Open photos for a slideshow.";return};present(SlideshowWindow(items:outputItems))}
+    @objc private func webGallery(){guard !outputItems.isEmpty else{message.stringValue="Open photos for a gallery.";return};present(GalleryWindow(items:outputItems))}
+    @objc private func publishPhotos(){present(PublishWindow(items:selectedItems,library:all))}
     /// Exact copies and near-duplicates among the selected photos, or all shown photos when none (or one) is selected.
     @objc private func findDuplicates(){
         let chosen=selectedItems.count>1 ? selectedItems:shown;guard chosen.count>1 else{message.stringValue="Open a folder with at least two photos to look for duplicates.";return}

@@ -204,3 +204,22 @@ Automated fixtures are generated and contain no user photographs. The real S9 fi
     - focus stacking keeping the sharp half of each frame;
     - largest covered rectangle, cylindrical projection, output names, float TIFF values above white.
 - Not yet verified by hand on a Mac: the HDR preview on an XDR display, HDR exports viewed on HDR screens, and merges of real hand-held brackets, panoramas and focus stacks.
+
+## Print, slideshow, web gallery and publish — September 26, 2026
+
+- Added:
+  - Print (single, contact sheet, custom grid) to the print dialog, PDF or JPEG, with print sharpening, resolution and RGB printer profiles;
+  - full-screen slideshows with transitions, slow zoom, music, and H.264 video export;
+  - self-contained web galleries (grid and lightbox);
+  - publish collections for a folder, Flickr and SmugMug, with new/modified/published tracking and keychain sign-in.
+- Automated tests (OutputTests):
+  - page cells, fitting, pagination, orientation, sanitizing;
+  - a two-page PDF and JPEG pages with the photo and white paper where expected;
+  - print sharpening and scaling to the printed size;
+  - a gallery with escaped titles, numbered images and thumbnails, no outside resources, and rebuilds replacing images;
+  - slideshow frames: pillarboxing, crossfade, fade through black, cut, no fade after the last slide;
+  - video export with the right size, length and looped music;
+  - the OAuth 1.0 specification's example signature and header encoding;
+  - collection state (new, published, modified, pending removal) and saving;
+  - folder publishing that replaces edited photos and removes ones taken out.
+- Not yet verified by hand on a Mac: printing to a real printer, slideshow playback on a display, and Flickr/SmugMug with real accounts.
