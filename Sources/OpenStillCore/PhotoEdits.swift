@@ -74,6 +74,7 @@ public struct PhotoEdits: Codable, Equatable {
             if let ca = e.advanced!.autoCA { e.advanced!.autoCA = ca.sanitized }
             if let colors = e.advanced!.pointColors { e.pointColors = colors }
             if let fixes = e.advanced!.eyeFixes { e.eyeFixes = fixes }
+            if let layers = e.advanced!.localAdjustments { e.localAdjustments = layers }
             e.monochrome = clamp(e.monochrome,0,1); e.blacks = clamp(e.blacks,-1,1); e.whites = clamp(e.whites,-1,1)
             e.straighten = clamp(e.straighten,-20,20); e.lutAmount = clamp(e.lutAmount,0,1); e.sunLength = clamp(e.sunLength,0,1)
             e.advanced!.colors = Array((e.advanced!.colors + [ColorBand](repeating:ColorBand(),count:8)).prefix(8))
@@ -243,7 +244,10 @@ public enum PhotoEditor {
         if e.exposure != 0 { image = image.applyingFilter("CIExposureAdjust",parameters:[kCIInputEVKey:e.exposure]) }
         if e.temperature != 6500 || e.tint != 0 { image = image.applyingFilter("CITemperatureAndTint",parameters:["inputNeutral":CIVector(x:6500,y:0),"inputTargetNeutral":CIVector(x:e.temperature,y:e.tint)]) }
         if e.highlights != 1 || e.shadows != 0 { image = image.applyingFilter("CIHighlightShadowAdjust",parameters:["inputHighlightAmount":e.highlights,"inputShadowAmount":e.shadows]) }
-        if e.contrast != 1 { image = image.applyingFilter("CIColorControls",parameters:[kCIInputContrastKey:e.contrast]) }
+        if e.contrast != 1 {
+            if e.usesSmartContrast { image = try SmartContrast.apply(image, contrast: e.contrast) }
+            else { image = image.applyingFilter("CIColorControls",parameters:[kCIInputContrastKey:e.contrast]) }
+        }
         image = try masked(before,image,"Develop"); before = image
         if stopBeforeTool == "Dehaze" { return image }
         if e.dehaze != 0 { image = try masked(before,try DevelopTools.dehaze(image,amount:e.dehaze),"Dehaze"); before = image }
@@ -278,6 +282,10 @@ public enum PhotoEditor {
         if e.clarity != 0 { image = try masked(before,try DevelopTools.clarity(image,amount:e.clarity),"Clarity"); before = image }
         if stopBeforeTool == "Texture" { return image }
         if e.texture != 0 { image = try masked(before,try DevelopTools.texture(image,amount:e.texture),"Texture"); before = image }
+        // Mask layers: each one's own settings, blended in through its own mask. A layer without a mask does nothing yet.
+        for layer in e.localAdjustments where !layer.hidden && !layer.settings.isNeutral && e.advanced?.masks[layer.maskKey] != nil {
+            image = try masked(before, try LocalAdjustments.apply(image, settings: layer.settings, sourceSize: sourceSize), layer.maskKey); before = image
+        }
         if stopBeforeTool == "Details" { return image }
         if e.sharpness > 0 {
             if e.usesDetailSettings { image = try Detail.sharpen(image, amount: e.sharpness, settings: e.detail, sourceSize: sourceSize) }

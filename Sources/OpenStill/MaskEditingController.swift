@@ -41,7 +41,7 @@ extension ViewerController {
         info.status("Sampling this tool’s input…")
         editQueue.async { [weak self] in
             let result=Result { () -> RangeSelection in
-                let input=try ModernRenderer.render(source:source,recipe:recipe,maximumDimension:1600,stopBeforeTool:key)
+                let input=try ModernRenderer.render(source:source,recipe:recipe,maximumDimension:1600,stopBeforeTool:key.hasPrefix(LocalAdjustment.keyPrefix) ? "Details":key)
                 let x=input.extent.width*point.x,y=input.extent.height*point.y
                 let region=CGRect(x:x-2,y:y-2,width:5,height:5).intersection(input.extent)
                 let average=input.applyingFilter("CIAreaAverage",parameters:[kCIInputExtentKey:CIVector(cgRect:region)])
@@ -77,7 +77,7 @@ extension ViewerController {
         case "clear":
             edits.setMask(nil,for:key); maskVisible = false; maskToken = UUID(); canvas.clearTool()
             changeEdits(edits,title:key+" · Clear mask",commit:true)
-        case "done": finishMaskEditing(); info.status("Mask saved for \(key). Adjust the sliders to edit the selected area.")
+        case "done": finishMaskEditing(); closeLightroomTool(); info.status("Mask saved. Adjust the sliders to edit the selected area.")
         case "show":
             guard edits.advanced?.masks[key] != nil else { info.status("Create a mask for \(key) first."); return }
             maskVisible = !wasVisible; refreshMaskOverlay()
@@ -147,7 +147,7 @@ extension ViewerController {
                 let scale = min(1,1200/max(sourceSize.width,sourceSize.height))
                 let size = CGSize(width:(sourceSize.width*scale).rounded(),height:(sourceSize.height*scale).rounded())
                 let geometry = EditGeometry(size:size,edits:edits)
-                let input=try ModernRenderer.render(source:source,recipe:recipe,maximumDimension:1200,stopBeforeTool:key)
+                let input=try ModernRenderer.render(source:source,recipe:recipe,maximumDimension:1200,stopBeforeTool:key.hasPrefix(LocalAdjustment.keyPrefix) ? "Details":key)
                 let selection=try mask.coverage(geometry:geometry,lens:edits.optics,input:input,modern:recipe.renderer == .linear2020)
                 let overlay = CIImage(color:CIColor(red:1,green:0.08,blue:0.08,alpha:0.42)).cropped(to:geometry.extent)
                     .applyingFilter("CIBlendWithMask",parameters:[kCIInputBackgroundImageKey:CIImage(color:.clear).cropped(to:geometry.extent),kCIInputMaskImageKey:selection])

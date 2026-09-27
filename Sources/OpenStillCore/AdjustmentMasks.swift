@@ -129,6 +129,10 @@ public struct AdvancedEdits: Codable, Equatable {
     public var pointColors: [PointColor]?
     /// Red eye and pet eye corrections.
     public var eyeFixes: [EyeFix]?
+    /// Mask layers: each has its own sliders and its own mask (stored in `masks` under its `maskKey`).
+    public var localAdjustments: [LocalAdjustment]?
+    /// "smart" once Contrast is changed in this version; nil keeps the original contrast curve for older edits.
+    public var contrastModel: String?
     public init() {}
 }
 

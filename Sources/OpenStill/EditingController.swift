@@ -60,6 +60,8 @@ extension ViewerController {
     }
     func changeEdits(_ incoming: PhotoEdits, title: String, commit: Bool) {
         var edits = incoming
+        // Moving Contrast switches this edit to Smart Contrast; untouched older edits keep their look.
+        edits.adoptSmartContrast(changedFrom: currentEdits)
         if title.hasPrefix("Sunrays ·"), currentEdits.advanced?.sunSettings == nil, var sun = edits.advanced?.sunSettings {
             let converted = currentEdits.editableSunSettings(sourceSize:editSourceSize())
             sun.centerX = converted.centerX; sun.centerY = converted.centerY; edits.sunSettings = sun
@@ -159,6 +161,7 @@ extension ViewerController {
     func editingCommand(_ name: String) {
         if name.hasPrefix("lr:") { lightroomCommand(name); return }
         if name.hasPrefix("lib:") { libraryCommand(name); return }
+        if name.hasPrefix("maskLayer:") { maskLayerCommand(name); return }
         if name.hasPrefix("recovery:"),let value=Int(name.dropFirst(9)){var edits=currentEdits;edits.ensureAdvanced();edits.advanced?.rawRecovery=min(9,max(0,value));changeEdits(edits,title:"RAW highlight recovery",commit:true);return}
         if name == "finishMask" {
             if canvas.tool == .sun { canvas.clearTool() }
@@ -281,7 +284,7 @@ extension ViewerController {
         var preset = currentEdits
         preset.ensureAdvanced(); preset.advanced!.masks = [:]; preset.advanced!.rawWhiteBalance = nil; preset.straighten = 0; preset.advanced!.lutAsset = nil; preset.advanced!.lutName = nil; preset.advanced!.lutID = nil; preset.advanced!.aiBackgroundAsset = nil; preset.advanced!.aiFeatureKey = nil; preset.advanced!.transform = nil; preset.advanced!.lensBlur = nil; preset.advanced!.rawDenoise = nil
         // Eye fixes and measured chromatic aberration belong to this photo.
-        preset.advanced!.eyeFixes = nil; preset.advanced!.autoCA = nil
+        preset.advanced!.eyeFixes = nil; preset.advanced!.autoCA = nil; preset.advanced!.localAdjustments = nil
         preset.baseAsset = nil; preset.overlayAsset = nil; preset.crop = nil; preset.rotation = 0; preset.flip = false
         let panel = NSSavePanel(); panel.title = "Save preset"; panel.nameFieldStringValue = "My preset.openstillpreset"; panel.allowedContentTypes = [UTType(filenameExtension: "openstillpreset") ?? .json]
         panel.beginSheetModal(for: window) { [weak self] response in
@@ -301,7 +304,7 @@ extension ViewerController {
                 preset.crop = self.currentEdits.crop; preset.rotation = self.currentEdits.rotation; preset.flip = self.currentEdits.flip
                 preset.ensureAdvanced(); preset.straighten = self.currentEdits.straighten
                 preset.advanced!.masks = self.currentEdits.advanced?.masks ?? [:]; preset.advanced!.transform = self.currentEdits.advanced?.transform; preset.advanced!.lensBlur = self.currentEdits.advanced?.lensBlur; preset.advanced!.rawDenoise = self.currentEdits.advanced?.rawDenoise
-                preset.advanced!.eyeFixes = self.currentEdits.advanced?.eyeFixes; preset.advanced!.autoCA = self.currentEdits.advanced?.autoCA
+                preset.advanced!.eyeFixes = self.currentEdits.advanced?.eyeFixes; preset.advanced!.autoCA = self.currentEdits.advanced?.autoCA; preset.advanced!.localAdjustments = self.currentEdits.advanced?.localAdjustments
                 preset.advanced!.aiBackgroundAsset = self.currentEdits.advanced?.aiBackgroundAsset; preset.advanced!.aiFeatureKey = self.currentEdits.advanced?.aiFeatureKey
                 preset.advanced!.lutAsset = self.currentEdits.advanced?.lutAsset; preset.advanced!.lutName = self.currentEdits.advanced?.lutName; preset.advanced!.lutID = self.currentEdits.advanced?.lutID; preset.lutAmount = self.currentEdits.lutAmount
                 self.changeEdits(preset, title: url.deletingPathExtension().lastPathComponent, commit: true)

@@ -109,6 +109,8 @@ final class ShootWindow:NSWindowController,NSCollectionViewDataSource,NSCollecti
     var keywordsChanged:(()->Void)?
     /// ⌥1–⌥9: the Keywording panel's keyword set.
     var keywordSetKey:((Int)->Void)?
+    /// Delete in the grid: the viewer confirms, then moves the selected photos to the Trash.
+    var trashRequested:(([ShootItem])->Void)?
     private let grid=ShootCollection(),scroll=NSScrollView(),message=NSTextField(labelWithString:"Reading photographs…")
     private let minimum=NSPopUpButton(frame:.zero,pullsDown:false),flag=NSPopUpButton(frame:.zero,pullsDown:false),sort=NSPopUpButton(frame:.zero,pullsDown:false),labelFilter=NSPopUpButton(frame:.zero,pullsDown:false)
     /// Label filter choices: nil = all, then each label, then unlabeled.
@@ -590,6 +592,7 @@ extension ShootWindow {
         case "library.compare":setViewMode(.compare)
         case "library.survey":setViewMode(.survey)
         case "library.filterBar":toggleFilterBar()
+        case "library.trash":trashRequested?(selectedItems)
         case "library.stack":toggleStacks()
         case "library.stackTop":moveToStackTop()
         case let id where id.hasPrefix("library.keywordSet"):keywordSetKey?(Int(id.dropFirst("library.keywordSet".count)) ?? 0)

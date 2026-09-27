@@ -38,6 +38,7 @@ import OpenStillCore
             ("library.loupe", "Loupe view (E)", KeyCombo("e")), ("library.compare", "Compare view (C)", KeyCombo("c")), ("library.survey", "Survey view (N)", KeyCombo("n")),
             ("library.filterBar", "Show or hide the filter bar (\\)", KeyCombo("\\")), ("library.stack", "Open or close a stack (S)", KeyCombo("s")),
             ("library.stackTop", "Move to top of stack (Shift-S)", KeyCombo("s", shift: true)),
+            ("library.trash", "Move selected photos to Trash (Delete)", KeyCombo("delete")),
         ]
         for i in 1...9 { views.append(("library.keywordSet\(i - 1)", "Keyword set keyword \(i) (⌥\(i))", KeyCombo("\(i)", option: true))) }
         for (id, title, combo) in views { map.register(ShortcutCommand(id: id, title: title, group: "Library grid", scope: .library, defaultCombo: combo)) }
@@ -47,6 +48,7 @@ import OpenStillCore
             ("editor.previousAlt", "Previous photo (alternate)", KeyCombo("up")), ("editor.nextAlt", "Next photo (alternate)", KeyCombo("down")),
             ("editor.nextSpace", "Next photo (Space)", KeyCombo("space")), ("editor.previousSpace", "Previous photo (Shift-Space)", KeyCombo("space", shift: true)),
             ("editor.trash", "Move photo to Trash", KeyCombo("delete")), ("editor.escape", "Cancel tool or leave full screen", KeyCombo("escape")),
+            ("editor.done", "Finish the current tool and close it (Return)", KeyCombo("return")),
             ("editor.brushSmaller", "Smaller mask brush", KeyCombo("[")), ("editor.brushLarger", "Larger mask brush", KeyCombo("]")),
         ]
         for (id, title, combo) in editor { map.register(ShortcutCommand(id: id, title: title, group: "Photo and filmstrip", scope: .editor, defaultCombo: combo)) }

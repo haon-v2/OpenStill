@@ -35,7 +35,7 @@ public struct CameraRawImport {
         }
         // Basic
         if let v = take("Exposure2012") ?? take("Exposure") { edits.exposure = v }
-        if let v = take("Contrast2012") ?? take("Contrast") { edits.contrast = 1 + v / 200 }
+        if let v = take("Contrast2012") ?? take("Contrast") { edits.contrast = 1 + v / 200; edits.usesSmartContrast = true }
         if let v = take("Highlights2012") ?? take("HighlightRecovery") {
             if v < 0 || crs["Highlights2012"] == nil { edits.highlights = 1 - abs(v) / 100 } else { applied -= 1; unsupported.append("Highlights +\(Int(v)) (OpenStill’s Highlights only recovers)") }
         }

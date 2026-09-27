@@ -247,7 +247,7 @@ public enum QuickDevelop {
         func clamp(_ v: Double, _ lo: Double, _ hi: Double) -> Double { min(hi, max(lo, v)) }
         switch step {
         case .exposure(let v): e.exposure = clamp(e.exposure + v, -4, 4)
-        case .contrast(let v): e.contrast = clamp(e.contrast + v, 0.5, 1.5)
+        case .contrast(let v): e.contrast = clamp(e.contrast + v, 0.5, 1.5); e.usesSmartContrast = true
         case .highlights(let v): e.highlights = clamp(e.highlights + v, 0, 1)
         case .shadows(let v): e.shadows = clamp(e.shadows + v, 0, 1)
         case .whites(let v): e.whites = clamp(e.whites + v, -1, 1)
