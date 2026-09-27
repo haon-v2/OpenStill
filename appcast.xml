@@ -114,5 +114,16 @@
             <sparkle:fullReleaseNotesLink>https://github.com/haon-v2/OpenStill/releases/tag/v0.0.10</sparkle:fullReleaseNotesLink>
             <enclosure url="https://github.com/haon-v2/OpenStill/releases/download/v0.0.10/OpenStill-0.0.10.zip" sparkle:edSignature="T9IaAa2eWFsd2XhPcybyuRlizts6z9OwbyVB08ISGgMzG4kDM0KQGFhTqQ1Y7k1byfLt+cxIWQ0bro2vDXwcAw==" length="32563505" type="application/octet-stream"/>
         </item>
+        <item>
+            <title>OpenStill 0.0.11</title>
+            <description><![CDATA[<h3>What’s new in 0.0.11</h3><ul><li>Mask layers: as many masks as you like, each with its own sliders</li><li>Return closes tool panels</li><li>Smart Contrast</li><li>Delete then Return moves a photo to Trash</li><li>click thumbnail stars to rate</li><li>JPEG Temperature and Tint now go the right way</li><li>Luminar Neo layout renamed EZ Layout</li></ul>]]></description>
+            <pubDate>Sun, 27 Sep 2026 15:16:01 GMT</pubDate>
+            <sparkle:version>27</sparkle:version>
+            <sparkle:shortVersionString>0.0.11</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <sparkle:fullReleaseNotesLink>https://github.com/haon-v2/OpenStill/releases/tag/v0.0.11</sparkle:fullReleaseNotesLink>
+            <enclosure url="https://github.com/haon-v2/OpenStill/releases/download/v0.0.11/OpenStill-0.0.11.zip" sparkle:edSignature="hrO8D0fxmHWJPVJKaTzBU6cxFMoD6prTBrXqXe+lRsIvCJGyG01qi4tWS4cH3HoBkUH3sj4iBzk+rclN8Lb+CA==" length="32624979" type="application/octet-stream"/>
+        </item>
     </channel>
 </rss>
