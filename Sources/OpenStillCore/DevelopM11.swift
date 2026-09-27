@@ -185,7 +185,7 @@ public struct PointColor: Codable, Equatable, Sendable {
     }
 }
 
-enum PointColors {
+public enum PointColors {
     static func apply(_ image: CIImage, colors raw: [PointColor]) -> CIImage {
         let colors = raw.map(\.sanitized).filter(\.hasEffect)
         guard !colors.isEmpty else { return image }
