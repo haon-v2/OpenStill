@@ -119,8 +119,8 @@ final class TetherWindow: OutputWindow, ICDeviceBrowserDelegate, ICCameraDeviceD
     func deviceDidBecomeReady(withCompleteContentCatalog device: ICCameraDevice) {
         guard device === camera, let session else { return }
         ready = true
-        let remote = device.capabilities.contains(ICCameraDeviceCanTakePicture.rawValue)
-        if device.capabilities.contains(ICCameraDeviceCanTakePictureUsingShutterReleaseOnCamera.rawValue) { device.requestEnableTethering() }
+        let remote = device.capabilities.contains(ICDeviceCapability.cameraDeviceCanTakePicture.rawValue)
+        if device.capabilities.contains(ICDeviceCapability.cameraDeviceCanTakePictureUsingShutterReleaseOnCamera.rawValue) { device.requestEnableTethering() }
         captureButton.isEnabled = remote
         status.stringValue = "Ready. New shots go to “\(session.folder.lastPathComponent)”." + (remote ? "" : " This camera can’t be fired from the Mac; use its shutter button.")
     }
@@ -152,7 +152,7 @@ final class TetherWindow: OutputWindow, ICDeviceBrowserDelegate, ICCameraDeviceD
     func cameraDevice(_ camera: ICCameraDevice, didReceiveMetadata metadata: [AnyHashable: Any]?, for item: ICCameraItem, error: Error?) {}
     func cameraDevice(_ camera: ICCameraDevice, didRenameItems items: [ICCameraItem]) {}
     func cameraDeviceDidChangeCapability(_ camera: ICCameraDevice) {
-        if camera === self.camera, ready { captureButton.isEnabled = camera.capabilities.contains(ICCameraDeviceCanTakePicture.rawValue) }
+        if camera === self.camera, ready { captureButton.isEnabled = camera.capabilities.contains(ICDeviceCapability.cameraDeviceCanTakePicture.rawValue) }
     }
     func cameraDevice(_ camera: ICCameraDevice, didReceivePTPEvent eventData: Data) {}
     func cameraDeviceDidRemoveAccessRestriction(_ device: ICDevice) {}
