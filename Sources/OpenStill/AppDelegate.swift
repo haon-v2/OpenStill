@@ -40,7 +40,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) { viewer.localAI.cancel() }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
-    private func buildMenu() {
+    @MainActor private func buildMenu() {
         let main = NSMenu()
         NSApp.mainMenu = main
         func menu(_ title: String) -> NSMenu {
