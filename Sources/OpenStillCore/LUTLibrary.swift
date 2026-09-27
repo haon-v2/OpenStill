@@ -40,7 +40,7 @@ public struct LUTItem: Equatable {
     }
 }
 public struct LUTLibrary {
-    public static let categories = ["All","Portraits","Cityscape & Street","Automotive","Nature & Landscape","Imported"]
+    public static let categories = ["All","Portraits","Cityscape & Street","Automotive","Nature & Landscape","Imported","Found by AI"]
     public let items: [LUTItem]
     public init(bundled folder:URL, imported:URL) throws {
         let catalog = try JSONDecoder().decode(LUTCatalog.self,from:Data(contentsOf:folder.appendingPathComponent("catalog.json")))
@@ -63,7 +63,8 @@ public struct LUTLibrary {
             let name = url.deletingPathExtension().lastPathComponent
             let source = provenance.first { record in (record["name"] as? String).map { name == $0 || name.hasPrefix($0+" — ") } ?? false }
             let id = "imported-"+SHA256.hash(data:Data(url.lastPathComponent.utf8)).map { String(format:"%02x",$0) }.joined()
-            let entry = LUTCatalogEntry(id:id,name:name,category:"Imported",filename:url.lastPathComponent,creator:source?["creator"] as? String ?? "Imported on this Mac",source:source?["source"] as? String ?? "",license:"Local import",checksum:"",description:"Your imported look. Adjust intensity to suit this photograph.")
+            let foundByAI = source?["foundByAI"] as? Bool == true
+            let entry = LUTCatalogEntry(id:id,name:name,category:foundByAI ? "Found by AI" : "Imported",filename:url.lastPathComponent,creator:source?["creator"] as? String ?? "Imported on this Mac",source:source?["source"] as? String ?? "",license:source?["license"] as? String ?? "Local import",checksum:"",description:foundByAI ? "Found by your AI assistant. Adjust intensity to suit this photograph." : "Your imported look. Adjust intensity to suit this photograph.")
             return LUTItem(entry:entry,url:url,isBundled:false)
         }
     }
