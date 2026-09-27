@@ -18,6 +18,11 @@ enum LayoutDump {
                 find(root)
                 LightroomState.shared.update { panels in for s in sections { panels.expanded[s.key] = titles.contains(s.title) } }
                 for s in sections { s.refresh() }
+                root.layoutSubtreeIfNeeded()
+                // Bring the last opened section on the right fully into view.
+                if let target = sections.last(where: { titles.contains($0.title) && $0.side == .right }) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { target.scrollToVisible(target.bounds) }
+                }
                 if let tool = ProcessInfo.processInfo.environment["OPENSTILL_DUMP_TOOL"] { (window?.contentViewController as? ViewerController)?.editingCommand(tool) }
                 root.needsLayout = true
             }
