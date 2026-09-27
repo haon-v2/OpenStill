@@ -242,7 +242,12 @@ public enum PhotoEditor {
         if stopBeforeTool == "Develop" { return image }
         if modern, e.neutralBalance != NeutralBalance() { image = ToneTools.balance(image,settings:e.neutralBalance) }
         if e.exposure != 0 { image = image.applyingFilter("CIExposureAdjust",parameters:[kCIInputEVKey:e.exposure]) }
-        if e.temperature != 6500 || e.tint != 0 { image = image.applyingFilter("CITemperatureAndTint",parameters:["inputNeutral":CIVector(x:6500,y:0),"inputTargetNeutral":CIVector(x:e.temperature,y:e.tint)]) }
+        if e.temperature != 6500 || e.tint != 0 {
+            // The photo is treated as lit at the slider's white point, so higher Temperature warms and positive Tint adds magenta, as on RAW photos.
+            // Edits made before this fix keep their original (reversed) look until Temperature or Tint is changed.
+            let (neutral, target) = e.usesCorrectedWhiteBalance ? (CIVector(x:e.temperature,y:e.tint), CIVector(x:6500,y:0)) : (CIVector(x:6500,y:0), CIVector(x:e.temperature,y:e.tint))
+            image = image.applyingFilter("CITemperatureAndTint",parameters:["inputNeutral":neutral,"inputTargetNeutral":target])
+        }
         if e.highlights != 1 || e.shadows != 0 { image = image.applyingFilter("CIHighlightShadowAdjust",parameters:["inputHighlightAmount":e.highlights,"inputShadowAmount":e.shadows]) }
         if e.contrast != 1 {
             if e.usesSmartContrast { image = try SmartContrast.apply(image, contrast: e.contrast) }

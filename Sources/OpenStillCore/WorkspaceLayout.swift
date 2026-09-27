@@ -12,7 +12,7 @@ public enum WorkspaceLayout: String, CaseIterable, Sendable {
         get { UserDefaults.standard.string(forKey: defaultsKey).flatMap(WorkspaceLayout.init(rawValue:)) ?? .luminar }
         set { UserDefaults.standard.set(newValue.rawValue, forKey: defaultsKey) }
     }
-    public var title: String { self == .luminar ? "Luminar Neo" : "Lightroom Classic" }
+    public var title: String { self == .luminar ? "EZ Layout" : "Lightroom Classic" }
     public var summary: String {
         switch self {
         case .luminar: return "Photo-first. Tools on the right, icon rails at the edges and the filmstrip under your photo. Great for quick edits."

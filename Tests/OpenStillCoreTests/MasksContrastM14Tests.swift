@@ -133,4 +133,30 @@ import Testing
         #expect(QuickDevelop.apply(.contrast(0.2), to: PhotoEdits()).usesSmartContrast)
         #expect(!QuickDevelop.apply(.exposure(1), to: PhotoEdits()).usesSmartContrast)
     }
+
+    // MARK: Temperature and Tint on rendered photos
+    @Test func temperatureWarmsAndTintAddsMagentaOnceCorrected() throws {
+        let gray = solid(0.4, 0.4, 0.4), size = CGSize(width: 64, height: 64)
+        func render(_ e: PhotoEdits) throws -> [Float] { pixel(try PhotoEditor.process(gray, sourceSize: size, edits: e, modern: true), 5, 5) }
+        var old = PhotoEdits(); old.temperature = 7500
+        #expect(!old.usesCorrectedWhiteBalance)
+        let legacy = try render(old)
+        // An older edit keeps its look: this is the reversed rendering it was saved with.
+        #expect(legacy[2] > legacy[0])
+        var warm = old; warm.temperature = 7600; warm.adoptSmartContrast(changedFrom: old)
+        #expect(warm.usesCorrectedWhiteBalance)
+        let w = try render(warm)
+        #expect(w[0] > w[2] + 0.02)
+        var cool = PhotoEdits(); cool.usesCorrectedWhiteBalance = true; cool.temperature = 4000
+        let c = try render(cool)
+        #expect(c[2] > c[0] + 0.02)
+        var magenta = PhotoEdits(); magenta.usesCorrectedWhiteBalance = true; magenta.tint = 50
+        let m = try render(magenta)
+        #expect(m[1] < m[0] && m[1] < m[2])
+        // Unrelated changes leave an older edit alone; Quick Develop and saved JSON carry the fix.
+        var other = old; other.exposure = 0.3; other.adoptSmartContrast(changedFrom: old)
+        #expect(!other.usesCorrectedWhiteBalance)
+        #expect(QuickDevelop.apply(.whiteBalance(.shade), to: PhotoEdits()).usesCorrectedWhiteBalance)
+        #expect(try JSONDecoder().decode(PhotoEdits.self, from: JSONEncoder().encode(warm)).usesCorrectedWhiteBalance)
+    }
 }

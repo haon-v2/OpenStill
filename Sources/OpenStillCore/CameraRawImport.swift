@@ -57,14 +57,14 @@ public struct CameraRawImport {
         let balance = crs["WhiteBalance"] ?? ""
         if raw {
             if balance != "" && balance != "As Shot", let k = number("Temperature") {
-                edits.temperature = min(10000, max(2500, k)); applied += 1
+                edits.temperature = min(10000, max(2500, k)); edits.usesCorrectedWhiteBalance = true; applied += 1
                 if k < 2500 || k > 10000 { approximated.append("Temperature \(Int(k)) K (limited to 2500–10000 K)") }
                 if let t = number("Tint") { edits.tint = min(100, max(-100, t)) }
             }
         } else {
             let t = number("IncrementalTemperature") ?? 0, g = number("IncrementalTint") ?? 0
             if t != 0 || g != 0 {
-                edits.temperature = min(10000, max(2500, 6500 + t * 35)); edits.tint = min(100, max(-100, g)); applied += 1
+                edits.temperature = min(10000, max(2500, 6500 + t * 35)); edits.tint = min(100, max(-100, g)); edits.usesCorrectedWhiteBalance = true; applied += 1
                 approximated.append("White balance (Temperature \(Int(t)), Tint \(Int(g)) mapped to OpenStill’s relative white balance)")
             }
         }

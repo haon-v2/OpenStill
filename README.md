@@ -57,6 +57,7 @@ OpenStill keeps a local SQLite catalog (`Catalog.sqlite`, next to your edit reco
 
 - **Faster opening.** A photo whose path, size and modification date haven't changed is found in the catalog without re-reading the whole file. A moved or renamed file is still recognized by its contents.
 - **Include subfolders** (Library sidebar) scans the folders inside the one you open. Hidden folders and packages are skipped.
+- **Star ratings.** Press **0–5**, or click the stars under a thumbnail to rate that photo; clicking its current rating again clears it.
 - **Color labels.** Press **6** red, **7** yellow, **8** green or **9** blue, or use **Label** for purple and Clear. Pressing a photo's current label key again clears it. Labels show as a colored strip on each thumbnail. Filter by label, or show only unlabeled photos.
 - **Metadata.** Select photos and choose **Actions → Edit metadata…** to set title, caption, creator, copyright, location, city, state, country and keywords. Keywords can have levels with `>`, for example `Places > France > Paris`; searching for "France" also finds it. With several photos selected, filled-in fields apply to all of them, keywords are added, and **Remove keywords** takes keywords off. Save frequent fields such as creator and copyright as **metadata presets**. Metadata is stored with OpenStill's edits and your original files are not changed. Exports include it as IPTC, with the keyword's last level as the IPTC keyword, when **Keep metadata** is on.
 - **Collections.** **Actions → Add to collection…** puts the selected photos in a new or existing collection. Collections list in the sidebar and can hold photos from any folder. Control-click a collection to rename or delete it; deleting a collection never deletes photos. **Actions → Remove from this collection** takes photos out.
@@ -212,8 +213,8 @@ Sharing copies are kept in OpenStill's temporary sharing folder so other apps ca
 
 ## Layouts and keyboard shortcuts
 
-**Settings → Layout** (or **View → Lightroom Classic Layout** ⌃⌘1 / **Luminar Neo Layout** ⌃⌘2) switches how the window is arranged. Your photos, edits and shortcuts stay the same.
-- **Luminar Neo** (the default) puts the photo first. There are icon rails at both edges and one tool panel on the right, with the filmstrip under the photo. The workspaces are called **Catalog** and **Edit**. It suits quick edits.
+**Settings → Layout** (or **View → Lightroom Classic Layout** ⌃⌘1 / **EZ Layout** ⌃⌘2) switches how the window is arranged. Your photos, edits and shortcuts stay the same.
+- **EZ Layout** (the default) puts the photo first. There are icon rails at both edges and one tool panel on the right, with the filmstrip under the photo. The workspaces are called **Catalog** and **Edit**. It suits quick edits.
 - **Lightroom Classic** follows Lightroom Classic's window, with flat dark-gray panels and square corners:
   - **Module picker** across the top: the identity plate on the left, **Library | Develop | Map | Slideshow | Print | Web** on the right. Map, Slideshow, Print and Web open their windows for the selected photos (⌥⌘3, ⌥⌘5, ⌥⌘6, ⌥⌘7). OpenStill has no Book module.
   - **Left panel:**
@@ -245,7 +246,7 @@ Sharing copies are kept in OpenStill's temporary sharing folder so other apps ca
 
     You can change them all in **Settings → Shortcuts → Workspace**.
   - **Masking works like Lightroom's.** **New mask** (Brush, Linear, Radial, Subject, Sky, Background, People, Object, Color / Luminance / Depth range) adds a mask with its own Exposure, Contrast, Highlights, Shadows, Whites, Blacks, Temperature, Tint, Saturation, Clarity, Texture, Dehaze, Sharpness and Noise sliders. Add as many as you like; each one changes only its own area. Rename, duplicate, invert, hide or delete a mask from its list. Below the list you can still limit a whole tool (Develop, Clarity, Color grading…) to a mask, as before.
-  - **Return finishes a tool.** In Crop, Remove, Red Eye and Masking, Return (or **Done**) applies the crop or ends painting and closes the panel. Escape closes it too. In the Luminar layout, Return takes a tool's Masking tab back to its adjustments, and closes the Masks tool or a tool you were drawing with.
+  - **Return finishes a tool.** In Crop, Remove, Red Eye and Masking, Return (or **Done**) applies the crop or ends painting and closes the panel. Escape closes it too. In the EZ Layout, Return takes a tool's Masking tab back to its adjustments, and closes the Masks tool or a tool you were drawing with.
   - **Look and behavior are close to Lightroom Classic, not a copy.** The panel names, order and keys follow it, and the controls are OpenStill's own. There are no Adobe icons or artwork, and slider scales are OpenStill's (for example, Contrast runs 0.5–1.5), not Lightroom's −100 to +100.
 
 **Settings → Shortcuts** lists every command and its shortcut:
@@ -335,6 +336,7 @@ The Lightroom-desktop-inspired workspace has a slim local-library rail on the le
 - RAW decoding (in Profile & calibration, for RAW sources): choose the demosaic method (AHD by default, or AAHD, DCB, DHT, VNG, PPG, or fast bilinear), LibRaw's wavelet noise reduction, color-noise median passes and hot-pixel (FBDD) reduction. Each change decodes the RAW again.
 - Develop: exposure, contrast, highlights, shadows, whites, blacks, temperature, and tint. **Auto** reads the photo's tonal range and sets exposure, contrast, highlights, shadows, whites, blacks and vibrance as one undoable step you can keep refining. (Whites and Blacks are shared with Black & white and follow its mask.)
 - Smart Contrast: the Contrast slider pivots on the photo's own middle tone instead of a fixed gray. Soft shoulders keep highlights and shadows from clipping, lowering it flattens midtones without milky blacks, it changes brightness only so colors don't shift, and higher settings add a little local contrast. Photos whose contrast was set before Smart Contrast keep their look until you move the slider again.
+- Temperature and Tint: higher Temperature warms and positive Tint adds magenta, on RAW and rendered photos (JPEG, HEIC, TIFF…) alike. Rendered photos used to go the opposite way; an edit made before this fix keeps its look until you move Temperature or Tint.
 - Dehaze: positive removes atmospheric haze using a dark-channel estimate; negative adds haze.
 - Clarity: broad midtone contrast (negative softens). Texture: medium-sized detail such as skin, foliage or fabric (negative smooths).
 - Color grading: Shadows, Midtones, Highlights and Global wheels. Drag in a wheel to set hue and strength, set each range's luminance, and use Blending and Balance to control how the ranges overlap. Double-click a wheel to reset it.
@@ -348,9 +350,9 @@ The Lightroom-desktop-inspired workspace has a slim local-library rail on the le
 - B&W mix: with Black & white on, eight sliders (red to magenta) brighten or darken each color's gray. **Auto mix** sets them from the photo's colors.
 - Detail: Sharpening has **Radius**, **Detail** and **Masking** (Masking 0 sharpens everything; higher values sharpen only edges). Noise reduction has Luminance **Detail** and **Contrast**, plus **Color** and **Color detail** for color blotches. Photos edited before these sliders existed look the same until you change one.
 - Remove chromatic aberration (Lens corrections): measures the red and blue fringing toward the corners of this photo and lines the colors up again. It works without a lens profile. Measuring again replaces the old values; **Turn off chromatic aberration removal** removes it.
-- Red eye and Pet eye (tool strip in Lightroom, **Red eye** tool in Luminar): drag an ellipse over an eye. Red eye darkens and desaturates the red pupil; Pet eye fills the pupil and can add a catchlight. **Pupil size** and **Darken** change the last eye. Eyes follow crop, rotation and flips.
+- Red eye and Pet eye (tool strip in Lightroom, **Red eye** tool in the EZ Layout): drag an ellipse over an eye. Red eye darkens and desaturates the red pupil; Pet eye fills the pupil and can add a catchlight. **Pupil size** and **Darken** change the last eye. Eyes follow crop, rotation and flips.
 - Visualize spots (Retouch / Remove): shows the photo as a black-and-white edge map so dust and small blemishes stand out; the slider sets how much detail it shows. It is never exported.
-- Snapshots (left panel in Lightroom, History in Luminar): **New snapshot…** saves the current edits under a name. Click one to go back to it in one undo step; Control-click it to rename or delete it. Snapshots belong to the version and are saved with it.
+- Snapshots (left panel in Lightroom, History in the EZ Layout): **New snapshot…** saves the current edits under a name. Click one to go back to it in one undo step; Control-click it to rename or delete it. Snapshots belong to the version and are saved with it.
 - Color: global saturation/vibrance plus eight visible swatches for red, orange, yellow, green, aqua, blue, purple, and magenta. Each color remembers its Saturation or HSL view. HSL provides Hue, Saturation, and Lightness with shade-gradient tracks and a live color indicator; switching views keeps your adjustments. Reset this color clears only the selected band.
 - Black & white: monochrome strength plus separate Blacks and Whites tonal sliders.
 - Vignette: negative darkens the edges, zero is neutral, positive lightens them.
@@ -371,7 +373,7 @@ The Lightroom-desktop-inspired workspace has a slim local-library rail on the le
 
 ### Masks
 
-**Masks** (Luminar) and **Masking** (Lightroom) make mask layers: each new mask has its own set of sliders, so you can brighten the sky and darken the ground with two masks. The sections below describe the selection tools every mask uses.
+**Masks** (EZ Layout) and **Masking** (Lightroom) make mask layers: each new mask has its own set of sliders, so you can brighten the sky and darken the ground with two masks. The sections below describe the selection tools every mask uses.
 
 ### Per-feature masks
 

@@ -415,6 +415,11 @@ Automated fixtures are generated and contain no user photographs. The real S9 fi
   - Mask layers: any number of masks, each with its own 14 sliders; rename, duplicate, invert, hide and delete. Per-tool masks still work.
   - Return (or Done) finishes Crop, Remove, Red Eye and Masking and closes the panel completely; Escape closes it too.
   - Smart Contrast replaces the plain contrast curve for new edits; older edits keep their look until Contrast is moved.
+  - Temperature and Tint on rendered photos went the wrong way (higher Temperature cooled a JPEG). They now match RAW; older edits keep their look until Temperature or Tint is moved.
+  - Mask Temperature and Tint go the same way as Lightroom's; lowering Smart Contrast no longer lifts deep blacks.
+  - Tall tool drawers scroll instead of stretching the window; an empty tool mask no longer shows blank component controls; Return in Crop without a frame leaves Crop.
+  - The Luminar Neo layout is now called the EZ Layout.
+  - The stars under library thumbnails can be clicked to rate that photo; clicking the current rating clears it.
   - haon-v2/OpenStill#16: Delete then Return moves the photo to Trash (Move to Trash is the default button, Escape cancels). Delete in the library grid trashes the selected photos after the same confirmation.
 - **Automated tests (MasksContrastM14Tests):**
   - Mask layers add, duplicate and remove with their masks, sanitize their sliders, and round-trip; older edits decode with none.
@@ -422,8 +427,9 @@ Automated fixtures are generated and contain no user photographs. The real S9 fi
   - Layer sliders render (exposure, saturation, temperature).
   - Batch copies layers only when masks are copied.
   - Smart Contrast is neutral at 1, never clips or reverses a ramp, keeps hue, and pivots on the photo's brightness.
+  - Temperature warms and Tint adds magenta once corrected; older edits keep the reversed look until Temperature or Tint changes.
   - Older edits keep the legacy contrast until Contrast changes; Quick Develop contrast switches to Smart Contrast.
-- **UI snapshots on macOS 26 CI:** each Lightroom tool drawer open and after Return; a new mask layer; the Luminar Masks tool; the library.
+- **UI snapshots on macOS 26 CI:** each Lightroom tool drawer open, after Return and after Escape; two mask layers; the EZ Layout Masks tool before and after Return (checked from the app's state, since glass panels don't render in CI snapshots); the library. The window keeps its size with every drawer open.
 - **Not yet verified by hand on a Mac:**
   - Painting a brush mask layer on a real photo.
   - Delete then Return in the Library grid with several photos selected.

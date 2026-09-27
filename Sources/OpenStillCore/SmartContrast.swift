@@ -59,5 +59,12 @@ extension PhotoEdits {
     /// Called with the previous edits: a changed Contrast switches this edit to Smart Contrast.
     public mutating func adoptSmartContrast(changedFrom old: PhotoEdits) {
         if contrast != old.contrast && !usesSmartContrast { usesSmartContrast = true }
+        if (temperature != old.temperature || tint != old.tint) && !usesCorrectedWhiteBalance { usesCorrectedWhiteBalance = true }
+    }
+    /// Whether Temperature and Tint on rendered photos go the right way (higher warms, positive Tint adds magenta).
+    /// Edits saved before the fix keep their original look until Temperature or Tint is changed. RAW photos were always right.
+    public var usesCorrectedWhiteBalance: Bool {
+        get { advanced?.whiteBalanceModel == "corrected" }
+        set { ensureAdvanced(); advanced!.whiteBalanceModel = newValue ? "corrected" : nil }
     }
 }

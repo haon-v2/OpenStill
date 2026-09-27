@@ -241,7 +241,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         sidebarWidth = librarySidebar.widthAnchor.constraint(equalToConstant: 216)
         infoWidth = info.widthAnchor.constraint(equalToConstant: 320)
         shelfHeight = shelf.heightAnchor.constraint(equalToConstant: 112)
-        // Luminar Neo: rails at both edges, glass panels, the filmstrip under the photo only.
+        // EZ Layout: rails at both edges, glass panels, the filmstrip under the photo only.
         luminarConstraints = [
             center.topAnchor.constraint(equalTo: content.topAnchor, constant: 10),
             librarySidebar.topAnchor.constraint(equalTo: center.topAnchor), info.topAnchor.constraint(equalTo: center.topAnchor),
@@ -277,14 +277,14 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         }
     }
 
-    // MARK: Layout (Lightroom Classic or Luminar Neo)
+    // MARK: Layout (Lightroom Classic or EZ Layout)
     @objc func useLightroomLayout() { WorkspaceLayout.current = .lightroom; NotificationCenter.default.post(name: .workspaceLayoutChanged, object: nil) }
     @objc func useLuminarLayout() { WorkspaceLayout.current = .luminar; NotificationCenter.default.post(name: .workspaceLayoutChanged, object: nil) }
     func applyLayout(_ layout: WorkspaceLayout) {
         layoutMode = layout
         let lr = layout == .lightroom
         if !lr { lights = .normal }
-        // Lightroom Classic: flat dark-gray panels with square corners. Luminar Neo: soft glass.
+        // Lightroom Classic: flat dark-gray panels with square corners. EZ Layout: soft glass.
         view.window?.appearance = lr ? NSAppearance(named: .darkAqua) : nil
         view.window?.toolbar?.isVisible = !lr
         workspaceContent.color = lr ? LRColors.backdrop : .clear
@@ -1058,6 +1058,6 @@ extension ViewerController {
 }
 
 extension Notification.Name {
-    /// Settings or the View menu switched between the Lightroom Classic and Luminar Neo layouts.
+    /// Settings or the View menu switched between the Lightroom Classic and EZ layouts.
     static let workspaceLayoutChanged = Notification.Name("OpenStillWorkspaceLayoutChanged")
 }

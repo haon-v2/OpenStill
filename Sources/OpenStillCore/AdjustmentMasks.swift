@@ -133,6 +133,8 @@ public struct AdvancedEdits: Codable, Equatable {
     public var localAdjustments: [LocalAdjustment]?
     /// "smart" once Contrast is changed in this version; nil keeps the original contrast curve for older edits.
     public var contrastModel: String?
+    /// "corrected" once Temperature or Tint is changed: higher Temperature warms and positive Tint adds magenta on rendered photos. nil keeps an older edit's look.
+    public var whiteBalanceModel: String?
     public init() {}
 }
 

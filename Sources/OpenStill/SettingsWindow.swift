@@ -99,7 +99,7 @@ private final class LayoutCard: NSView {
     init(_ layout: WorkspaceLayout) {
         self.layout = layout
         super.init(frame: NSRect(x: 0, y: 0, width: 250, height: 170))
-        setAccessibilityRole(.radioButton); setAccessibilityLabel(layout.title + " layout"); setAccessibilityHelp(layout.summary)
+        setAccessibilityRole(.radioButton); setAccessibilityLabel(layout.title.hasSuffix("Layout") ? layout.title : layout.title + " layout"); setAccessibilityHelp(layout.summary)
         addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect], owner: self))
     }
     required init?(coder: NSCoder) { fatalError() }
@@ -178,7 +178,7 @@ private final class LayoutSettings: NSViewController {
     private var cards: [LayoutCard] = []
     override func loadView() {
         title = "Layout"
-        let intro = note("Choose how OpenStill arranges its panels. Your photos, edits and shortcuts stay the same; switch any time, also from View → Lightroom Classic Layout (⌃⌘1) or Luminar Neo Layout (⌃⌘2).")
+        let intro = note("Choose how OpenStill arranges its panels. Your photos, edits and shortcuts stay the same; switch any time, also from View → Lightroom Classic Layout (⌃⌘1) or EZ Layout (⌃⌘2).")
         intro.widthAnchor.constraint(equalToConstant: 540).isActive = true
         let row = NSStackView(); row.spacing = 18; row.alignment = .top
         for layout in [WorkspaceLayout.luminar, .lightroom] {
