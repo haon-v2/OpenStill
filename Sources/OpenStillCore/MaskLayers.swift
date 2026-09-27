@@ -67,8 +67,8 @@ public enum LocalAdjustments {
         let s = raw.sanitized, extent = input.extent
         var image = input
         if s.temperature != 0 || s.tint != 0 {
-            // ±1 moves white balance about ±2000 K and ±50 tint, like a strong Lightroom mask.
-            image = image.applyingFilter("CITemperatureAndTint", parameters: ["inputNeutral": CIVector(x: 6500, y: 0), "inputTargetNeutral": CIVector(x: 6500 + s.temperature * 2000, y: s.tint * 50)])
+            // ±1 moves white balance about ±2000 K and ±50 tint, like a strong Lightroom mask. Positive is warmer: a lower target neutral warms the photo.
+            image = image.applyingFilter("CITemperatureAndTint", parameters: ["inputNeutral": CIVector(x: 6500, y: 0), "inputTargetNeutral": CIVector(x: 6500 - s.temperature * 2000, y: s.tint * 50)])
         }
         if s.exposure != 0 { image = image.applyingFilter("CIExposureAdjust", parameters: [kCIInputEVKey: s.exposure]) }
         if s.highlights < 0 || s.shadows > 0 {

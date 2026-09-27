@@ -18,8 +18,9 @@ public enum SmartContrast {
             float up = p < pivot ? pivot * pow(p / pivot, k) : 1.0 - (1.0 - pivot) * pow((1.0 - p) / (1.0 - pivot), k);
             f = mix(p, up, 0.85);
         } else {
-            // Lower contrast pulls midtones toward the pivot but keeps black and white where they are (no milky blacks).
-            f = p + (-amount) * 0.9 * (pivot - p) * 4.0 * p * (1.0 - p);
+            // Lower contrast pulls midtones toward the pivot. The squared weight leaves deep shadows and highlights nearly alone (no milky blacks).
+            float w = 4.0 * p * (1.0 - p);
+            f = p + (-amount) * 0.9 * (pivot - p) * w * w;
         }
         float ratio = pow(max(f, 0.0), 2.2) / lum;
         return vec4(s.rgb * ratio, s.a);

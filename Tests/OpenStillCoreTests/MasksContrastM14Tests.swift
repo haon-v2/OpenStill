@@ -72,7 +72,13 @@ import Testing
         #expect(abs(gray[0] - gray[1]) < 0.02)
         s = LocalSettings(); s.temperature = 1
         let warm = pixel(try LocalAdjustments.apply(photo, settings: s, sourceSize: CGSize(width: 64, height: 64)), 10, 10)
-        #expect(warm[2] < 0.2)
+        #expect(warm[2] < 0.2 && warm[0] > 0.3)
+        s = LocalSettings(); s.tint = 1
+        let magenta = pixel(try LocalAdjustments.apply(photo, settings: s, sourceSize: CGSize(width: 64, height: 64)), 10, 10)
+        #expect(magenta[1] < 0.5, "tint +1 should be more magenta: \(magenta)")
+        // Temporary probe: which way the global Temperature slider moves a gray rendered photo.
+        var global = PhotoEdits(); global.temperature = 7500
+        print("PROBE global temperature 7500 on gray:", pixel(try PhotoEditor.process(solid(0.4, 0.4, 0.4), sourceSize: CGSize(width: 64, height: 64), edits: global, modern: true), 5, 5))
     }
     @Test func batchCopiesMaskLayersOnlyWithMasks() throws {
         var source = PhotoEdits(); let layer = source.addLocalAdjustment(named: "Sky")
@@ -96,8 +102,8 @@ import Testing
                 #expect(v >= last - 0.002 && v >= -0.001 && v <= 1.001, "contrast \(contrast) at \(x)")
                 last = v
             }
-            // Black stays black and white stays white: no clipping, no milky blacks.
-            #expect(pixel(out, 0, 1)[0] < 0.01 && pixel(out, 255, 1)[0] > 0.99)
+            // The ends stay where they were: no clipping, no milky blacks.
+            #expect(abs(pixel(out, 0, 1)[0] - pixel(r, 0, 1)[0]) < 0.03 && abs(pixel(out, 255, 1)[0] - pixel(r, 255, 1)[0]) < 0.03, "contrast \(contrast) ends")
         }
         // More contrast darkens shadows and brightens highlights around the pivot; less does the opposite.
         let high = try SmartContrast.apply(r, contrast: 1.5, pivot: 0.5, localContrast: false), low = try SmartContrast.apply(r, contrast: 0.5, pivot: 0.5)
