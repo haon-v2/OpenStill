@@ -48,5 +48,16 @@
             <sparkle:fullReleaseNotesLink>https://github.com/haon-v2/OpenStill/releases/tag/v0.0.4</sparkle:fullReleaseNotesLink>
             <enclosure url="https://github.com/haon-v2/OpenStill/releases/download/v0.0.4/OpenStill-0.0.4.zip" sparkle:edSignature="VPP6AWENLPYonYcY27lWWezEgbhTS4lAIlgr7vxru2+ZiaNnCsrQ7282ye56f+YgYf7b7Du/0ow9W3mlAsOGCA==" length="31890088" type="application/octet-stream"/>
         </item>
+        <item>
+            <title>OpenStill 0.0.5</title>
+            <description><![CDATA[<h3>What’s new in 0.0.5</h3><ul><li>Switch between Lightroom Classic and Luminar Neo layouts (View menu or Settings → Layout)</li><li>Every keyboard shortcut can be changed in Settings → Shortcuts</li><li>Redesigned Settings window</li></ul>]]></description>
+            <pubDate>Sun, 27 Sep 2026 06:23:27 GMT</pubDate>
+            <sparkle:version>21</sparkle:version>
+            <sparkle:shortVersionString>0.0.5</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <sparkle:fullReleaseNotesLink>https://github.com/haon-v2/OpenStill/releases/tag/v0.0.5</sparkle:fullReleaseNotesLink>
+            <enclosure url="https://github.com/haon-v2/OpenStill/releases/download/v0.0.5/OpenStill-0.0.5.zip" sparkle:edSignature="BweSCKRbXqvb/saKkJiEUTQDT3yAjkr9oVAZPpB9tVqVoU5xjxdwArGvvLXjKotvnQMek3R1K+XDY7YAm0ZCBA==" length="31955424" type="application/octet-stream"/>
+        </item>
     </channel>
 </rss>
