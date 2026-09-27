@@ -93,6 +93,7 @@ final class NavigationCollectionView: NSCollectionView {
             applyPhotoSelection()
             return
         }
+        if Shortcuts.performWorkspace(event) { return }
         switch Shortcuts.command(for: event, in: .editor) {
         case "editor.trash": if !event.isARepeat { requestTrash?() }
         case "editor.previousAlt", "editor.previousSpace": navigate?(-1)

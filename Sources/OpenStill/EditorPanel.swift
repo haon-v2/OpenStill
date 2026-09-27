@@ -60,6 +60,26 @@ final class EditorPanel: GlassChrome {
     private var busy = false
     private var toolBodies: [NSView] = []
     private var headers: [NSButton] = []
+    // Lightroom Classic arrangement (see the extension at the end of this file).
+    /// Presets, Versions and History: the left panel while developing in the Lightroom layout.
+    let leftDevelopColumn = LRPanelColumn()
+    private var lrColumns: [LightroomModule: LRPanelColumn] = [:]
+    fileprivate var lrModule: LightroomModule?
+    fileprivate var borrowed: [Borrowed] = []
+    fileprivate var lrSlots: [LightroomModule: [(NSView, NSView, CGFloat?)]] = [:]
+    fileprivate let lrCamera = NSTextField(labelWithString: "")
+    fileprivate let lrStrip = LRToolStrip()
+    fileprivate let lrDrawer = NSStackView()
+    fileprivate let treatment = NSSegmentedControl(labels: ["Color", "Black & White"], trackingMode: .selectOne, target: nil, action: nil)
+    fileprivate let lrKeywords = NSTextField(wrappingLabelWithString: "")
+    fileprivate let maskTarget = NSPopUpButton(frame: .zero, pullsDown: false)
+    fileprivate var drawerViews: [String: NSView] = [:]
+    fileprivate var maskOrder: [String] = []
+    fileprivate var maskBorrow: Borrowed?
+    fileprivate let maskSlot = NSView()
+    fileprivate let presetSlot = NSView(), historySlot = NSView(), versionSlot = NSView()
+    /// The Lightroom tool strip changed tool (crop, remove, masking or none).
+    var lightroomTool: ((String?) -> Void)?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -368,7 +388,7 @@ final class EditorPanel: GlassChrome {
         if let index = toolBodies.firstIndex(where: { $0 === sender.superview }) { focusTool(headers[index]) }
     }
     private func makeMaskPanel(_ key:String) -> MaskPanel {
-        let panel = MaskPanel(key:key);maskPanels[key] = panel
+        let panel = MaskPanel(key:key);maskPanels[key] = panel;maskOrder.append(key)
         panel.command = { [weak self] action in self?.command?("mask:"+key+":"+action) }
         panel.maskChanged = { [weak self] mask,title,final in guard let self else{return};self.states.setMask(mask,for:key);self.editChanged?(self.states,key+" · "+title,final) }
         panel.featherChanged = { [weak self,weak panel] value,final in
@@ -442,49 +462,12 @@ final class EditorPanel: GlassChrome {
             self.toolsScroll.reflectScrolledClipView(self.toolsScroll.contentView)
         }
     }
-    /// In the Lightroom layout Presets and History live in a panel on the left, as in Develop; this panel keeps Edit and Info.
-    private(set) var sidePanel: NSView?
-    private var sideTitles: [NSTextField] = []
-    func movePresetsAndHistory(to side: NSView?) {
-        guard side !== sidePanel else { return }
-        for view in [presetScroll, historyScroll] { view.removeFromSuperview() }
-        sideTitles.forEach { $0.removeFromSuperview() }; sideTitles = []
-        sidePanel = side
-        if let side {
-            let presets = NSTextField(labelWithString: "Presets"), history = NSTextField(labelWithString: "History")
-            for (title, scroll) in [(presets, presetScroll), (history, historyScroll)] {
-                title.font = .systemFont(ofSize: 15, weight: .semibold)
-                for v in [title, scroll] as [NSView] { v.translatesAutoresizingMaskIntoConstraints = false; side.addSubview(v) }
-                scroll.isHidden = false
-            }
-            sideTitles = [presets, history]
-            NSLayoutConstraint.activate([
-                presets.topAnchor.constraint(equalTo: side.topAnchor, constant: 16), presets.leadingAnchor.constraint(equalTo: side.leadingAnchor, constant: 16),
-                presetScroll.topAnchor.constraint(equalTo: presets.bottomAnchor, constant: 6), presetScroll.leadingAnchor.constraint(equalTo: side.leadingAnchor),
-                presetScroll.trailingAnchor.constraint(equalTo: side.trailingAnchor), presetScroll.heightAnchor.constraint(equalTo: side.heightAnchor, multiplier: 0.58),
-                history.topAnchor.constraint(equalTo: presetScroll.bottomAnchor, constant: 10), history.leadingAnchor.constraint(equalTo: presets.leadingAnchor),
-                historyScroll.topAnchor.constraint(equalTo: history.bottomAnchor, constant: 6), historyScroll.leadingAnchor.constraint(equalTo: side.leadingAnchor),
-                historyScroll.trailingAnchor.constraint(equalTo: side.trailingAnchor), historyScroll.bottomAnchor.constraint(equalTo: side.bottomAnchor, constant: -10),
-            ])
-            lutBrowser.setActive(true)
-            if activeTab == 1 || activeTab == 2 { showTab(0) }
-        } else {
-            for scroll in [presetScroll, historyScroll] {
-                body.addSubview(scroll)
-                NSLayoutConstraint.activate([scroll.topAnchor.constraint(equalTo: body.topAnchor), scroll.bottomAnchor.constraint(equalTo: body.bottomAnchor),
-                                             scroll.leadingAnchor.constraint(equalTo: body.leadingAnchor), scroll.trailingAnchor.constraint(equalTo: body.trailingAnchor)])
-            }
-            showTab(activeTab)
-        }
-    }
     func showTab(_ index: Int) {
-        // With Presets and History on the left, they're always visible there; this panel stays on its tab.
-        if sidePanel != nil, index == 1 || index == 2 { sectionChanged?(index); return }
         command?("finishMask")
         activeTab = index
-        lutBrowser.setActive(index == 1 || sidePanel != nil)
-        for (i, view) in [toolsScroll, presetScroll, historyScroll, info].enumerated() where sidePanel == nil || i == 0 || i == 3 { view.isHidden = i != index }
-        sectionTitle.stringValue = [sidePanel == nil ? "Edit" : "Develop", "Presets", "History", "Info"][index]
+        lutBrowser.setActive(index == 1 || lrModule == .develop)
+        for (i, view) in [toolsScroll, presetScroll, historyScroll, info].enumerated() { view.isHidden = i != index }
+        sectionTitle.stringValue = ["Edit", "Presets", "History", "Info"][index]
         sectionChanged?(index)
     }
     func openTool(_ name: String, masking: Bool = false) {
@@ -508,6 +491,7 @@ final class EditorPanel: GlassChrome {
         func compact(_ value:String) -> String { value == "Not recorded" ? "—" : value }
         settings.stringValue = metadata.map { "ISO \(compact($0.iso))  ·  \(compact($0.focalLength))  ·  \(compact($0.aperture))  ·  \(compact($0.shutter))" } ?? "—"
         summary.toolTip = summary.stringValue; settings.toolTip = settings.stringValue
+        lrCamera.stringValue = metadata == nil ? "" : settings.stringValue
     }
     func update(_ edits: PhotoEdits, document: EditDocument?, enabled: Bool) {
         states = edits; hasPhoto = enabled
@@ -525,6 +509,7 @@ final class EditorPanel: GlassChrome {
         retouch.update(edits.retouch)
         for (slider, label, path) in sliders { slider.doubleValue = edits[keyPath: path]; label.stringValue = Self.number(edits[keyPath: path]); slider.isEnabled = enabled && !busy }
         for (button, path) in toggles { button.state = edits[keyPath: path] ? .on : .off; button.isEnabled = enabled && !busy }
+        treatment.selectedSegment = edits.monochrome >= 0.5 ? 1 : 0; treatment.isEnabled = enabled && !busy
         for button in editButtons { button.isEnabled = (enabled && !busy) || button.identifier?.rawValue == "setupAI" || (busy && button.identifier?.rawValue == "cancelAI") }
         historyStack.arrangedSubviews.forEach { historyStack.removeArrangedSubview($0); $0.removeFromSuperview() }
         addTitle("EDIT HISTORY", to: historyStack)
@@ -543,6 +528,7 @@ final class EditorPanel: GlassChrome {
     @objc private func historyClicked(_ sender: NSButton) { chooseHistory?(sender.tag) }
     func status(_ text: String, busy: Bool = false) {
         message.stringValue = text; message.toolTip = text; self.busy = busy
+        for column in lrColumns.values { column.note.stringValue = text }; leftDevelopColumn.note.stringValue = ""
         lutBrowser.setEnabled(hasPhoto && !busy)
         for panel in maskPanels.values { panel.setEnabled(hasPhoto && !busy) }
         mixer.setEnabled(hasPhoto && !busy)
@@ -555,5 +541,272 @@ final class EditorPanel: GlassChrome {
         for (slider, _, _) in sliders { slider.isEnabled = hasPhoto && !busy }
         for (button, _) in toggles { button.isEnabled = hasPhoto && !busy }
         for button in editButtons { button.isEnabled = button.identifier?.rawValue == "cancelAI" ? busy : ((hasPhoto && !busy) || (!busy && button.identifier?.rawValue == "setupAI")) }
+    }
+}
+
+/// A view lent to the Lightroom arrangement, and where it goes back to.
+fileprivate struct Borrowed {
+    let view: NSView
+    let stack: NSStackView?
+    let index: Int
+    let parent: NSView?
+    let scroll: NSScrollView?
+    let wasHidden: Bool
+}
+
+// MARK: - Lightroom Classic arrangement
+
+extension EditorPanel {
+    /// Switches between the Luminar arrangement (nil) and Lightroom Classic's Library or Develop panels.
+    /// The same controls are used either way; the Lightroom panels borrow them and give them back.
+    func setLightroom(_ module: LightroomModule?) {
+        let target: LightroomModule? = module.map { $0 == .develop ? .develop : .library }
+        guard target != lrModule else { return }
+        command?("finishMask")
+        lrStrip.show(nil); showDrawer(nil)
+        returnBorrowed()
+        for column in lrColumns.values { column.isHidden = true }
+        lrModule = target
+        for v in [sectionTitle, summary, settings, body, message] as [NSView] { v.isHidden = target != nil }
+        flatColor = target == nil ? nil : LRColors.panel
+        guard let target else { showTab(activeTab); return }
+        let column = lrColumns[target] ?? buildLightroom(target)
+        column.isHidden = false
+        for (slot, view, height) in lrSlots[target] ?? [] { borrow(view, into: slot, height: height) }
+        lutBrowser.setActive(target == .develop)
+    }
+    /// The Lightroom tool strip: Crop (R), Remove (Q) or Masking (Shift-W), or nil to close the tool.
+    func showLightroomTool(_ id: String?) {
+        guard lrModule == .develop else { return }
+        lrStrip.show(id); showDrawer(id)
+    }
+    var lightroomToolOpen: String? { lrStrip.selected }
+    /// Keywords of the photo selected in the library, for the Keywording panel.
+    func showKeywords(_ keywords: [String]?) {
+        lrKeywords.stringValue = keywords.map { $0.isEmpty ? "No keywords" : $0.joined(separator: ", ") } ?? "Select a photo to see its keywords."
+    }
+
+    private func buildLightroom(_ module: LightroomModule) -> LRPanelColumn {
+        let column = LRPanelColumn()
+        column.translatesAutoresizingMaskIntoConstraints = false; addSubview(column)
+        NSLayoutConstraint.activate([column.leadingAnchor.constraint(equalTo: leadingAnchor), column.trailingAnchor.constraint(equalTo: trailingAnchor), column.topAnchor.constraint(equalTo: topAnchor), column.bottomAnchor.constraint(equalTo: bottomAnchor)])
+        lrColumns[module] = column
+        var slots: [(NSView, NSView, CGFloat?)] = []
+        func section(_ title: String, open: Bool = false, pinned: Bool = false, _ fill: (LRSection) -> Void) {
+            let s = LRSection(title, module: module, side: .right, open: open); fill(s); column.add(s, pinned: pinned)
+        }
+        func slot(_ view: NSView, in s: LRSection, height: CGFloat? = nil) { let holder = NSView(); s.add(holder); slots.append((holder, view, height)) }
+        func label(_ text: String, in s: LRSection) {
+            let l = NSTextField(labelWithString: text); l.font = .systemFont(ofSize: 11, weight: .medium); l.textColor = LRColors.dim; s.add(l)
+        }
+        lrCamera.font = .monospacedDigitSystemFont(ofSize: 10, weight: .regular); lrCamera.textColor = LRColors.dim; lrCamera.alignment = .center
+        if module == .library {
+            section("Histogram", open: true, pinned: true) { slot(histogram, in: $0) }
+            section("Keywording", open: true) { s in
+                lrKeywords.font = .systemFont(ofSize: 11); lrKeywords.textColor = LRColors.text; lrKeywords.maximumNumberOfLines = 6
+                s.add(lrKeywords); showKeywords(nil)
+                s.add(LRButton("Edit Keywords & Metadata…") { [weak self] in self?.command?("lr:metadata") })
+            }
+            section("Metadata", open: true) { slot(info, in: $0, height: 460) }
+            column.setButtons([("Sync Metadata…", { [weak self] in self?.command?("lr:syncMetadata") }), ("Sync Settings…", { [weak self] in self?.command?("lr:syncSettings") })])
+            lrSlots[module] = slots
+            return column
+        }
+        // Develop: the histogram and tool strip stay at the top; the adjustment panels scroll beneath, in Lightroom's order.
+        section("Histogram", open: true, pinned: true) { s in slot(histogram, in: s); s.add(lrCamera) }
+        column.pin(lrStrip)
+        lrStrip.choose = { [weak self] id in self?.command?("finishMask"); self?.showDrawer(id); self?.lightroomTool?(id) }
+        lrDrawer.orientation = .vertical; lrDrawer.alignment = .leading; lrDrawer.spacing = 8
+        lrDrawer.edgeInsets = NSEdgeInsets(top: 6, left: 14, bottom: 12, right: 14)
+        column.pin(lrDrawer)
+        let crop = LRStack(), remove = LRStack(), masking = LRStack()
+        for box in [crop, remove, masking] { box.orientation = .vertical; box.alignment = .leading; box.spacing = 8; fullWidth(box, in: lrDrawer); box.isHidden = true }
+        drawerViews = ["crop": crop, "remove": remove, "masking": masking]
+        let cropHolder = NSView(); fullWidth(cropHolder, in: crop); slots.append((cropHolder, cropPresets, nil))
+        slider("Angle", path: \.straighten, range: -20...20, in: crop)
+        for (title, id) in [("Draw crop", "crop"), ("Apply crop", "applyCrop"), ("Auto straighten", "autoStraighten"), ("AI align horizon", "horizon"), ("Rotate clockwise", "rotate"), ("Flip horizontally", "flip"), ("Reset", "resetCrop")] { action(title, id, to: crop) }
+        let removeHolder = NSView(); fullWidth(removeHolder, in: remove); slots.append((removeHolder, retouch, nil))
+        help("Remove with AI: select the area with Masking, then:", to: remove); action("Remove selected area", "ai:erase", to: remove)
+        let target = NSTextField(labelWithString: "Mask limits:"); target.font = .systemFont(ofSize: 11); target.textColor = LRColors.dim
+        maskTarget.removeAllItems(); maskTarget.addItems(withTitles: maskOrder); maskTarget.controlSize = .small; maskTarget.font = .systemFont(ofSize: 11)
+        maskTarget.target = self; maskTarget.action = #selector(maskTargetChanged); maskTarget.setAccessibilityLabel("Adjustment the mask limits")
+        if let develop = maskOrder.firstIndex(of: "Develop") { maskTarget.selectItem(at: develop) }
+        let targetRow = NSStackView(views: [target, maskTarget]); targetRow.spacing = 6; fullWidth(targetRow, in: masking)
+        help("OpenStill masks belong to one adjustment. Choose which, then add brush, linear, radial or AI selections.", to: masking)
+        fullWidth(maskSlot, in: masking)
+
+        section("Basic", open: true) { s in
+            treatment.target = self; treatment.action = #selector(treatmentChanged); treatment.controlSize = .small; treatment.setAccessibilityLabel("Treatment")
+            let row = NSStackView(views: [labelView("Treatment"), treatment]); row.spacing = 8; s.add(row)
+            toggle("HDR", path: \.hdrEnabled, in: s.body)
+            slider("HDR headroom (stops)", path: \.hdrHeadroom, range: 0.5...4, in: s.body)
+            label("Profile", in: s); slot(profilePanel, in: s)
+            slider("Profile amount", path: \.profileAmount, range: 0...2, in: s.body)
+            label("White Balance", in: s)
+            action("WB eyedropper", "whiteBalance", to: s.body); action("As Shot", "resetWhiteBalance", to: s.body)
+            slider("Temp", path: \.temperature, range: 2500...10000, in: s.body)
+            slider("Tint", path: \.tint, range: -100...100, in: s.body)
+            label("Tone", in: s); action("Auto", "autoTone", to: s.body)
+            slider("Exposure", path: \.exposure, range: -4...4, in: s.body)
+            slider("Contrast", path: \.contrast, range: 0.5...1.5, in: s.body)
+            slider("Highlights", path: \.highlights, range: 0...1, in: s.body)
+            slider("Shadows", path: \.shadows, range: 0...1, in: s.body)
+            slider("Whites", path: \.whites, range: -1...1, in: s.body)
+            slider("Blacks", path: \.blacks, range: -1...1, in: s.body)
+            label("Presence", in: s)
+            slider("Texture", path: \.texture, range: -1...1, in: s.body)
+            slider("Clarity", path: \.clarity, range: -1...1, in: s.body)
+            slider("Dehaze", path: \.dehaze, range: -1...1, in: s.body)
+            slider("Vibrance", path: \.vibrance, range: -1...1, in: s.body)
+            slider("Saturation", path: \.saturation, range: 0...2, in: s.body)
+        }
+        section("Tone Curve") { slot(curves, in: $0) }
+        section("HSL / Color") { slot(mixer, in: $0) }
+        section("Color Grading") { s in
+            slot(grading, in: s)
+            slider("Blending", path: \.gradeBlending, range: 0...1, in: s.body)
+            slider("Balance", path: \.gradeBalance, range: -1...1, in: s.body)
+        }
+        section("Detail") { s in
+            label("Sharpening", in: s); slider("Amount", path: \.sharpness, range: 0...2, in: s.body)
+            label("Noise Reduction", in: s); slider("Luminance", path: \.denoise, range: 0...1, in: s.body)
+            action("Denoise with AI…", "ai:denoise", to: s.body); action("Denoise RAW data (keeps edits)", "ai:rawdenoise", to: s.body)
+            label("Enhance", in: s); action("Restore detail (AI)", "ai:detail", to: s.body); action("Super Resolution 2×", "ai:upscale", to: s.body)
+        }
+        section("Lens Corrections") { s in
+            slot(lens, in: s)
+            label("Defringe", in: s)
+            slider("Purple amount", path: \.defringePurple, range: 0...1, in: s.body)
+            slider("Purple hue from (°)", path: \.defringePurpleLow, range: 180...360, in: s.body)
+            slider("Purple hue to (°)", path: \.defringePurpleHigh, range: 180...360, in: s.body)
+            slider("Green amount", path: \.defringeGreen, range: 0...1, in: s.body)
+            slider("Green hue from (°)", path: \.defringeGreenLow, range: 30...200, in: s.body)
+            slider("Green hue to (°)", path: \.defringeGreenHigh, range: 30...200, in: s.body)
+        }
+        section("Transform") { s in
+            slot(transformPanel, in: s)
+            slider("Vertical", path: \.transformVertical, range: -1...1, in: s.body)
+            slider("Horizontal", path: \.transformHorizontal, range: -1...1, in: s.body)
+            slider("Rotate", path: \.transformRotate, range: -15...15, in: s.body)
+            slider("Aspect", path: \.transformAspect, range: -1...1, in: s.body)
+            slider("Scale", path: \.transformScale, range: 0.5...1.5, in: s.body)
+            slider("Offset X", path: \.transformOffsetX, range: -1...1, in: s.body)
+            slider("Offset Y", path: \.transformOffsetY, range: -1...1, in: s.body)
+            toggle("Constrain Crop", path: \.transformConstrain, in: s.body)
+            action("Reset transform", "resetTransform", to: s.body)
+        }
+        section("Effects") { s in
+            label("Post-Crop Vignetting", in: s); slider("Amount", path: \.vignette, range: -1...1, in: s.body)
+            label("Grain", in: s)
+            slider("Amount", path: \.grainAmount, range: 0...1, in: s.body)
+            slider("Size", path: \.grainSize, range: 0...1, in: s.body)
+            slider("Roughness", path: \.grainRoughness, range: 0...1, in: s.body)
+        }
+        section("Lens Blur") { s in
+            action("Use the photo’s depth data", "lensBlur:camera", to: s.body)
+            action("Estimate depth (local AI)", "lensBlur:ai", to: s.body)
+            action("Keep the subject sharp", "lensBlur:subject", to: s.body)
+            slider("Blur Amount", path: \.lensBlurAmount, range: 0...1, in: s.body)
+            slider("Focus distance", path: \.lensBlurFocus, range: 0...1, in: s.body)
+            slider("Focus range", path: \.lensBlurRange, range: 0...1, in: s.body)
+            toggle("Blur the foreground too", path: \.lensBlurForeground, in: s.body)
+            action("Remove lens blur", "lensBlur:remove", to: s.body)
+        }
+        section("Calibration") { s in
+            slider("Shadows Tint", path: \.calibrationShadowsTint, range: -1...1, in: s.body)
+            label("Red Primary", in: s)
+            slider("Hue", path: \.calibrationRedHue, range: -1...1, in: s.body); slider("Saturation", path: \.calibrationRedSaturation, range: -1...1, in: s.body)
+            label("Green Primary", in: s)
+            slider("Hue", path: \.calibrationGreenHue, range: -1...1, in: s.body); slider("Saturation", path: \.calibrationGreenSaturation, range: -1...1, in: s.body)
+            label("Blue Primary", in: s)
+            slider("Hue", path: \.calibrationBlueHue, range: -1...1, in: s.body); slider("Saturation", path: \.calibrationBlueSaturation, range: -1...1, in: s.body)
+        }
+        // OpenStill's own tools, after Lightroom's panels.
+        section("Structure") { s in slider("Structure", path: \.structure, range: 0...1, in: s.body); toggle("Auto light & color", path: \.autoEnhance, in: s.body) }
+        section("Glow") { slot(glow, in: $0) }
+        section("Sunrays") { slot(sunrays, in: $0) }
+        section("Sky Replacement") { s in action("Choose sky & replace…", "ai:sky", to: s.body) }
+        section("Layers") { s in
+            slider("Edit strength", path: \.opacity, range: 0...1, in: s.body)
+            action("Add image layer…", "addLayer", to: s.body)
+            slider("Layer opacity", path: \.overlayOpacity, range: 0...1, in: s.body)
+            action("Normal blend", "blendNormal", to: s.body); action("Screen blend", "blendScreen", to: s.body); action("Multiply blend", "blendMultiply", to: s.body)
+            action("Remove image layer", "removeLayer", to: s.body)
+        }
+        section("Local AI") { s in action("Set up local AI tools…", "setupAI", to: s.body); action("Cancel AI processing", "cancelAI", to: s.body) }
+        column.setButtons([("Previous", { [weak self] in self?.command?("previousSettings") }), ("Reset", { [weak self] in self?.command?("reset") })])
+        lrSlots[module] = slots
+        buildLeftDevelop()
+        status(message.stringValue, busy: busy)
+        return column
+    }
+    /// Develop's left panel: Presets, Versions (OpenStill's named alternatives) and History, with Copy… / Paste.
+    private func buildLeftDevelop() {
+        let presets = LRSection("Presets", module: .develop, side: .left, open: true)
+        presets.add(presetSlot); leftDevelopColumn.add(presets)
+        let versionsSection = LRSection("Versions", module: .develop, side: .left, open: false)
+        versionsSection.add(versionSlot); leftDevelopColumn.add(versionsSection)
+        let history = LRSection("History", module: .develop, side: .left, open: true)
+        history.add(historySlot); leftDevelopColumn.add(history)
+        leftDevelopColumn.setButtons([("Copy…", { [weak self] in self?.command?("lr:copy") }), ("Paste", { [weak self] in self?.command?("lr:paste") })])
+        if let presetsDoc = presetScroll.documentView, let historyDoc = historyScroll.documentView {
+            lrSlots[.develop, default: []] += [(presetSlot, presetsDoc, nil), (versionSlot, versions, nil), (historySlot, historyDoc, nil)]
+        }
+    }
+    private func labelView(_ text: String) -> NSTextField { let l = NSTextField(labelWithString: text); l.font = .systemFont(ofSize: 11); l.textColor = LRColors.dim; return l }
+    @objc private func treatmentChanged() {
+        states.monochrome = treatment.selectedSegment == 1 ? 1 : 0
+        editChanged?(states, "Treatment: " + (treatment.selectedSegment == 1 ? "Black & White" : "Color"), true)
+    }
+    private func showDrawer(_ id: String?) {
+        for (key, view) in drawerViews { view.isHidden = key != id }
+        lrDrawer.isHidden = id == nil
+        if id == "masking" { borrowMask() } else { returnMask() }
+    }
+    @objc private func maskTargetChanged() { returnMask(); borrowMask() }
+    private func borrowMask() {
+        returnMask()
+        guard let key = maskTarget.titleOfSelectedItem, let panel = maskPanels[key] else { return }
+        maskBorrow = lend(panel, into: maskSlot, height: nil)
+        panel.resetInteraction()
+    }
+    private func returnMask() { if let b = maskBorrow { give(b); maskBorrow = nil } }
+    private func borrow(_ view: NSView, into slot: NSView, height: CGFloat?) {
+        if let b = lend(view, into: slot, height: height) { borrowed.append(b) }
+    }
+    /// Moves a view into `slot`, remembering where it came from.
+    private func lend(_ view: NSView, into slot: NSView, height: CGFloat?) -> Borrowed? {
+        guard let parent = view.superview else { return nil }
+        let stack = parent as? NSStackView
+        let scroll = (parent as? NSClipView)?.enclosingScrollView
+        let b = Borrowed(view: view, stack: stack, index: stack?.arrangedSubviews.firstIndex(of: view) ?? 0, parent: parent, scroll: scroll, wasHidden: view.isHidden)
+        if let scroll { scroll.documentView = nil } else { view.removeFromSuperview() }
+        view.isHidden = false; view.translatesAutoresizingMaskIntoConstraints = false; slot.addSubview(view)
+        slot.translatesAutoresizingMaskIntoConstraints = false
+        var pins = [view.leadingAnchor.constraint(equalTo: slot.leadingAnchor), view.trailingAnchor.constraint(equalTo: slot.trailingAnchor), view.topAnchor.constraint(equalTo: slot.topAnchor), view.bottomAnchor.constraint(equalTo: slot.bottomAnchor)]
+        if let height { pins.append(slot.heightAnchor.constraint(equalToConstant: height)) }
+        NSLayoutConstraint.activate(pins)
+        return b
+    }
+    /// Puts a lent view back where it was.
+    private func give(_ b: Borrowed) {
+        let slot = b.view.superview
+        b.view.removeFromSuperview(); b.view.isHidden = b.wasHidden
+        slot?.constraints.filter { $0.firstAttribute == .height && $0.secondItem == nil }.forEach { $0.isActive = false }
+        if let scroll = b.scroll {
+            b.view.translatesAutoresizingMaskIntoConstraints = false; scroll.documentView = b.view
+            NSLayoutConstraint.activate([b.view.leadingAnchor.constraint(equalTo: scroll.contentView.leadingAnchor), b.view.topAnchor.constraint(equalTo: scroll.contentView.topAnchor), b.view.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor)])
+        } else if let stack = b.stack {
+            stack.insertArrangedSubview(b.view, at: min(b.index, stack.arrangedSubviews.count))
+            b.view.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -stack.edgeInsets.left - stack.edgeInsets.right).isActive = true
+        } else if let parent = b.parent {
+            parent.addSubview(b.view)
+            NSLayoutConstraint.activate([b.view.leadingAnchor.constraint(equalTo: parent.leadingAnchor), b.view.trailingAnchor.constraint(equalTo: parent.trailingAnchor), b.view.topAnchor.constraint(equalTo: parent.topAnchor), b.view.bottomAnchor.constraint(equalTo: parent.bottomAnchor)])
+        }
+    }
+    private func returnBorrowed() {
+        returnMask()
+        for b in borrowed.reversed() { give(b) }
+        borrowed = []
     }
 }

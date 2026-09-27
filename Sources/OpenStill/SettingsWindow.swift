@@ -281,7 +281,7 @@ private final class ShortcutSettings: NSViewController, NSTableViewDataSource, N
     private let search = NSSearchField()
     private let status = note("")
     private var rows: [Row] = []
-    private static let groupOrder = ["App", "File", "Edit", "View", "Window", "Library grid", "Photo and filmstrip"]
+    private static let groupOrder = ["App", "File", "Edit", "View", "Window", "Workspace", "Library grid", "Photo and filmstrip"]
 
     override func loadView() {
         title = "Shortcuts"

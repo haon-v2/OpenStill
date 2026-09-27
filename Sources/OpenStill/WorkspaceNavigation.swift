@@ -38,6 +38,18 @@ final class LibrarySidebar: GlassChrome {
     var subfoldersChanged: ((Bool) -> Void)?
     var openCollection: ((PhotoCollection) -> Void)?
     var newSmartCollection: (() -> Void)?
+    /// Lightroom layout: Publish Services opens the publish window.
+    var publish: (() -> Void)?
+    /// Lightroom Classic's Catalog, Folders, Collections and Publish Services sections instead of the Luminar list.
+    var lightroom = false {
+        didSet {
+            guard lightroom != oldValue else { return }
+            flatColor = lightroom ? LRColors.panel : nil
+            stack.edgeInsets = lightroom ? NSEdgeInsets() : NSEdgeInsets(top: 20, left: 16, bottom: 20, right: 16)
+            stack.spacing = lightroom ? 0 : 10
+            reloadCollections()
+        }
+    }
     private let stack = LibraryStack()
     private var folder: URL?
     private var count = 0
@@ -67,6 +79,7 @@ final class LibrarySidebar: GlassChrome {
         self.folder = folder; self.count = count; shownCollection = collection
         collections = EditStorage.records.catalog?.collections() ?? []
         stack.arrangedSubviews.forEach { stack.removeArrangedSubview($0); $0.removeFromSuperview() }
+        if lightroom { buildLightroom(collection: collection); return }
         heading("Local", size: 19)
         label("Your photos, on this Mac.")
         let openButton = button("Open folder…", symbol: "folder.badge.plus", action: #selector(openFolder)); Appearance.primary(openButton)
@@ -144,5 +157,76 @@ final class LibrarySidebar: GlassChrome {
             self?.reloadCollections()
         }
     }
+    // MARK: Lightroom Classic sections
+    private func buildLightroom(collection: UUID?) {
+        func section(_ title: String, open: Bool = true, _ fill: (LRSection) -> Void) {
+            let s = LRSection(title, module: .library, side: .left, open: open); s.body.spacing = 0
+            s.body.edgeInsets = NSEdgeInsets(top: 4, left: 0, bottom: 8, right: 0)
+            fill(s); stack.addArrangedSubview(s); s.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+        }
+        let current = collections.first { $0.id == collection }
+        section("Catalog") { s in
+            s.add(row("All Photographs", count: count, action: #selector(filterPhotos(_:)), tag: 0))
+            s.add(row("Picks", action: #selector(filterPhotos(_:)), tag: 1))
+            s.add(row("Rejected", action: #selector(filterPhotos(_:)), tag: 2))
+        }
+        section("Folders") { s in
+            if let folder {
+                let r = row(folder.lastPathComponent, count: current == nil ? count : nil, action: #selector(reveal), selected: current == nil, symbol: "folder.fill")
+                r.toolTip = folder.path + " · Click to show in Finder"; s.add(r)
+            }
+            for (index, url) in recent.enumerated() where url != folder {
+                let r = row(url.lastPathComponent, action: #selector(openRecent(_:)), tag: index, symbol: "folder"); r.toolTip = url.path; s.add(r)
+            }
+            let subfolders = NSButton(checkboxWithTitle: "Include Subfolders", target: self, action: #selector(toggleSubfolders(_:)))
+            subfolders.state = Self.includeSubfolders ? .on : .off; subfolders.font = .systemFont(ofSize: 11); subfolders.controlSize = .small
+            let holder = NSStackView(views: [subfolders]); holder.edgeInsets = NSEdgeInsets(top: 4, left: 26, bottom: 2, right: 8); s.add(holder)
+            s.add(row("Add Folder…", action: #selector(openFolder), symbol: "plus"))
+        }
+        section("Collections") { s in
+            for (index, c) in collections.enumerated() {
+                let r = row(c.name, action: #selector(chooseCollection(_:)), tag: index, selected: c.id == collection, symbol: c.isSmart ? "gearshape" : "rectangle.stack")
+                let menu = NSMenu()
+                for (title, action) in [("Rename…", #selector(renameCollection(_:))), ("Delete…", #selector(deleteCollection(_:)))] {
+                    let item = NSMenuItem(title: title, action: action, keyEquivalent: ""); item.target = self; item.tag = index; menu.addItem(item)
+                }
+                r.menu = menu; r.toolTip = (c.isSmart ? "Smart collection" : "Collection") + " · Control-click to rename or delete"; s.add(r)
+            }
+            s.add(row("Create Smart Collection…", action: #selector(createSmartCollection), symbol: "plus"))
+        }
+        section("Publish Services") { s in s.add(row("Set Up Publishing…", action: #selector(publishServices), symbol: "square.and.arrow.up")) }
+    }
+    /// A flat Lightroom list row: icon, name, and a count on the right.
+    private func row(_ title: String, count: Int? = nil, action: Selector, tag: Int = 0, selected: Bool = false, symbol: String? = nil) -> NSButton {
+        let b = LRListRow(title: title, count: count, symbol: symbol, selected: selected)
+        b.target = self; b.action = action; b.tag = tag; b.setAccessibilityLabel(count.map { "\(title), \($0) photos" } ?? title)
+        return b
+    }
+    @objc private func publishServices() { publish?() }
     @objc private func openRecent(_ sender: NSButton) { guard recent.indices.contains(sender.tag) else { return }; open?(recent[sender.tag]) }
+}
+
+/// A row in Lightroom's left panel lists: highlighted when it's the current source.
+final class LRListRow: NSButton {
+    private let label: String, count: Int?, symbol: String?, selected: Bool
+    init(title: String, count: Int?, symbol: String?, selected: Bool) {
+        label = title; self.count = count; self.symbol = symbol; self.selected = selected
+        super.init(frame: .zero)
+        self.title = title; isBordered = false; heightAnchor.constraint(equalToConstant: 22).isActive = true
+    }
+    required init?(coder: NSCoder) { fatalError() }
+    override func draw(_ dirtyRect: NSRect) {
+        if selected || isHighlighted { NSColor(calibratedWhite: selected ? 0.34 : 0.28, alpha: 1).setFill(); bounds.fill() }
+        var x: CGFloat = 26
+        if let symbol, let image = Appearance.symbol(symbol, size: 11) {
+            image.draw(in: NSRect(x: 26, y: (bounds.height - 12) / 2, width: 13, height: 12), from: .zero, operation: .sourceOver, fraction: 0.7, respectFlipped: true, hints: nil); x = 46
+        }
+        let style = NSMutableParagraphStyle(); style.lineBreakMode = .byTruncatingMiddle
+        let color = selected ? LRColors.bright : LRColors.text
+        (label as NSString).draw(in: NSRect(x: x, y: (bounds.height - 15) / 2, width: bounds.width - x - 50, height: 15), withAttributes: [.font: NSFont.systemFont(ofSize: 11), .foregroundColor: color, .paragraphStyle: style])
+        if let count {
+            let text = "\(count)" as NSString, attrs: [NSAttributedString.Key: Any] = [.font: NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .regular), .foregroundColor: LRColors.dim]
+            text.draw(at: NSPoint(x: bounds.width - 12 - text.size(withAttributes: attrs).width, y: (bounds.height - 13) / 2), withAttributes: attrs)
+        }
+    }
 }
