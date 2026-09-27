@@ -344,3 +344,35 @@ Automated fixtures are generated and contain no user photographs. The real S9 fi
   - Targeted adjustment drags.
   - Restoring a snapshot.
 
+## Library: views, filter bar, stacks, Quick Develop, keywords, rename, Auto Import — September 27, 2026
+
+- **Added:**
+  - Library views: Loupe, Compare and Survey.
+  - A thumbnail size slider.
+  - Metadata filter columns with counts.
+  - Stacks (manual and by capture time).
+  - The Quick Develop panel.
+  - Keyword Sets with ⌥1–9, and keyword suggestions.
+  - The Keyword List.
+  - The Painter.
+  - Rename Photos (F2) with undo.
+  - Auto Import from a watched folder.
+  - The Reference View window.
+- **Automated tests (LibraryM12Tests):**
+  - Stacks group, reorder and break up, and a stack left with one photo goes away.
+  - Closed stacks show their top photo and open ones show all of them.
+  - Auto-stack groups bursts.
+  - Metadata columns count and narrow each other.
+  - Quick Develop nudges, clamps and undoes as a batch.
+  - The keyword tree lists every level.
+  - Suggestions come from co-occurring keywords, and Recent Keywords are tracked.
+  - Rename moves the files and sidecars, updates records and the catalog, refuses clashes, and undoes.
+  - Auto Import waits for files to settle, moves only top-level photos, and refuses a destination inside the watched folder.
+- **UI snapshots on macOS 26 CI:** Grid with the filter bar, Quick Develop and Keywording; Loupe; Compare; Survey; Develop.
+- **Not yet verified by hand on a Mac:**
+  - Dragging the Painter across photos.
+  - Opening a stack with S.
+  - A rename and its undo in a real folder.
+  - Auto Import with a real tethering app.
+  - ⌥1–9 keyword sets.
+
