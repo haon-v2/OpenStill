@@ -27,7 +27,7 @@ import Testing
     @Test func stacksGroupReorderAndBreakUp() throws {
         let catalog = try #require(PhotoRecordStore(root: directory.appendingPathComponent("app")).catalog)
         let a = UUID(), b = UUID(), c = UUID(), d = UUID()
-        #expect(try catalog.createStack([a]) == nil)
+        let single = try catalog.createStack([a]); #expect(single == nil)
         let stack = try #require(try catalog.createStack([a, b, c, a]))
         #expect(catalog.stacks()[stack] == [a, b, c])
         try catalog.setStackTop(c)
@@ -108,9 +108,9 @@ import Testing
         let items = [try item(photo("a.jpg"), store: store), try item(photo("b.jpg"), store: store)]
         let batch = try BatchEdits.apply(QuickDevelop.prepare(items, step: .exposure(1)), store: store)
         #expect(batch.entries.allSatisfy { $0.failure == nil })
-        for i in items { #expect(try store.read(i.id).active.document.current.exposure == 1) }
+        for i in items { let e = try store.read(i.id).active.document.current.exposure; #expect(e == 1) }
         _ = try BatchEdits.undo(batch, store: store)
-        for i in items { #expect(try store.read(i.id).active.document.current.exposure == 0) }
+        for i in items { let e = try store.read(i.id).active.document.current.exposure; #expect(e == 0) }
         let auto = QuickDevelop.prepare(items, step: .autoTone)
         #expect(auto.entries.allSatisfy { $0.failure != nil })
     }
@@ -149,12 +149,12 @@ import Testing
         let a = try photo("a.jpg"), b = try photo("b.jpg")
         try Data("<x:xmpmeta/>".utf8).write(to: XMPSidecar.url(for: a))
         let items = [try item(a, store: store), try item(b, store: store)]
-        #expect(throws: RenameError.self) { try BatchRename.plan(items, template: "{nope}") }
-        #expect(throws: RenameError.self) { try BatchRename.plan(items, template: "same") }
-        #expect(try BatchRename.plan(items, template: "{name}").isEmpty)
+        #expect(throws: RenameError.self) { _ = try BatchRename.plan(items, template: "{nope}") }
+        #expect(throws: RenameError.self) { _ = try BatchRename.plan(items, template: "same") }
+        let unchanged = try BatchRename.plan(items, template: "{name}"); #expect(unchanged.isEmpty)
         // An unrelated file already has the name.
         _ = try photo("trip-001.jpg")
-        #expect(throws: RenameError.self) { try BatchRename.plan(items, template: "trip-{index}") }
+        #expect(throws: RenameError.self) { _ = try BatchRename.plan(items, template: "trip-{index}") }
         let plan = try BatchRename.plan(items, template: "trip-{index}", start: 5)
         #expect(plan.map(\.to.lastPathComponent) == ["trip-005.jpg", "trip-006.jpg"])
         let journal = try BatchRename.perform(plan, store: store)
@@ -162,14 +162,14 @@ import Testing
         #expect(journal.entries.allSatisfy(\.done))
         #expect(FileManager.default.fileExists(atPath: renamed.path) && !FileManager.default.fileExists(atPath: a.path))
         #expect(FileManager.default.fileExists(atPath: XMPSidecar.url(for: renamed).path))
-        #expect(try store.read(items[0].id).sourcePath == renamed.standardizedFileURL.path)
+        let movedPath = try store.read(items[0].id).sourcePath; #expect(movedPath == renamed.standardizedFileURL.path)
         #expect(store.catalog?.photo(items[0].id)?.path == renamed.standardizedFileURL.path)
-        #expect(try store.record(for: renamed).id == items[0].id)
+        let found = try store.record(for: renamed).id; #expect(found == items[0].id)
         #expect(BatchRename.latest(store: store)?.id == journal.id)
         let undone = try BatchRename.undo(journal, store: store)
         #expect(undone.undone && undone.entries.allSatisfy { !$0.done })
         #expect(FileManager.default.fileExists(atPath: a.path) && FileManager.default.fileExists(atPath: XMPSidecar.url(for: a).path))
-        #expect(try store.read(items[0].id).sourcePath == a.standardizedFileURL.path)
+        let backPath = try store.read(items[0].id).sourcePath; #expect(backPath == a.standardizedFileURL.path)
         #expect(BatchRename.latest(store: store) == nil)
     }
 
