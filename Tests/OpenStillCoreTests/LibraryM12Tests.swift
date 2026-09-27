@@ -159,7 +159,7 @@ import Testing
         #expect(plan.map(\.to.lastPathComponent) == ["trip-005.jpg", "trip-006.jpg"])
         let journal = try BatchRename.perform(plan, store: store)
         let renamed = directory.appendingPathComponent("Photos/trip-005.jpg")
-        #expect(journal.entries.allSatisfy(\.done))
+        #expect(journal.entries.allSatisfy { $0.done })
         #expect(FileManager.default.fileExists(atPath: renamed.path) && !FileManager.default.fileExists(atPath: a.path))
         #expect(FileManager.default.fileExists(atPath: XMPSidecar.url(for: renamed).path))
         let movedPath = try store.read(items[0].id).sourcePath; #expect(movedPath == renamed.standardizedFileURL.path)
