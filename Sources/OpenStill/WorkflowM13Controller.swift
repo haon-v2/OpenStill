@@ -229,8 +229,14 @@ extension ViewerController {
         let alert = NSAlert(); alert.messageText = "Identity Plate"
         alert.informativeText = "Your name or studio in the top-left of the Lightroom layout, or a logo image. Leave it empty for “OpenStill”."
         let text = NSTextField(string: UserDefaults.standard.string(forKey: LRModulePicker.plateTextKey) ?? ""); text.placeholderString = "OpenStill"
-        text.frame = NSRect(x: 0, y: 0, width: 300, height: 24); alert.accessoryView = text
-        alert.addButton(withTitle: "Use Text"); alert.addButton(withTitle: "Choose Logo…"); alert.addButton(withTitle: "Cancel")
+        text.frame = NSRect(x: 0, y: 0, width: 300, height: 24)
+        // Logos made or imported in the logo designer (Export → Watermark) can be used here too.
+        let logos = Watermarks.library(), saved = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 300, height: 26))
+        saved.addItem(withTitle: logos.isEmpty ? "No saved logos yet" : "Saved logo…"); saved.addItems(withTitles: logos.map(\.name)); saved.isEnabled = !logos.isEmpty
+        saved.setAccessibilityLabel("Saved logo for the identity plate")
+        let accessory = NSStackView(views: [text, saved]); accessory.orientation = .vertical; accessory.alignment = .leading; accessory.spacing = 8
+        accessory.frame = NSRect(x: 0, y: 0, width: 300, height: 58); alert.accessoryView = accessory
+        alert.addButton(withTitle: "Use Text"); alert.addButton(withTitle: "Choose Logo…"); alert.addButton(withTitle: "Use Saved Logo"); alert.addButton(withTitle: "Cancel")
         alert.beginSheetModal(for: window) { [weak self] response in
             guard let self else { return }
             switch response {
@@ -245,6 +251,17 @@ extension ViewerController {
                 try? FileManager.default.createDirectory(at: EditStorage.root, withIntermediateDirectories: true)
                 try? FileManager.default.removeItem(at: copy); try? FileManager.default.copyItem(at: url, to: copy)
                 UserDefaults.standard.set(copy.path, forKey: LRModulePicker.plateImageKey); self.modulePicker.refreshIdentityPlate()
+            case .alertThirdButtonReturn:
+                guard saved.indexOfSelectedItem > 0, logos.indices.contains(saved.indexOfSelectedItem - 1) else { return }
+                let logo = logos[saved.indexOfSelectedItem - 1]
+                do {
+                    let image = try logo.design.map { try LogoRenderer.vector($0).raster(maximum: 600) } ?? ModernRenderer.display(Watermarks.image(EditStorage.asset(logo.asset), maximum: 600))
+                    guard let png = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]) else { return }
+                    let copy = EditStorage.root.appendingPathComponent("IdentityPlate.png")
+                    try FileManager.default.createDirectory(at: EditStorage.root, withIntermediateDirectories: true)
+                    try png.write(to: copy, options: .atomic)
+                    UserDefaults.standard.set(copy.path, forKey: LRModulePicker.plateImageKey); self.modulePicker.refreshIdentityPlate()
+                } catch { NSSound.beep() }
             default: break
             }
         }

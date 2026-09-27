@@ -224,7 +224,7 @@ public enum LUTImport {
         var installed: [URL] = [], sources = provenance(folder)
         for cube in cubes {
             guard (try? CubeLUT(text: cube.text)) != nil else { continue }
-            let base = safeName(cubes.count == 1 ? source.name : source.name + " — " + URL(fileURLWithPath: cube.name).deletingPathExtension().lastPathComponent)
+            let base = cubes.count == 1 ? safeName(source.name) : safeName(source.name) + " — " + safeName(URL(fileURLWithPath: cube.name).deletingPathExtension().lastPathComponent)
             var target = folder.appendingPathComponent(base + ".cube"), n = 2
             while FileManager.default.fileExists(atPath: target.path) { target = folder.appendingPathComponent("\(base) \(n).cube"); n += 1 }
             try Data(cube.text.utf8).write(to: target, options: .atomic)
