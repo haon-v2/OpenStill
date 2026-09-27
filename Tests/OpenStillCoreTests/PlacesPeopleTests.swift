@@ -210,8 +210,14 @@ import Testing
         try catalog.remove(photos[2].id)
         #expect(catalog.faces(photo: photos[2].id).isEmpty)
     }
-    @Test func noFacesInAPlainPhoto() throws {
-        #expect(FaceDetector.detect(try photo("plain-face.jpg")).isEmpty)
+    @Test func noFacesInAPlainPhoto() async throws {
+        let url = try photo("plain-face.jpg")
+        // Vision blocks until it finishes; run it on a dispatch queue so it never ties up Swift's shared task threads,
+        // which other Vision tests running in parallel also need.
+        let faces = await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async { continuation.resume(returning: FaceDetector.detect(url)) }
+        }
+        #expect(faces.isEmpty)
     }
 
     // MARK: Tethering
