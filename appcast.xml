@@ -81,5 +81,16 @@
             <sparkle:fullReleaseNotesLink>https://github.com/haon-v2/OpenStill/releases/tag/v0.0.7</sparkle:fullReleaseNotesLink>
             <enclosure url="https://github.com/haon-v2/OpenStill/releases/download/v0.0.7/OpenStill-0.0.7.zip" sparkle:edSignature="W5yEqcLSdR/kqQUTFgRXwidPIihMPUfp83eXzjtrwZ0kJwPRgra+htsop2AYNTwH1rPpseO9Vpt3jVd38RrRBw==" length="32060351" type="application/octet-stream"/>
         </item>
+        <item>
+            <title>OpenStill 0.0.8</title>
+            <description><![CDATA[<h3>What’s new in 0.0.8</h3><ul><li>Point and parametric tone curves</li><li>Point Color</li><li>HSL targeted adjustment</li><li>B&amp;W mix</li><li>Detail sliders</li><li>Remove chromatic aberration</li><li>Red eye and Pet eye</li><li>Visualize spots</li><li>Snapshots</li><li>Camera Raw import of curves, gray mix and detail</li></ul>]]></description>
+            <pubDate>Sun, 27 Sep 2026 12:51:56 GMT</pubDate>
+            <sparkle:version>24</sparkle:version>
+            <sparkle:shortVersionString>0.0.8</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <sparkle:fullReleaseNotesLink>https://github.com/haon-v2/OpenStill/releases/tag/v0.0.8</sparkle:fullReleaseNotesLink>
+            <enclosure url="https://github.com/haon-v2/OpenStill/releases/download/v0.0.8/OpenStill-0.0.8.zip" sparkle:edSignature="F0cAcd7aNcTzRVikZhBd3P2bix1E8XuC5kBBCVuLGskry0ErdOXpYRSZYig6aNo7g70rPYm8eA8RmEgX5TDHCQ==" length="32203180" type="application/octet-stream"/>
+        </item>
     </channel>
 </rss>
