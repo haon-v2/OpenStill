@@ -14,7 +14,9 @@ public struct ExportJob:Codable,Identifiable {
     public var id=UUID(),source:URL,sourceHash:String,recipe:RenderRecipe,versionName:String,captured:Date
     public var output:URL?,state=ExportJobState.waiting,error:String?
     public var metadata:IPTCMetadata?
-    public init(_ item:ShootItem){source=item.url;sourceHash=item.record.contentFingerprint;recipe=item.record.active.recipe;versionName=item.record.active.name;captured=item.captured;metadata=item.record.metadata}
+    /// A location set in OpenStill; written when the export keeps GPS.
+    public var location:GeoLocation?
+    public init(_ item:ShootItem){source=item.url;sourceHash=item.record.contentFingerprint;recipe=item.record.active.recipe;versionName=item.record.active.name;captured=item.captured;metadata=item.record.metadata;location=item.record.geotag}
 }
 public struct ExportBatch:Codable,Identifiable {
     public var id=UUID(),jobs:[ExportJob],settings:ExportSettings,directory:URL
@@ -63,7 +65,7 @@ public enum ExportWorkflow {
                         // SDR exports use the SDR rendition of an HDR edit; gain maps need both.
                         let image=try ModernRenderer.render(source:job.source,recipe:batch.settings.isHDR ? job.recipe:job.recipe.sdr)
                         let sdr=batch.settings.hdr == .gainMap && job.recipe.edits.hdr.enabled ? try ModernRenderer.render(source:job.source,recipe:job.recipe.sdr):nil
-                        try ModernRenderer.export(image,to:output,source:job.source,settings:batch.settings,metadata:batch.settings.keepMetadata ? job.metadata:nil,sdrImage:sdr)
+                        try ModernRenderer.export(image,to:output,source:job.source,settings:batch.settings,metadata:batch.settings.keepMetadata ? job.metadata:nil,location:job.location,sdrImage:sdr)
                         result.jobs[i].output=output;result.jobs[i].state = .complete
                     }catch{try? FileManager.default.removeItem(at:output);throw error}
                 }

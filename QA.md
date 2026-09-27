@@ -223,3 +223,26 @@ Automated fixtures are generated and contain no user photographs. The real S9 fi
   - collection state (new, published, modified, pending removal) and saving;
   - folder publishing that replaces edited photos and removes ones taken out.
 - Not yet verified by hand on a Mac: printing to a real printer, slideshow playback on a display, and Flickr/SmugMug with real accounts.
+
+## People, map, timeline and tethered capture — September 27, 2026
+
+- Added:
+  - face detection (Vision) with local grouping, naming, suggestions and "not this person", stored in the catalog, with `People > Name` keywords;
+  - a map of photo locations with drag-to-place, draggable pins and GPX track matching (the file's time zone, or a chosen one plus a clock correction);
+  - locations saved with the photo record, mirrored to the catalog, written to XMP (`exif:GPSLatitude`/`GPSLongitude`) and to exports that keep GPS;
+  - a year/month/day timeline;
+  - tethered capture with ImageCaptureCore into a numbered session folder, with metadata and develop presets, opening each shot.
+- Automated tests (PlacesPeopleTests):
+  - location validation, distance, EXIF GPS and XMP coordinate round trips;
+  - capture times with and without EXIF time-zone offsets;
+  - GPX parsing (namespaces, fractional seconds, bad points), interpolation, the ends of the track, gaps, the date line, and matching with a time zone and a clock correction;
+  - geotags reaching the catalog, XMP and exports (and not exports without Keep GPS), and old records without a location still loading;
+  - timeline grouping across a year boundary, undated photos, ordering;
+  - face grouping of synthetic descriptions, and catalog storage: groups, naming, suggestions, rejections, rescans keeping names, deleting people, removing photos;
+  - People keywords following names and renames;
+  - no faces in a plain image;
+  - session folder and file naming, and presets applied to tethered shots.
+- Not yet verified by hand on a Mac:
+  - face grouping quality on real portraits;
+  - the MapKit window;
+  - tethering with a real camera.

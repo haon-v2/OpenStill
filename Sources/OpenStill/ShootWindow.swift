@@ -68,6 +68,8 @@ final class ShootWindow:NSWindowController,NSCollectionViewDataSource,NSCollecti
     private var metadataWindow:MetadataWindow?
     private var duplicatesWindow:DuplicatesWindow?
     private var outputWindows:[OutputWindow]=[]
+    /// Photos picked from People, Map or Timeline: the library shows only these until "Show all photos".
+    private var focused:(ids:Set<UUID>,title:String)?
     private let queue=OperationQueue(),cache=NSCache<NSString,NSImage>()
     private let search = NSSearchField()
     private var preferredURL: URL?
@@ -98,7 +100,7 @@ final class ShootWindow:NSWindowController,NSCollectionViewDataSource,NSCollecti
         if embedded {
             let more = NSPopUpButton(frame:.zero,pullsDown:true)
             more.addItem(withTitle:"Actions")
-            for (title, action) in [("Edit selected",#selector(openSelected)),("Compare two",#selector(compareSelected)),("Edit metadata…",#selector(editMetadata)),("Write metadata to XMP",#selector(writeXMP)),("Read metadata from XMP",#selector(readXMP)),("Import Camera Raw edits from XMP",#selector(importCameraRaw)),("Add to collection…",#selector(addToCollection)),("Find duplicates…",#selector(findDuplicates)),("Merge to HDR…",#selector(mergeHDR)),("Merge to panorama…",#selector(mergePanorama)),("Focus stack…",#selector(mergeFocusStack)),("Remove from this collection",#selector(removeFromCollection)),("Copy adjustments",#selector(copyAdjustments)),("Paste adjustments…",#selector(pasteAdjustments)),("Undo batch",#selector(undoBatch)),("Export selected…",#selector(exportSelection)),("Print…",#selector(printPhotos)),("Slideshow…",#selector(slideshow)),("Web gallery…",#selector(webGallery)),("Publish…",#selector(publishPhotos)),("Refresh",#selector(refreshAction))] {
+            for (title, action) in [("Edit selected",#selector(openSelected)),("Compare two",#selector(compareSelected)),("Edit metadata…",#selector(editMetadata)),("Write metadata to XMP",#selector(writeXMP)),("Read metadata from XMP",#selector(readXMP)),("Import Camera Raw edits from XMP",#selector(importCameraRaw)),("Add to collection…",#selector(addToCollection)),("Find duplicates…",#selector(findDuplicates)),("Merge to HDR…",#selector(mergeHDR)),("Merge to panorama…",#selector(mergePanorama)),("Focus stack…",#selector(mergeFocusStack)),("Remove from this collection",#selector(removeFromCollection)),("Copy adjustments",#selector(copyAdjustments)),("Paste adjustments…",#selector(pasteAdjustments)),("Undo batch",#selector(undoBatch)),("Export selected…",#selector(exportSelection)),("Print…",#selector(printPhotos)),("Slideshow…",#selector(slideshow)),("Web gallery…",#selector(webGallery)),("Publish…",#selector(publishPhotos)),("People…",#selector(showPeople)),("Map…",#selector(showMap)),("Timeline…",#selector(showTimeline)),("Show all photos",#selector(clearFocus)),("Refresh",#selector(refreshAction))] {
                 let item=NSMenuItem(title:title,action:action,keyEquivalent:"");item.target=self;more.menu?.addItem(item)
             }
             top=NSStackView(views:[minimum,flag,labelFilter,sort,NSView(),more])
@@ -150,9 +152,10 @@ final class ShootWindow:NSWindowController,NSCollectionViewDataSource,NSCollecti
     private func applyFilter(preserving selection:Set<UUID>){
         let query=search.stringValue.trimmingCharacters(in:.whitespacesAndNewlines)
         shown=ShootWorkflow.filter(all,minimumRating:max(0,minimum.indexOfSelectedItem),flag:ShootFlagFilter.allCases[max(0,flag.indexOfSelectedItem)],sort:ShootSort.allCases[max(0,sort.indexOfSelectedItem)],label:Self.labelChoices[max(0,labelFilter.indexOfSelectedItem)],text:query)
+        if let focused{shown=shown.filter{focused.ids.contains($0.id)}}
         grid.reloadData();grid.selectionIndexPaths=Set(shown.enumerated().filter{selection.contains($0.element.id) || $0.element.url == preferredURL}.map{IndexPath(item:$0.offset,section:0)})
         preferredURL=nil
-        message.stringValue="\(shown.count) of \(all.count) photographs · Reject flags never delete files"
+        message.stringValue=focused.map{"\(shown.count) of \(all.count) photographs · \($0.title) · Actions → Show all photos to see the rest"} ?? "\(shown.count) of \(all.count) photographs · Reject flags never delete files"
         selectionChanged?()
     }
     func exportSelectedPhotos() { exportSelection() }
@@ -283,6 +286,27 @@ final class ShootWindow:NSWindowController,NSCollectionViewDataSource,NSCollecti
     @objc private func slideshow(){guard !outputItems.isEmpty else{message.stringValue="Open photos for a slideshow.";return};present(SlideshowWindow(items:outputItems))}
     @objc private func webGallery(){guard !outputItems.isEmpty else{message.stringValue="Open photos for a gallery.";return};present(GalleryWindow(items:outputItems))}
     @objc private func publishPhotos(){present(PublishWindow(items:selectedItems,library:all))}
+    /// Shows only these photos (from People, Map or Timeline) until Show all photos.
+    func focus(on ids:Set<UUID>,title:String){
+        focused=(ids,title);applyFilter(preserving:[]);(browserView.window ?? window)?.makeKeyAndOrderFront(nil)
+        if shown.isEmpty{message.stringValue="None of the photos for \(title) are in this folder or collection."}
+    }
+    @objc private func clearFocus(){focused=nil;applyFilter(preserving:Set(selectedItems.map(\.id)))}
+    @objc private func showPeople(){
+        guard !all.isEmpty else{message.stringValue="Open a folder of photos first.";return}
+        let w=PeopleWindow(items:all)
+        w.show={[weak self] ids,title in self?.focus(on:ids,title:title)};w.changedRecords={[weak self] in self?.refresh();self?.recordsChanged?()};present(w)
+    }
+    @objc private func showMap(){
+        guard !all.isEmpty else{message.stringValue="Open a folder of photos first.";return}
+        let w=MapWindow(items:all)
+        w.show={[weak self] ids,title in self?.focus(on:ids,title:title)};w.changedRecords={[weak self] in self?.refresh();self?.recordsChanged?()};present(w)
+    }
+    @objc private func showTimeline(){
+        guard !all.isEmpty else{message.stringValue="Open a folder of photos first.";return}
+        let w=TimelineWindow(items:all)
+        w.show={[weak self] ids,title in self?.focus(on:ids,title:title)};present(w)
+    }
     /// Exact copies and near-duplicates among the selected photos, or all shown photos when none (or one) is selected.
     @objc private func findDuplicates(){
         let chosen=selectedItems.count>1 ? selectedItems:shown;guard chosen.count>1 else{message.stringValue="Open a folder with at least two photos to look for duplicates.";return}

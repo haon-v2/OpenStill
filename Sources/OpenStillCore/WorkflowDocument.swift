@@ -110,6 +110,8 @@ public struct PhotoRecord: Codable, Identifiable {
     public var flag: PhotoFlag = .none
     public var label: ColorLabel?
     public var metadata: IPTCMetadata?
+    /// A location set in OpenStill (map or GPX), used instead of the file's GPS.
+    public var location: GeoLocation?
     public var active: EditVersion { versions.first(where: { $0.id == activeVersionID }) ?? versions[0] }
     public init(source: URL, fingerprint: String, version: EditVersion) {
         sourcePath = source.standardizedFileURL.path; contentFingerprint = fingerprint

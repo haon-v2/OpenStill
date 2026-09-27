@@ -17,6 +17,7 @@
     <key>SUPublicEDKey</key><string>eovHlM2DVFa6ULdwVoUBWU5w/cIksr18Vk6253NZURs=</string>
     <key>SUEnableAutomaticChecks</key><true/>
     <key>SUScheduledCheckInterval</key><integer>86400</integer>
+    <key>NSCameraUsageDescription</key><string>OpenStill copies new shots from a camera connected with USB during tethered capture.</string>
     <key>NSHumanReadableCopyright</key><string>Copyright © 2026 OpenStill contributors. MIT License.</string>
     <key>CFBundleDocumentTypes</key>
     <array>

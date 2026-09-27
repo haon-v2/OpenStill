@@ -102,6 +102,34 @@ Select photos in the library (or none, for every photo shown), then choose **Lib
 
 Limits: the Flickr and SmugMug connections follow their published OAuth 1.0a upload APIs but haven't been tested against live accounts in CI; tell us if one misbehaves. Printing to CMYK profiles relies on the printer driver.
 
+## People, map, timeline and tethered capture
+
+Choose **Library → Actions**. Each of these works on the photos in the open folder or collection.
+
+- **People…**
+  - **Find Faces** looks for faces in the photos. It uses Apple's Vision framework on this Mac.
+  - Similar faces form unnamed groups. **Grouping** sets how alike faces must be: strict, normal or loose.
+  - Select a group or some faces, then use **Name…**. OpenStill then suggests other faces that look like that person. Select a suggestion and choose **Name…** to confirm it, or **Not This Person** so it isn't suggested for them again.
+  - Named people are added to each photo as a `People > Name` keyword. This makes them searchable, and they're written to exports and XMP.
+  - **Show Photos** shows only that person's photos in the library. Use **Actions → Show all photos** to go back.
+- **Map…**
+  - Shows photos that have a location. It also lists the photos that don't.
+  - To set where photos were taken, drag them from the list onto the map, or drag a pin to move it.
+  - **Import GPX Track…** places photos from a phone, watch or GPS log. It matches each photo's capture time to the track. Photos that record their time zone use it. For the others, choose the time zone the camera's clock was set to, and how many minutes fast it was.
+  - **Show Photos in View** shows only the photos in the visible part of the map.
+  - Locations you set are saved with the photo and replace the camera's. They're written to XMP, and to exports when **Include GPS location** is on.
+  - The map is Apple Maps, so viewing it downloads map tiles from Apple.
+- **Timeline…** groups photos by year, month and day of capture. Double-click one to show its photos.
+- **File → Tethered Capture…** (⇧⌘T)
+  - Connect a camera with USB and name the session. Optionally choose a metadata preset and a develop preset, then click **Start Session**.
+  - Each new shot is copied to `Pictures/OpenStill Sessions/<date> <name>/` and numbered in order. The presets are applied, and the shot opens in the editor.
+  - **Take Picture** fires the camera from the Mac when the camera supports remote capture over PTP. Otherwise, use the camera's shutter button.
+  - There's no live view.
+
+Limits:
+- Face grouping describes each face with Vision's general-purpose image feature print. It isn't a dedicated face-recognition model, so check suggestions before naming them. Lighting, angle and age can split one person into several groups; strict grouping helps when different people are merged.
+- Tethering depends on the camera's USB/PTP support, and it hasn't been tested with a camera in CI.
+
 ## HDR, panoramas and focus stacks
 
 Select photos in the library, then choose **Library → Actions**:
