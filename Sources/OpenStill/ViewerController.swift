@@ -824,6 +824,7 @@ extension ViewerController {
     func setupLightroomChrome() {
         navigator.canvas = canvas
         navigatorSection.add(navigator)
+        navigatorSection.toggled = { [weak self] in self?.updateWorkspaceLayout() }
         navigatorSection.translatesAutoresizingMaskIntoConstraints = false; navigatorBox.addSubview(navigatorSection)
         NSLayoutConstraint.activate([navigatorSection.topAnchor.constraint(equalTo: navigatorBox.topAnchor), navigatorSection.leadingAnchor.constraint(equalTo: navigatorBox.leadingAnchor),
                                      navigatorSection.trailingAnchor.constraint(equalTo: navigatorBox.trailingAnchor), navigatorSection.bottomAnchor.constraint(equalTo: navigatorBox.bottomAnchor)])
@@ -872,6 +873,8 @@ extension ViewerController {
             leftEdge.leadingAnchor.constraint(equalTo: content.leadingAnchor), leftEdge.widthAnchor.constraint(equalToConstant: g), leftEdge.topAnchor.constraint(equalTo: modulePicker.bottomAnchor), leftEdge.bottomAnchor.constraint(equalTo: filmstripBar.topAnchor),
             rightEdge.trailingAnchor.constraint(equalTo: content.trailingAnchor), rightEdge.widthAnchor.constraint(equalToConstant: g), rightEdge.topAnchor.constraint(equalTo: modulePicker.bottomAnchor), rightEdge.bottomAnchor.constraint(equalTo: filmstripBar.topAnchor),
             navigatorBox.leadingAnchor.constraint(equalTo: leftEdge.trailingAnchor), navigatorBox.topAnchor.constraint(equalTo: modulePicker.bottomAnchor), navigatorBox.widthAnchor.constraint(equalToConstant: 250),
+            // The Navigator keeps its own height (header, 160-point preview and padding) so the panel below gets the rest.
+            navigatorBox.heightAnchor.constraint(equalToConstant: navigatorSection.isOpen ? 210 : 28),
             librarySidebar.leadingAnchor.constraint(equalTo: navigatorBox.leadingAnchor), librarySidebar.topAnchor.constraint(equalTo: navigatorBox.bottomAnchor), librarySidebar.bottomAnchor.constraint(equalTo: libraryButtons.topAnchor),
             libraryButtons.leadingAnchor.constraint(equalTo: navigatorBox.leadingAnchor), libraryButtons.widthAnchor.constraint(equalToConstant: 250), libraryButtons.bottomAnchor.constraint(equalTo: filmstripBar.topAnchor), libraryButtons.heightAnchor.constraint(equalToConstant: 40),
             develop.leadingAnchor.constraint(equalTo: navigatorBox.leadingAnchor), develop.widthAnchor.constraint(equalToConstant: 250), develop.topAnchor.constraint(equalTo: navigatorBox.bottomAnchor), develop.bottomAnchor.constraint(equalTo: filmstripBar.topAnchor),

@@ -306,3 +306,10 @@ Automated fixtures are generated and contain no user photographs. The real S9 fi
   - Switching layouts back and forth.
   - Crop / Masking drawers, Lights Out, Sync and Copy / Paste.
   - Panel memory after relaunching.
+
+## Lightroom layout drawing fix — September 27, 2026
+
+- **Fixed:** in 0.0.6 the Lightroom Classic layout showed an empty gray window with only the edge triangles and the toolbar. Since macOS 14, views don't clip their drawing to their own frame, and the flat panel background filled the whole area being redrawn, painting over everything. It now fills only its own frame and clips.
+- **Fixed:** the Navigator stretched and squeezed Develop's Presets, Versions and History out of the left panel. It now keeps its own height.
+- **Verified on macOS 26 CI:** the app was launched with sample photos and snapshots were taken of Lightroom Develop and Library. They show the module picker, Navigator, left and right panels, photo, toolbar and filmstrip.
+- **Known:** the Library histogram stays empty until that photo's grid preview has been saved.
