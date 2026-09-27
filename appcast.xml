@@ -125,5 +125,16 @@
             <sparkle:fullReleaseNotesLink>https://github.com/haon-v2/OpenStill/releases/tag/v0.0.11</sparkle:fullReleaseNotesLink>
             <enclosure url="https://github.com/haon-v2/OpenStill/releases/download/v0.0.11/OpenStill-0.0.11.zip" sparkle:edSignature="hrO8D0fxmHWJPVJKaTzBU6cxFMoD6prTBrXqXe+lRsIvCJGyG01qi4tWS4cH3HoBkUH3sj4iBzk+rclN8Lb+CA==" length="32624979" type="application/octet-stream"/>
         </item>
+        <item>
+            <title>OpenStill 0.0.12</title>
+            <description><![CDATA[<h3>What’s new in 0.0.12</h3><ul><li>Logo designer: Design your own, Generate with AI with a prompt, and Import</li><li>identity plate can use a saved logo</li></ul>]]></description>
+            <pubDate>Sun, 27 Sep 2026 23:21:35 GMT</pubDate>
+            <sparkle:version>28</sparkle:version>
+            <sparkle:shortVersionString>0.0.12</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <sparkle:fullReleaseNotesLink>https://github.com/haon-v2/OpenStill/releases/tag/v0.0.12</sparkle:fullReleaseNotesLink>
+            <enclosure url="https://github.com/haon-v2/OpenStill/releases/download/v0.0.12/OpenStill-0.0.12.zip" sparkle:edSignature="ciP9wI7zWslAmecKWqQ02sy/G13AR5Ks/+jmXBqnHOhIan4ByRLAt5uBG5LiOr12qFeKwNh8K1q5GEYktD0PAA==" length="32635219" type="application/octet-stream"/>
+        </item>
     </channel>
 </rss>
