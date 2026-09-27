@@ -1,5 +1,4 @@
 import AppKit
-import OpenStillCore
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var window: NSWindow!
@@ -9,7 +8,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         createWindow()
-        LayoutDump.runIfRequested(window: window)
         Shortcuts.registerKeys()
         buildMenu()
         NSApp.activate(ignoringOtherApps: true)
