@@ -63,6 +63,16 @@ enum LayoutDump {
                 if depth < 9 { for s in v.subviews { walk(s, depth + 1) } }
             }
             walk(root, 0)
+            if let viewer = window.contentViewController as? ViewerController {
+                var bodies: [NSView] = [], headers: [NSButton] = []
+                for child in Mirror(reflecting: viewer.info).children {
+                    if child.label == "toolBodies" { bodies = child.value as? [NSView] ?? [] }
+                    if child.label == "headers" { headers = child.value as? [NSButton] ?? [] }
+                }
+                let open = zip(headers, bodies).filter { !$0.1.isHidden }.map { $0.0.title }
+                let masking = viewer.info.lightroomToolOpen ?? "none"
+                print("STATE \(path): open tools \(open), lightroom drawer \(masking), canvas tool \(viewer.canvas.tool), layers \(viewer.currentEdits.localAdjustments.map(\.name))"); fflush(stdout)
+            }
             let h = root.bounds.height, w = root.bounds.width
             for (name, p) in [("center", NSPoint(x: w/2, y: h/2)), ("top", NSPoint(x: w/2, y: h - 40)), ("left", NSPoint(x: 120, y: h/2)), ("right", NSPoint(x: w - 120, y: h/2)), ("bottom", NSPoint(x: w/2, y: 60))] {
                 out += "hit \(name) \(p): \(root.hitTest(p).map { "\(type(of: $0))" } ?? "nil")\n"

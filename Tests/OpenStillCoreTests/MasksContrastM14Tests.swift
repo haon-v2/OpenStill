@@ -76,9 +76,6 @@ import Testing
         s = LocalSettings(); s.tint = 1
         let magenta = pixel(try LocalAdjustments.apply(photo, settings: s, sourceSize: CGSize(width: 64, height: 64)), 10, 10)
         #expect(magenta[1] < 0.5, "tint +1 should be more magenta: \(magenta)")
-        // Temporary probe: which way the global Temperature slider moves a gray rendered photo.
-        var global = PhotoEdits(); global.temperature = 7500
-        print("PROBE global temperature 7500 on gray:", pixel(try PhotoEditor.process(solid(0.4, 0.4, 0.4), sourceSize: CGSize(width: 64, height: 64), edits: global, modern: true), 5, 5))
     }
     @Test func batchCopiesMaskLayersOnlyWithMasks() throws {
         var source = PhotoEdits(); let layer = source.addLocalAdjustment(named: "Sky")
