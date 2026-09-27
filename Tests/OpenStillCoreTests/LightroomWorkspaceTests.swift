@@ -9,7 +9,7 @@ import Testing
     deinit { UserDefaults().removePersistentDomain(forName: suite) }
 
     @Test func modulesMatchLightroomWithoutBook() {
-        #expect(LightroomModule.allCases.map(\.title) == ["Library", "Develop", "Map", "Slideshow", "Print", "Web"])
+        #expect(LightroomModule.allCases.map(\.title) == ["Library", "Develop", "Map", "Book", "Slideshow", "Print", "Web"])
         #expect(LightroomModule.allCases.filter(\.isWorkspace) == [.library, .develop])
     }
 

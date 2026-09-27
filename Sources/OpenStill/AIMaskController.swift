@@ -5,7 +5,7 @@ import OpenStillCore
 /// AI mask components (Vision, plus the local AI worker for sky and depth) and Lens Blur depth sources.
 extension ViewerController {
     /// The photo as the mask assets see it: the current base image (after any AI edit), upright, at most `maximum` pixels.
-    private func aiBaseImage(_ edits: PhotoEdits, original: CGImage, maximum: Double = 2048) throws -> CGImage {
+    func aiBaseImage(_ edits: PhotoEdits, original: CGImage, maximum: Double = 2048) throws -> CGImage {
         let base = try edits.baseAsset.map { name -> CGImage in
             if name.hasSuffix(".osfloat") { let image = try ModernRenderer.readImage(EditStorage.asset(name)); guard let cg = ModernRenderer.context.createCGImage(image, from: image.extent, format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!) else { throw EditError.render }; return cg }
             return try PhotoDecoder.decode(EditStorage.asset(name))
@@ -16,7 +16,7 @@ extension ViewerController {
         guard let small = ModernRenderer.context.createCGImage(ci, from: ci.extent.integral, format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!) else { throw EditError.render }
         return small
     }
-    private func saveMask(_ image: CGImage) throws -> String {
+    func saveMask(_ image: CGImage) throws -> String {
         let asset = try EditStorage.newAsset(); try PhotoEditor.write(image, to: asset); return asset.lastPathComponent
     }
 

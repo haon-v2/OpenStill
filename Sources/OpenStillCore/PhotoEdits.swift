@@ -115,6 +115,7 @@ public enum EditStorage {
     public static var root: URL {
         if let path = ProcessInfo.processInfo.environment["OPENSTILL_STORAGE_ROOT"], !path.isEmpty { return URL(fileURLWithPath: path, isDirectory: true) }
         if ProcessInfo.processInfo.arguments.first?.contains(".xctest") == true { return testRoot }
+        if let chosen = CatalogLocation.chosen { return chosen }
         return FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("OpenStill", isDirectory: true)
     }
     private static let recordLock = NSRecursiveLock()

@@ -18,6 +18,8 @@ final class ExportPanel:NSWindowController,NSWindowDelegate,NSTextFieldDelegate 
     private let start=NSButton(title:"Choose folder & export…",target:nil,action:nil),retry=NSButton(title:"Retry unfinished",target:nil,action:nil),cancel=NSButton(title:"Stop queue",target:nil,action:nil)
     private let watermark=NSPopUpButton(),anchor=NSPopUpButton(),markSize=NSSlider(value:20,minValue:1,maxValue:100,target:nil,action:nil),margin=NSSlider(value:3,minValue:0,maxValue:25,target:nil,action:nil),markOpacity=NSSlider(value:0.8,minValue:0,maxValue:1,target:nil,action:nil)
     private var logos:[WatermarkLogo]=[],designer:LogoDesigner?
+    /// After export: nothing, show in Finder, open in an app, or run a script with the exported files.
+    private let after=NSPopUpButton()
     private var controls:[NSControl]=[],batch:ExportBatch?,running=false,closed=false,previewToken=UUID(),cancellation=WorkflowCancellation()
     private let previewQueue:OperationQueue={let q=OperationQueue();q.maxConcurrentOperationCount=1;q.qualityOfService = .userInitiated;return q}()
     init(items:[ShootItem]) {
@@ -39,6 +41,8 @@ final class ExportPanel:NSWindowController,NSWindowDelegate,NSTextFieldDelegate 
         let hint=NSTextField(wrappingLabelWithString:"Filename tokens: {name}, {index}, {date}, {version}. Existing files receive a unique suffix.");hint.font = .systemFont(ofSize:10);hint.textColor = .secondaryLabelColor;left.addArrangedSubview(hint)
         metadata.state = .on
         for view in [upscale,metadata,gps]{left.addArrangedSubview(view)}
+        after.addItems(withTitles:["Do nothing","Show in Finder","Open in app…","Run script…"]);after.target=self;after.action = #selector(afterChosen);after.setAccessibilityLabel("After export")
+        let afterRow=NSStackView(views:[NSTextField(labelWithString:"After export"),after]);afterRow.spacing=12;left.addArrangedSubview(afterRow)
         let watermarkTitle=NSTextField(labelWithString:"Watermarks");watermarkTitle.font = .systemFont(ofSize:10,weight:.semibold);watermarkTitle.textColor = .secondaryLabelColor;left.addArrangedSubview(watermarkTitle)
         refreshLogos();anchor.addItems(withTitles:WatermarkAnchor.allCases.map(\.title));anchor.selectItem(at:8)
         let logoActions=NSStackView(views:[NSButton(title:"Import logo…",target:self,action:#selector(importLogo)),NSButton(title:"Create logo…",target:self,action:#selector(createLogo))]);logoActions.spacing=8;left.addArrangedSubview(logoActions)
@@ -49,7 +53,7 @@ final class ExportPanel:NSWindowController,NSWindowDelegate,NSTextFieldDelegate 
         proofName.font = .systemFont(ofSize:11);proofName.lineBreakMode = .byTruncatingMiddle;left.addArrangedSubview(proofName)
         for view in [proofEnabled,intent,paper,gamut]{left.addArrangedSubview(view)}
         let proofHint=NSTextField(wrappingLabelWithString:"Proofing simulates the selected printer profile on your display. It does not change exported files.");proofHint.font = .systemFont(ofSize:10);proofHint.textColor = .secondaryLabelColor;left.addArrangedSubview(proofHint)
-        controls=[format,hdrOutput,profile,depth,quality,sharp,edge,name,upscale,metadata,gps,preset,save,choose,proofEnabled,intent,paper,gamut,watermark,anchor,markSize,margin,markOpacity]+logoActions.arrangedSubviews.compactMap{$0 as? NSControl}
+        controls=[after,format,hdrOutput,profile,depth,quality,sharp,edge,name,upscale,metadata,gps,preset,save,choose,proofEnabled,intent,paper,gamut,watermark,anchor,markSize,margin,markOpacity]+logoActions.arrangedSubviews.compactMap{$0 as? NSControl}
         for control in [format,hdrOutput,profile,depth,quality,sharp,upscale,metadata,gps,proofEnabled,intent,paper,gamut] as [NSControl]{control.target=self;control.action = #selector(changed)}
         preview.setContentHuggingPriority(.defaultLow,for:.horizontal);preview.setContentHuggingPriority(.defaultLow,for:.vertical);preview.setContentCompressionResistancePriority(.defaultLow,for:.horizontal);preview.setContentCompressionResistancePriority(.defaultLow,for:.vertical);preview.imageScaling = .scaleProportionallyUpOrDown;preview.setAccessibilityLabel("Export preview of "+(items.first?.url.lastPathComponent ?? "photo"))
         result.isEditable=false;result.isSelectable=true;result.font = .systemFont(ofSize:11);result.textContainerInset=NSSize(width:8,height:8);result.autoresizingMask=[.width];result.isVerticallyResizable=true;result.textContainer?.widthTracksTextView=true
@@ -94,7 +98,47 @@ final class ExportPanel:NSWindowController,NSWindowDelegate,NSTextFieldDelegate 
         let panel=NSOpenPanel();panel.title="Export folder";panel.canChooseDirectories=true;panel.canChooseFiles=false;panel.canCreateDirectories=true;panel.prompt="Export here";panel.beginSheetModal(for:window){[weak self] response in guard let self,response == .OK,let directory=panel.url else{return};self.batch=ExportBatch(items:self.items,settings:self.settings,directory:directory);self.runBatch()}
     }
     private func runBatch(){guard let batch,!running else{return};running=true;cancellation=WorkflowCancellation();let cancellation=cancellation;controls.forEach{$0.isEnabled=false};start.isEnabled=false;retry.isEnabled=false;cancel.isEnabled=true
-        ExportWorkflow.queue.addOperation{[weak self] in let finished=ExportWorkflow.run(batch,cancelled:{cancellation.cancelled},progress:{progress in DispatchQueue.main.async{self?.showProgress(progress)}});DispatchQueue.main.async{guard let self else{return};self.batch=finished;self.running=false;self.controls.forEach{$0.isEnabled=true};self.start.isEnabled=true;self.cancel.isEnabled=false;self.retry.isEnabled=finished.jobs.contains{$0.state != .complete};self.updateEnabled();self.showProgress(finished)}}
+        ExportWorkflow.queue.addOperation{[weak self] in let finished=ExportWorkflow.run(batch,cancelled:{cancellation.cancelled},progress:{progress in DispatchQueue.main.async{self?.showProgress(progress)}});DispatchQueue.main.async{guard let self else{return};self.batch=finished;self.running=false;self.controls.forEach{$0.isEnabled=true};self.start.isEnabled=true;self.cancel.isEnabled=false;self.retry.isEnabled=finished.jobs.contains{$0.state != .complete};self.updateEnabled();self.showProgress(finished);self.runAfter(finished)}}
+    }
+    @objc private func afterChosen(){
+        switch after.indexOfSelectedItem{
+        case 1:settings.after = .showInFinder
+        case 2,3:
+            guard let window else{return}
+            let panel=NSOpenPanel();panel.canChooseDirectories=false
+            if after.indexOfSelectedItem==2{panel.allowedContentTypes=[.application];panel.directoryURL=URL(fileURLWithPath:"/Applications")}
+            panel.message=after.indexOfSelectedItem==2 ? "Choose the app to open exported photos in":"Choose a script. It receives the exported files as arguments."
+            let script=after.indexOfSelectedItem==3
+            panel.beginSheetModal(for:window){[weak self] response in
+                guard let self else{return}
+                guard response == .OK,let url=panel.url else{self.after.selectItem(at:0);self.settings.after=nil;return}
+                self.settings.after=script ? .runScript(path:url.path):.openIn(app:url.path)
+                self.after.item(at:self.after.indexOfSelectedItem)?.title=(self.settings.after?.title ?? "")+"…"
+            }
+        default:settings.after=nil
+        }
+    }
+    /// Runs the After export action on the files that exported.
+    private func runAfter(_ batch:ExportBatch){
+        let outputs=batch.jobs.compactMap(\.output);guard !outputs.isEmpty,let action=settings.after else{return}
+        switch action{
+        case .nothing:break
+        case .showInFinder:NSWorkspace.shared.activateFileViewerSelecting(outputs)
+        case .openIn(let app):NSWorkspace.shared.open(outputs,withApplicationAt:URL(fileURLWithPath:app),configuration:NSWorkspace.OpenConfiguration()){_,error in if let error{DispatchQueue.main.async{self.status.stringValue=error.localizedDescription}}}
+        case .runScript(let path):
+            status.stringValue="Running \((path as NSString).lastPathComponent)…"
+            DispatchQueue.global(qos:.userInitiated).async{[weak self] in
+                let result=Result{try ExportAfter.runScript(path,files:outputs)}
+                DispatchQueue.main.async{
+                    guard let self else{return}
+                    switch result{
+                    case .success(let run):self.status.stringValue=run.status==0 ? "Script finished.":"Script ended with status \(run.status)."
+                        if !run.output.isEmpty{self.result.string+="\n\nScript output:\n"+run.output}
+                    case .failure(let error):self.status.stringValue="Couldn’t run the script: "+error.localizedDescription
+                    }
+                }
+            }
+        }
     }
     private func showProgress(_ batch:ExportBatch){let done=batch.jobs.filter{$0.state == .complete}.count;status.stringValue="\(done) of \(batch.jobs.count) exported"+(running ? "…":" · Originals preserved");result.string=batch.jobs.map{$0.source.lastPathComponent+" → "+($0.output?.lastPathComponent ?? $0.state.rawValue)+($0.error.map{"\n  "+$0} ?? "")}.joined(separator:"\n\n")}
     @objc private func stopBatch(){cancellation.cancel();status.stringValue="Stopping after the current photo. Completed exports are retained."}

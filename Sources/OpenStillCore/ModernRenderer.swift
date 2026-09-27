@@ -42,7 +42,10 @@ public enum ModernRenderer {
         let key = "\(url.standardizedFileURL.path)|\(EditStorage.fingerprint(url))|\(mode.rawValue)|\(rawKey)|\(halfSize)" as NSString
         if let cached = sourceCache.object(forKey:key) { return cached.image }
         let image:CIImage
-        if RawDecoder.isRAW(url) {
+        if let preview = SmartPreviews.stand(in: url) {
+            // The original's drive isn't connected: edit its Smart Preview (already decoded, before any edits).
+            image = try readImage(preview)
+        } else if RawDecoder.isRAW(url) {
             switch mode {
             case .raw:
                 let result = try RawDecoder.decode(url, settings:raw,halfSize:halfSize); image = result.image
