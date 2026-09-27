@@ -28,6 +28,7 @@ jobs:
           perl -e 'alarm shift; exec @ARGV' 420 bash scripts/test.sh --filter LibraryM12Tests --no-parallel > m8.log 2>&1
           status=$?
           grep -E "⏱|Test .*(started|passed|failed)|✘|recorded an issue|error:" m8.log | tail -40
+          grep -nE "LibraryM12Tests.swift:[0-9]+" m8.log | sort -u | head -30
           echo "--- started but not finished ---"
           python3 - <<'PY'
           import re
