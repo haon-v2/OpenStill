@@ -1,4 +1,5 @@
 import AppKit
+import OpenStillCore
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var window: NSWindow!
@@ -38,7 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         createWindow(); return true
     }
-    func applicationWillTerminate(_ notification: Notification) { viewer.localAI.cancel() }
+    func applicationWillTerminate(_ notification: Notification) { viewer.localAI.cancel(); viewer.backupIfDue() }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
     @MainActor private func buildMenu() {
@@ -80,6 +81,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         add(file, "Reveal in Finder", #selector(ViewerController.revealPhoto), "r", target: viewer)
         add(file, "Share Photo…", #selector(ViewerController.sharePhoto), "s", target: viewer, modifiers: [.command, .shift])
         add(file, "Move to Trash…", #selector(ViewerController.trashPhoto), "\u{7f}", target: viewer)
+        file.addItem(.separator())
+        add(file, "Export as Catalog…", #selector(ViewerController.exportAsCatalog), target: viewer)
+        add(file, "Import Catalog…", #selector(ViewerController.importCatalog), target: viewer)
+        add(file, "Back Up Catalog Now", #selector(ViewerController.backUpCatalogNow), target: viewer)
+        add(file, "Catalog Settings…", #selector(ViewerController.catalogSettings), target: viewer)
         file.addItem(.separator())
         add(file, "Close Window", #selector(NSWindow.performClose(_:)), "w")
         let edit = menu("Edit")
@@ -124,12 +130,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         library.addItem(.separator())
         add(library, "Auto Import Settings…", #selector(ViewerController.showAutoImportSettings), target: viewer)
         add(library, "Reference View", #selector(ViewerController.showReferenceView), target: viewer)
+        let develop = menu("Develop")
+        add(develop, "Edit In App", #selector(ViewerController.editInApp), "e", target: viewer, modifiers: [.command])
+        add(develop, "Edit In Other App…", #selector(ViewerController.editInOtherApp), target: viewer)
+        develop.addItem(.separator())
+        add(develop, "Auto Sync (On / Off)", #selector(ViewerController.toggleAutoSync), target: viewer)
+        develop.addItem(.separator())
+        let adaptive = NSMenuItem(title: "Adaptive Presets", action: nil, keyEquivalent: ""); let adaptiveMenu = NSMenu(title: "Adaptive Presets")
+        for (i, preset) in AdaptivePresets.all.enumerated() {
+            let item = NSMenuItem(title: preset.name, action: #selector(ViewerController.applyAdaptivePreset(_:)), keyEquivalent: ""); item.tag = i; item.target = viewer; adaptiveMenu.addItem(item)
+        }
+        adaptive.submenu = adaptiveMenu; develop.addItem(adaptive)
+        develop.addItem(.separator())
+        add(develop, "Build Smart Previews", #selector(ViewerController.buildSmartPreviews), target: viewer)
+        add(develop, "Discard Smart Previews", #selector(ViewerController.discardSmartPreviews), target: viewer)
+        develop.addItem(.separator())
+        add(develop, "Identity Plate…", #selector(ViewerController.editIdentityPlate), target: viewer)
         let windowMenu = menu("Window")
         add(windowMenu, "Minimize", #selector(NSWindow.performMiniaturize(_:)), "m")
         add(windowMenu, "Zoom", #selector(NSWindow.performZoom(_:)))
         // Lightroom Classic's module shortcuts and panel keys (F5–F8).
         windowMenu.addItem(.separator())
         add(windowMenu, "Map", #selector(ViewerController.showMapModule), "3", target: viewer, modifiers: [.command, .option])
+        add(windowMenu, "Book", #selector(ViewerController.showBookModule), "4", target: viewer, modifiers: [.command, .option])
         add(windowMenu, "Slideshow", #selector(ViewerController.showSlideshowModule), "5", target: viewer, modifiers: [.command, .option])
         add(windowMenu, "Print", #selector(ViewerController.showPrintModule), "6", target: viewer, modifiers: [.command, .option])
         add(windowMenu, "Web", #selector(ViewerController.showWebModule), "7", target: viewer, modifiers: [.command, .option])
@@ -138,6 +161,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         add(windowMenu, "Show / Hide Filmstrip", #selector(ViewerController.toggleFilmstripPanel), String(UnicodeScalar(NSF6FunctionKey)!), target: viewer, modifiers: [])
         add(windowMenu, "Show / Hide Left Panel", #selector(ViewerController.toggleLeftPanel), String(UnicodeScalar(NSF7FunctionKey)!), target: viewer, modifiers: [])
         add(windowMenu, "Show / Hide Right Panel", #selector(ViewerController.toggleRightPanel), String(UnicodeScalar(NSF8FunctionKey)!), target: viewer, modifiers: [])
+        windowMenu.addItem(.separator())
+        add(windowMenu, "Secondary Display", #selector(ViewerController.toggleSecondaryDisplay), String(UnicodeScalar(NSF11FunctionKey)!), target: viewer, modifiers: [.command])
         NSApp.windowsMenu = windowMenu
     }
     @objc private func showSettings() { settings.showWindow(nil); settings.window?.center(); settings.window?.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true) }

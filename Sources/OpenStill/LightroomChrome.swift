@@ -225,10 +225,21 @@ final class LRModulePicker: LRFill {
     var choose: ((LightroomModule) -> Void)?
     var current: LightroomModule = .develop { didSet { restyle() } }
     private var buttons: [LightroomModule: NSButton] = [:]
+    /// The identity plate: "OpenStill", your own text, or a logo image (Develop › Identity Plate…).
+    static let plateTextKey = "OpenStillIdentityPlateText", plateImageKey = "OpenStillIdentityPlateImage"
+    private let identity = NSTextField(labelWithString: "OpenStill"), logo = NSImageView()
+    func refreshIdentityPlate() {
+        let text = UserDefaults.standard.string(forKey: Self.plateTextKey) ?? ""
+        identity.stringValue = text.isEmpty ? "OpenStill" : text
+        let image = UserDefaults.standard.string(forKey: Self.plateImageKey).flatMap { NSImage(contentsOfFile: $0) }
+        logo.image = image; logo.isHidden = image == nil; identity.isHidden = image != nil
+    }
     init() {
         super.init(LRColors.backdrop)
-        let identity = NSTextField(labelWithString: "OpenStill")
         identity.font = .systemFont(ofSize: 19, weight: .light); identity.textColor = LRColors.dim
+        logo.imageScaling = .scaleProportionallyDown; logo.translatesAutoresizingMaskIntoConstraints = false; addSubview(logo)
+        NSLayoutConstraint.activate([logo.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 22), logo.centerYAnchor.constraint(equalTo: centerYAnchor),
+                                     logo.heightAnchor.constraint(equalToConstant: 30), logo.widthAnchor.constraint(lessThanOrEqualToConstant: 260)])
         let modules = NSStackView(); modules.spacing = 0
         for (index, module) in LightroomModule.allCases.enumerated() {
             if index > 0 {
@@ -246,7 +257,7 @@ final class LRModulePicker: LRFill {
             identity.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 22), identity.centerYAnchor.constraint(equalTo: centerYAnchor),
             modules.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -22), modules.centerYAnchor.constraint(equalTo: centerYAnchor),
         ])
-        restyle()
+        restyle(); refreshIdentityPlate()
     }
     required init?(coder: NSCoder) { fatalError() }
     private func restyle() {

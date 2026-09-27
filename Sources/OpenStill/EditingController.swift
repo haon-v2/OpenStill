@@ -70,8 +70,10 @@ extension ViewerController {
         }
         currentEdits = edits; comparing = false
         if commit {
+            let before = editDocument.current
             editDocument.commit(edits, title: title)
             saveEdits()
+            if autoSync, !title.hasPrefix("Auto Sync") { autoSyncChange(from: before, to: edits, title: title) }
             info.update(edits, document: editDocument, enabled: true)
         }
         renderEdits(interactive:!commit)

@@ -362,10 +362,11 @@ final class ShootWindow:NSWindowController,NSCollectionViewDataSource,NSCollecti
     @objc private func slideshow(){guard !outputItems.isEmpty else{message.stringValue="Open photos for a slideshow.";return};present(SlideshowWindow(items:outputItems))}
     @objc private func webGallery(){guard !outputItems.isEmpty else{message.stringValue="Open photos for a gallery.";return};present(GalleryWindow(items:outputItems))}
     @objc private func publishPhotos(){present(PublishWindow(items:selectedItems,library:all))}
+    @objc func showBook(){guard !outputItems.isEmpty else{message.stringValue="Open photos for a book.";return};present(BookWindow(items:outputItems))}
     // MARK: Lightroom layout: module picker and panel buttons
     /// Opens Map, Slideshow, Print or Web for the selected photos (or all shown photos).
     func openModule(_ module:LightroomModule){
-        switch module{case .map:showMap();case .slideshow:slideshow();case .print:printPhotos();case .web:webGallery();case .library,.develop:break}
+        switch module{case .map:showMap();case .book:showBook();case .slideshow:slideshow();case .print:printPhotos();case .web:webGallery();case .library,.develop:break}
     }
     func openPublish(){publishPhotos()}
     /// Selects this photo in the grid, e.g. when it's clicked in the Lightroom filmstrip.

@@ -24,7 +24,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
     private var infoWidth: NSLayoutConstraint!
     private var shelfHeight: NSLayoutConstraint!
     // Lightroom Classic layout: module picker, Navigator, filmstrip bar, toolbar and the edge triangles.
-    private let modulePicker = LRModulePicker()
+    let modulePicker = LRModulePicker()
     private let navigator = LRNavigator()
     private let zoomLinks = LRZoomLinks()
     private lazy var navigatorSection = LRSection("Navigator", module: .library, side: .left, open: true, accessory: zoomLinks)
@@ -42,6 +42,9 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
     let autoImportMonitor = AutoImportMonitor()
     var autoImportWindow: AutoImportWindow?
     var referenceWindow: ReferenceWindow?
+    // Workflow: the second display window and Auto Sync.
+    var secondaryWindow: SecondaryDisplayWindow?
+    var autoSync = false
     var libraryURLs: [URL] = []
     var folderURL: URL?
     /// The collection the library shows, when opened from the sidebar's Collections.
@@ -469,6 +472,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
     func select(_ index: Int, preservingSelection: Bool = false) {
         guard urls.indices.contains(index) else { return }
         selected = index
+        defer { updateSecondaryDisplay() }
         if !preservingSelection {
             collection.selectSingle(index)
         }
@@ -1017,7 +1021,7 @@ extension ViewerController {
     /// The Library's right panel follows the grid selection: its histogram (from the saved preview), keywords and metadata.
     func updateLibraryInspector() {
         guard layoutMode == .lightroom, isLibrary else { return }
-        updateLibraryPanels()
+        updateLibraryPanels(); updateSecondaryDisplay()
         guard let item = libraryBrowser?.selectedItems.first else { info.showKeywords(nil); info.show(nil); info.updateHistogram(nil, sensor: nil); return }
         info.showKeywords(item.record.metadata?.keywords ?? [])
         if let index = urls.firstIndex(of: item.url) { collection.selectSingle(index); collection.scrollToItems(at: [IndexPath(item: index, section: 0)], scrollPosition: .centeredHorizontally) }

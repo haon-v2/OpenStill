@@ -44,6 +44,8 @@ public struct ExportSettings: Codable, Equatable {
     public var watermark:WatermarkSettings?
     /// HDR output; nil = SDR. PQ and HLG need HEIF; a gain map works with JPEG or HEIF.
     public var hdr: HDRExport?
+    /// After export: show in Finder, open in an app or run a script (nil does nothing).
+    public var after: ExportAfter?
     public init() {}
     public var isHDR: Bool { hdr != nil }
     public var sanitized: ExportSettings {
@@ -237,6 +239,8 @@ public final class PhotoRecordStore {
     public func record(for source: URL, legacy: EditDocument? = nil) throws -> PhotoRecord {
         lock.lock(); defer { lock.unlock() }
         let path = source.standardizedFileURL.path
+        // A missing original (for example on an unplugged drive) keeps its record, so its Smart Preview can be edited.
+        if !FileManager.default.fileExists(atPath: path), let id = catalog?.recordID(path: path), let record = try? read(id), record.sourcePath == path { return record }
         // Fast path: the catalog knows this exact file (same path, size and modification time), so no hashing.
         // A fresh URL: Foundation caches resource values per URL object, which would hide a replaced file.
         let values = try? URL(fileURLWithPath: path).resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])

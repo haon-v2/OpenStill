@@ -1,13 +1,14 @@
 import Foundation
 
-/// The modules along the top of the Lightroom Classic layout. OpenStill has no Book module.
+/// The modules along the top of the Lightroom Classic layout.
 public enum LightroomModule: String, CaseIterable, Codable, Sendable {
-    case library, develop, map, slideshow, print, web
+    case library, develop, map, book, slideshow, print, web
     public var title: String {
         switch self {
         case .library: "Library"
         case .develop: "Develop"
         case .map: "Map"
+        case .book: "Book"
         case .slideshow: "Slideshow"
         case .print: "Print"
         case .web: "Web"
