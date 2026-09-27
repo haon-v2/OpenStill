@@ -42,6 +42,7 @@ extension ViewerController {
     /// Recomputes the clipping overlay and, when the split view is on, a "before" render with the same frame.
     func refreshCompareExtras(_ displayed: CGImage, interactive: Bool) {
         let token = UUID(); compareToken = token
+        if spotsVisible && !interactive { refreshSpots() }
         if showClipping {
             histogramQueue.async { [weak self] in
                 let overlay = ClippingOverlay.render(displayed)

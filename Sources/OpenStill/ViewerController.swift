@@ -74,6 +74,14 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
     var currentEdits = PhotoEdits()
     /// The last photo's settings, for Lightroom's Previous button.
     var previousEdits: PhotoEdits?
+    /// Targeted adjustment in progress: what's being changed, the edits it started from, and what was sampled.
+    var targetState: (kind: String, base: PhotoEdits, luminance: Double, hue: Double)?
+    /// Visualize Spots overlay and its sensitivity (0 finds only strong spots … 1 finds faint ones).
+    var spotsVisible = false
+    var spotThreshold = 0.7
+    var eyeKind = EyeFixKind.redEye
+    /// The targeted adjustment chosen, waiting for a press on the photo ("curve", "hue", "saturation" or "luminance").
+    var pendingTarget: String?
     var preparedSource: URL?
     var photoRecord: PhotoRecord?
     var editToken = UUID()
@@ -981,6 +989,8 @@ extension ViewerController {
     }
     /// Choosing Crop starts the crop overlay; closing it applies the crop, as Lightroom's Done does.
     fileprivate func lightroomToolChanged(_ id: String?) {
+        if id == "redeye" { editingCommand("eye:redEye"); return }
+        if canvas.tool == .eyeFix { canvas.clearTool() }
         if id == "crop" { editingCommand("crop") }
         else if canvas.tool == .crop { editingCommand("applyCrop") }
     }

@@ -69,35 +69,33 @@ public struct CameraRawImport {
             }
         }
 
-        // Tone curve: sampled at OpenStill's five points.
-        func curve(_ key: String) -> [Double]? {
+        // Tone curve: the exact points, and the parametric curve.
+        func curve(_ key: String) -> [CurvePoint]? {
             used.insert(key)
             guard let items = xmp.cameraRawLists[key] else { return nil }
-            let points = items.compactMap { item -> (Double, Double)? in
+            let points = items.compactMap { item -> CurvePoint? in
                 let parts = item.split(separator: ",").compactMap { Double($0.trimmingCharacters(in: .whitespaces)) }
-                return parts.count == 2 ? (parts[0] / 255, parts[1] / 255) : nil
-            }.sorted { $0.0 < $1.0 }
-            guard points.count >= 2 else { return nil }
-            let sampled = ToneCurves.identity.map { x -> Double in
-                if x <= points[0].0 { return points[0].1 }
-                if x >= points[points.count - 1].0 { return points[points.count - 1].1 }
-                let i = points.firstIndex { $0.0 >= x }!, a = points[i - 1], b = points[i]
-                return b.0 == a.0 ? b.1 : a.1 + (b.1 - a.1) * (x - a.0) / (b.0 - a.0)
+                return parts.count == 2 ? CurvePoint(parts[0] / 255, parts[1] / 255) : nil
             }
-            return zip(sampled, ToneCurves.identity).allSatisfy { abs($0 - $1) < 1e-4 } ? nil : sampled
+            guard points.count >= 2 else { return nil }
+            let cleaned = CurvePoint.cleaned(points)
+            return cleaned == CurvePoint.identity ? nil : cleaned
         }
         var curves = edits.curves, curved = false
-        if let c = curve("ToneCurvePV2012") ?? curve("ToneCurve") { curves.master = c; curved = true }
-        if let c = curve("ToneCurvePV2012Red") { curves.red = c; curved = true }
-        if let c = curve("ToneCurvePV2012Green") { curves.green = c; curved = true }
-        if let c = curve("ToneCurvePV2012Blue") { curves.blue = c; curved = true }
-        if curved {
-            edits.curves = curves; applied += 1
-            if (xmp.cameraRawLists["ToneCurvePV2012"]?.count ?? 0) > 5 { approximated.append("Point curve (sampled at five points)") }
-        }
-        let parametric = ["ParametricShadows", "ParametricDarks", "ParametricLights", "ParametricHighlights"].compactMap { key -> String? in take(key).map { "\(key.dropFirst(10)) \(Int($0))" } }
-        used.formUnion(["ParametricShadowSplit", "ParametricMidtoneSplit", "ParametricHighlightSplit"])
-        if !parametric.isEmpty { applied -= parametric.count; unsupported.append("Parametric curve (" + parametric.joined(separator: ", ") + ")") }
+        if let c = curve("ToneCurvePV2012") ?? curve("ToneCurve") { curves.masterPoints = c; curved = true }
+        if let c = curve("ToneCurvePV2012Red") { curves.redPoints = c; curved = true }
+        if let c = curve("ToneCurvePV2012Green") { curves.greenPoints = c; curved = true }
+        if let c = curve("ToneCurvePV2012Blue") { curves.bluePoints = c; curved = true }
+        var parametric = ParametricCurve(), parametricUsed = false
+        if let v = take("ParametricShadows") { parametric.shadows = v / 100; parametricUsed = true }
+        if let v = take("ParametricDarks") { parametric.darks = v / 100; parametricUsed = true }
+        if let v = take("ParametricLights") { parametric.lights = v / 100; parametricUsed = true }
+        if let v = take("ParametricHighlights") { parametric.highlights = v / 100; parametricUsed = true }
+        if let v = take("ParametricShadowSplit", default: 25) { parametric.shadowSplit = v / 100 }
+        if let v = take("ParametricMidtoneSplit", default: 50) { parametric.midtoneSplit = v / 100 }
+        if let v = take("ParametricHighlightSplit", default: 75) { parametric.highlightSplit = v / 100 }
+        if parametricUsed, !parametric.sanitized.isIdentity { curves.parametric = parametric; curved = true }
+        if curved { edits.curves = curves; applied += 1 }
 
         // HSL / Color mixer
         let bands = ["Red", "Orange", "Yellow", "Green", "Aqua", "Blue", "Purple", "Magenta"]
@@ -111,8 +109,9 @@ public struct CameraRawImport {
             if let luminance { b.lightness = luminance / 100 }
             b.displayMode = "hsl"; edits.advanced!.colors[i] = b
         }
-        let grays = bands.compactMap { band in take("GrayMixer\(band)").map { "\(band) \(Int($0))" } }
-        if !grays.isEmpty { applied -= grays.count; unsupported.append("Black & white mix (" + grays.joined(separator: ", ") + ")") }
+        var mix = PhotoEdits.neutralGrayMix, mixed = false
+        for (i, band) in bands.enumerated() { if let v = take("GrayMixer\(band)") { mix[i] = v / 100; mixed = true } }
+        if mixed { edits.grayMix = mix }
 
         // Color grading (and the older split toning)
         var grading = edits.colorGrading, graded = false
@@ -137,9 +136,17 @@ public struct CameraRawImport {
 
         // Detail
         if let v = take("Sharpness", default: raw ? 40 : 0) { edits.sharpness = min(2, v / 75) }
-        used.formUnion(["SharpenRadius", "SharpenDetail", "SharpenEdgeMasking", "LuminanceNoiseReductionDetail", "LuminanceNoiseReductionContrast", "ColorNoiseReductionDetail", "ColorNoiseReductionSmoothness"])
+        var detail = DetailSettings(), detailed = false
+        if let v = take("SharpenRadius", default: 1) { detail.radius = v; detailed = true }
+        if let v = take("SharpenDetail", default: 25) { detail.detail = v / 100; detailed = true }
+        if let v = take("SharpenEdgeMasking", default: 0) { detail.masking = v / 100; detailed = true }
         if let v = take("LuminanceSmoothing") { edits.denoise = v / 100 }
-        if let v = take("ColorNoiseReduction", default: raw ? 25 : 0) { applied -= 1; approximated.append("Color noise reduction \(Int(v)) (use RAW decoding → Color noise in Profile & calibration)") }
+        if let v = take("LuminanceNoiseReductionDetail", default: 50) { detail.noiseDetail = v / 100; detailed = true }
+        if let v = take("LuminanceNoiseReductionContrast", default: 0) { detail.noiseContrast = v / 100; detailed = true }
+        if let v = take("ColorNoiseReduction", default: raw ? 25 : 0) { detail.color = v / 100; detailed = true }
+        if let v = take("ColorNoiseReductionDetail", default: 50) { detail.colorDetail = v / 100; detailed = true }
+        used.insert("ColorNoiseReductionSmoothness")
+        if detailed { edits.detail = detail }
 
         // Effects
         if let v = take("PostCropVignetteAmount") { edits.vignette = v / 100 }
@@ -156,7 +163,7 @@ public struct CameraRawImport {
         if let v = take("VignetteAmount") { applied -= 1; unsupported.append("Lens vignetting \(Int(v))") }
         used.insert("VignetteMidpoint")
         if flag("LensProfileEnable") { unsupported.append("Lens profile corrections (turn on Lens corrections in OpenStill; its profiles are matched separately)") }
-        if flag("AutoLateralCA") { unsupported.append("Remove chromatic aberration (use Defringe in Lens corrections)") }
+        if flag("AutoLateralCA") { unsupported.append("Remove chromatic aberration (click Remove chromatic aberration in Lens corrections to measure it for this photo)") }
         used.formUnion(["LensProfileSetup", "LensProfileName", "LensProfileFilename", "LensProfileDigest", "LensProfileDistortionScale", "LensProfileVignettingScale", "LensProfileChromaticAberrationScale", "LensManualDistortionAmount", "LensProfileIsEmbedded"])
         let defringe = ["DefringePurpleAmount", "DefringeGreenAmount"].compactMap { key in take(key).map { (key, $0) } }
         if !defringe.isEmpty {

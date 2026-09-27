@@ -2,39 +2,75 @@ import AppKit
 import CoreImage
 import OpenStillCore
 
+/// The curve graph. Point mode: click to add a point, drag to move it, double-click (or drag off the graph) to remove it.
 private final class CurveGraph: NSView {
-    var values = ToneCurves.identity { didSet { needsDisplay = true } }
+    var points = CurvePoint.identity { didSet { needsDisplay = true } }
+    /// Draws this function instead of the points (the parametric curve), and disables point editing.
+    var curve: ((Double) -> Double)? { didSet { needsDisplay = true } }
     var color = NSColor.white
-    var changed: (([Double],Bool)->Void)?
+    var changed: (([CurvePoint],Bool)->Void)?
     private var handle:Int?
     override var acceptsFirstResponder:Bool { true }
-    override init(frame:NSRect) { super.init(frame:frame); setAccessibilityElement(true); setAccessibilityLabel("Tone curve: drag a point, or use the five output sliders below"); setAccessibilityRole(.image) }
+    override init(frame:NSRect) { super.init(frame:frame); setAccessibilityElement(true); setAccessibilityLabel("Tone curve: click to add a point, drag to move it, double-click to remove it"); setAccessibilityRole(.image) }
     required init?(coder:NSCoder) { fatalError() }
+    private var area: CGRect { bounds.insetBy(dx:10,dy:10) }
     override func draw(_ dirtyRect:NSRect) {
         NSColor(calibratedWhite:0.08,alpha:0.7).setFill(); NSBezierPath(roundedRect:bounds,xRadius:6,yRadius:6).fill()
-        let r = bounds.insetBy(dx:10,dy:10)
+        let r = area
         NSColor.separatorColor.setStroke()
         for i in 0...4 {
             let f = Double(i)/4, line = NSBezierPath()
             line.move(to:CGPoint(x:r.minX+f*r.width,y:r.minY)); line.line(to:CGPoint(x:r.minX+f*r.width,y:r.maxY))
             line.move(to:CGPoint(x:r.minX,y:r.minY+f*r.height)); line.line(to:CGPoint(x:r.maxX,y:r.minY+f*r.height)); line.stroke()
         }
-        let curve = NSBezierPath(); curve.lineWidth = 1.5; color.setStroke()
-        for i in 0...256 { let x = Double(i)/256; let p = CGPoint(x:r.minX+x*r.width,y:r.minY+ToneCurves.value(at:x,points:values)*r.height); if i == 0 { curve.move(to:p) } else { curve.line(to:p) } }
-        curve.stroke(); color.setFill()
-        for (i,v) in values.enumerated() { NSBezierPath(ovalIn:CGRect(x:r.minX+Double(i)/4*r.width-3,y:r.minY+v*r.height-3,width:6,height:6)).fill() }
+        let path = NSBezierPath(); path.lineWidth = 1.5; color.setStroke()
+        for i in 0...256 {
+            let x = Double(i)/256, y = curve?(x) ?? CurvePoint.value(at:x,points:points)
+            let p = CGPoint(x:r.minX+x*r.width,y:r.minY+min(1,max(0,y))*r.height); if i == 0 { path.move(to:p) } else { path.line(to:p) }
+        }
+        path.stroke()
+        guard curve == nil else { return }
+        color.setFill()
+        for (i,p) in points.enumerated() {
+            let dot = NSBezierPath(ovalIn:CGRect(x:r.minX+p.x*r.width-4,y:r.minY+p.y*r.height-4,width:8,height:8))
+            dot.fill(); if i == handle { NSColor.white.setStroke(); dot.lineWidth = 1.5; dot.stroke() }
+        }
+        setAccessibilityValue(points.map { "\(Int($0.x*255)) to \(Int($0.y*255))" }.joined(separator:", "))
+    }
+    private func location(_ event:NSEvent) -> CurvePoint {
+        let p = convert(event.locationInWindow,from:nil), r = area
+        return CurvePoint((p.x-r.minX)/r.width,(p.y-r.minY)/r.height)
     }
     override func mouseDown(with event:NSEvent) {
+        guard curve == nil, isEnabled else { return }
         window?.makeFirstResponder(self)
-        let p = convert(event.locationInWindow,from:nil), r = bounds.insetBy(dx:10,dy:10)
-        handle = min(4,max(0,Int(((p.x-r.minX)/r.width*4).rounded()))); update(event,final:false)
+        let q = location(event), r = area
+        let near = points.indices.min { hypot((points[$0].x-q.x)*r.width,(points[$0].y-q.y)*r.height) < hypot((points[$1].x-q.x)*r.width,(points[$1].y-q.y)*r.height) }
+        let close = near.map { hypot((points[$0].x-q.x)*r.width,(points[$0].y-q.y)*r.height) < 9 } ?? false
+        if event.clickCount == 2, close, let near, near != 0, near != points.count-1 { points.remove(at:near); handle = nil; changed?(points,true); return }
+        if close, let near { handle = near }
+        else if points.count < CurvePoint.maximumCount {
+            let x = min(1,max(0,q.x)), onCurve = CurvePoint(x,CurvePoint.value(at:x,points:points))
+            points.append(onCurve); points.sort { $0.x < $1.x }; handle = points.firstIndex(of:onCurve)
+            changed?(points,false)
+        }
+        needsDisplay = true
     }
-    override func mouseDragged(with event:NSEvent) { update(event,final:false) }
-    override func mouseUp(with event:NSEvent) { update(event,final:true); handle = nil }
-    private func update(_ event:NSEvent, final:Bool) {
-        guard let handle else { return }; let p = convert(event.locationInWindow,from:nil), r = bounds.insetBy(dx:10,dy:10)
-        values[handle] = min(1,max(0,(p.y-r.minY)/r.height)); changed?(values,final)
+    override func mouseDragged(with event:NSEvent) {
+        guard let i = handle, points.indices.contains(i) else { return }
+        var q = location(event)
+        let lo = i == 0 ? 0 : points[i-1].x+0.01, hi = i == points.count-1 ? 1 : points[i+1].x-0.01
+        q.x = min(hi,max(lo,q.x)); q.y = min(1,max(0,q.y))
+        points[i] = q; changed?(points,false)
     }
+    override func mouseUp(with event:NSEvent) {
+        guard let i = handle, points.indices.contains(i) else { handle = nil; return }
+        // Dragging an inner point well off the graph removes it, as in Lightroom.
+        let q = location(event)
+        if i != 0, i != points.count-1, q.y < -0.08 || q.y > 1.08 { points.remove(at:i) }
+        handle = nil; changed?(points,true)
+    }
+    var isEnabled = true { didSet { needsDisplay = true } }
 }
 private final class CurveSlider: NSSlider {
     var change:((Double,Bool)->Void)?
@@ -42,35 +78,79 @@ private final class CurveSlider: NSSlider {
     @objc func adjust() { change?(doubleValue,!tracking) }
     override func mouseDown(with event:NSEvent) { tracking = true; super.mouseDown(with:event); tracking = false; change?(doubleValue,true) }
 }
+/// Tone Curve, as in Lightroom: a Parametric curve (four region sliders and three splits) and a Point curve per channel.
 final class ToneCurvePanel: NSStackView {
     var changed: ((ToneCurves,Bool)->Void)?
-    private let channel = NSPopUpButton(frame:.zero,pullsDown:false)
+    private let mode = NSSegmentedControl(labels:["Parametric","Point"], trackingMode:.selectOne, target:nil, action:nil)
+    private let channel = NSSegmentedControl(labels:["RGB","Red","Green","Blue"], trackingMode:.selectOne, target:nil, action:nil)
     private let graph = CurveGraph()
-    private var sliders:[CurveSlider] = []
+    private let parametricRows = NSStackView()
+    private let hint = NSTextField(wrappingLabelWithString:"Click the curve to add a point, drag to move it, double-click to remove it.")
+    private var sliders:[(CurveSlider,NSTextField,WritableKeyPath<ParametricCurve,Double>)] = []
     private var settings = ToneCurves()
-    private let paths:[WritableKeyPath<ToneCurves,[Double]>] = [\.master,\.red,\.green,\.blue]
+    private let pointPaths:[WritableKeyPath<ToneCurves,[CurvePoint]?>] = [\.masterPoints,\.redPoints,\.greenPoints,\.bluePoints]
+    private let samplePaths:[WritableKeyPath<ToneCurves,[Double]>] = [\.master,\.red,\.green,\.blue]
     override init(frame:NSRect) {
         super.init(frame:frame); orientation = .vertical; alignment = .leading; spacing = 8
-        channel.addItems(withTitles:["Master","Red","Green","Blue"]); channel.target = self; channel.action = #selector(selectChannel); channel.setAccessibilityLabel("Curve channel")
-        addArrangedSubview(channel); channel.widthAnchor.constraint(equalTo:widthAnchor).isActive = true
-        addArrangedSubview(graph); graph.widthAnchor.constraint(equalTo:widthAnchor).isActive = true; graph.heightAnchor.constraint(equalToConstant:155).isActive = true
-        graph.changed = { [weak self] values,final in guard let self else { return }; self.settings[keyPath:self.paths[self.channel.indexOfSelectedItem]] = values; self.refresh(); self.changed?(self.settings,final) }
-        for i in 0..<5 {
-            let label = NSTextField(labelWithString:["Blacks","Shadows","Midtones","Highlights","Whites"][i]); label.font = .systemFont(ofSize:10); label.widthAnchor.constraint(equalToConstant:65).isActive = true
-            let slider = CurveSlider(value:Double(i)/4,minValue:0,maxValue:1,target:nil,action:nil); slider.target = slider; slider.action = #selector(CurveSlider.adjust); slider.isContinuous = true; slider.setAccessibilityLabel("Curve " + label.stringValue)
-            slider.change = { [weak self] value,final in guard let self else { return }; self.settings[keyPath:self.paths[self.channel.indexOfSelectedItem]][i] = value; self.refresh(); self.changed?(self.settings,final) }
-            let row = NSStackView(views:[label,slider]); row.spacing = 8; addArrangedSubview(row); row.widthAnchor.constraint(equalTo:widthAnchor).isActive = true; sliders.append(slider)
+        mode.selectedSegment = 1; mode.target = self; mode.action = #selector(modeChanged); mode.setAccessibilityLabel("Curve type"); mode.controlSize = .small
+        channel.selectedSegment = 0; channel.target = self; channel.action = #selector(modeChanged); channel.setAccessibilityLabel("Curve channel"); channel.controlSize = .small
+        for v in [mode, channel] as [NSView] { addArrangedSubview(v) }
+        addArrangedSubview(graph); graph.widthAnchor.constraint(equalTo:widthAnchor).isActive = true; graph.heightAnchor.constraint(equalTo:graph.widthAnchor, multiplier:0.9).isActive = true
+        graph.changed = { [weak self] points,final in guard let self else { return }; self.setPoints(points); self.changed?(self.settings,final) }
+        hint.font = .systemFont(ofSize:10); hint.textColor = .secondaryLabelColor; addArrangedSubview(hint); hint.widthAnchor.constraint(equalTo:widthAnchor).isActive = true
+        parametricRows.orientation = .vertical; parametricRows.alignment = .leading; parametricRows.spacing = 6
+        let rows:[(String,WritableKeyPath<ParametricCurve,Double>,ClosedRange<Double>)] = [("Highlights",\.highlights,-1...1),("Lights",\.lights,-1...1),("Darks",\.darks,-1...1),("Shadows",\.shadows,-1...1),
+                                                                                     ("Shadow split",\.shadowSplit,0.1...0.4),("Midtone split",\.midtoneSplit,0.3...0.7),("Highlight split",\.highlightSplit,0.6...0.9)]
+        for (title,path,range) in rows {
+            let label = NSTextField(labelWithString:title); label.font = .systemFont(ofSize:10); label.widthAnchor.constraint(equalToConstant:82).isActive = true
+            let value = NSTextField(labelWithString:""); value.font = .monospacedDigitSystemFont(ofSize:10, weight:.regular); value.textColor = .secondaryLabelColor; value.widthAnchor.constraint(equalToConstant:34).isActive = true
+            let slider = CurveSlider(value:0,minValue:range.lowerBound,maxValue:range.upperBound,target:nil,action:nil); slider.target = slider; slider.action = #selector(CurveSlider.adjust); slider.isContinuous = true; slider.controlSize = .small
+            slider.setAccessibilityLabel("Parametric curve " + title)
+            slider.change = { [weak self] v,final in
+                guard let self else { return }
+                var p = self.settings.parametric ?? ParametricCurve(); p[keyPath:path] = v; self.settings.parametric = p.isIdentity && path != \.shadowSplit && path != \.midtoneSplit && path != \.highlightSplit ? nil : p
+                self.refresh(); self.changed?(self.settings,final)
+            }
+            let row = NSStackView(views:[label,slider,value]); row.spacing = 6; parametricRows.addArrangedSubview(row); row.widthAnchor.constraint(equalTo:parametricRows.widthAnchor).isActive = true
+            sliders.append((slider,value,path))
         }
-        let reset = NSButton(title:"Reset curves",target:self,action:#selector(reset)); reset.bezelStyle = .rounded; addArrangedSubview(reset)
+        addArrangedSubview(parametricRows); parametricRows.widthAnchor.constraint(equalTo:widthAnchor).isActive = true
+        let reset = NSButton(title:"Reset curve",target:self,action:#selector(reset)); reset.bezelStyle = .rounded; reset.controlSize = .small; addArrangedSubview(reset)
+        refresh()
     }
     required init?(coder:NSCoder) { fatalError() }
-    func update(_ next:ToneCurves, enabled:Bool) { settings = next.sanitized; channel.isEnabled = enabled; graph.isHidden = !enabled; sliders.forEach { $0.isEnabled = enabled }; refresh() }
-    @objc private func selectChannel() { refresh() }
-    @objc private func reset() { settings = ToneCurves(); refresh(); changed?(settings,true) }
+    func update(_ next:ToneCurves, enabled:Bool) {
+        settings = next.sanitized; mode.isEnabled = enabled; channel.isEnabled = enabled; graph.isEnabled = enabled
+        sliders.forEach { $0.0.isEnabled = enabled }; refresh()
+    }
+    /// The curve currently shown, for the targeted adjustment tool: 0 master … 3 blue.
+    var selectedChannel: Int { mode.selectedSegment == 1 ? max(0,channel.selectedSegment) : 0 }
+    @objc private func modeChanged() { refresh() }
+    @objc private func reset() {
+        if mode.selectedSegment == 0 { settings.parametric = nil }
+        else { let i = selectedChannel; settings[keyPath:pointPaths[i]] = nil; settings[keyPath:samplePaths[i]] = ToneCurves.identity }
+        refresh(); changed?(settings,true)
+    }
+    /// Points of the selected channel. An older five-sample curve becomes five points the first time it's edited.
+    private func currentPoints() -> [CurvePoint] {
+        let i = selectedChannel
+        if let points = settings[keyPath:pointPaths[i]] { return points }
+        return zip(ToneCurves.identity,settings[keyPath:samplePaths[i]]).map { CurvePoint($0,$1) }
+    }
+    private func setPoints(_ points:[CurvePoint]) {
+        let i = selectedChannel
+        settings[keyPath:pointPaths[i]] = points; settings[keyPath:samplePaths[i]] = ToneCurves.identity
+        settings = settings.sanitized
+    }
     private func refresh() {
-        let i = max(0,channel.indexOfSelectedItem), values = settings[keyPath:paths[i]]
-        graph.color = [NSColor.white,.systemRed,.systemGreen,.systemBlue][i]; graph.values = values
-        for (slider,value) in zip(sliders,values) { slider.doubleValue = value }
+        let parametric = mode.selectedSegment == 0
+        channel.isHidden = parametric; parametricRows.isHidden = !parametric; hint.isHidden = parametric
+        let i = selectedChannel
+        graph.color = parametric ? .white : [NSColor.white,.systemRed,.systemGreen,.systemBlue][i]
+        let p = settings.parametric ?? ParametricCurve()
+        graph.curve = parametric ? { p.value(at:$0) } : nil
+        graph.points = currentPoints()
+        for (slider,label,path) in sliders { slider.doubleValue = p[keyPath:path]; label.stringValue = String(format:"%.0f", p[keyPath:path]*100) }
     }
 }
 final class HistogramPanel: NSView {

@@ -54,17 +54,17 @@ public enum BatchEdits {
             switch group {
             case .develop:result.exposure=source.exposure;result.contrast=source.contrast;result.highlights=source.highlights;result.shadows=source.shadows;result.temperature=source.temperature;result.tint=source.tint;result.advanced?.neutralBalance=source.advanced?.neutralBalance
             case .curves:result.advanced?.curves=source.advanced?.curves
-            case .color:result.saturation=source.saturation;result.vibrance=source.vibrance;result.advanced?.colors=source.advanced?.colors ?? AdvancedEdits().colors
-            case .monochrome:result.blackAndWhite=source.blackAndWhite;result.monochrome=source.monochrome;result.blacks=source.blacks;result.whites=source.whites
-            case .details:result.structure=source.structure;result.sharpness=source.sharpness;result.denoise=source.denoise
+            case .color:result.saturation=source.saturation;result.vibrance=source.vibrance;result.advanced?.colors=source.advanced?.colors ?? AdvancedEdits().colors;result.advanced?.pointColors=source.advanced?.pointColors
+            case .monochrome:result.blackAndWhite=source.blackAndWhite;result.monochrome=source.monochrome;result.blacks=source.blacks;result.whites=source.whites;result.advanced?.grayMix=source.advanced?.grayMix
+            case .details:result.structure=source.structure;result.sharpness=source.sharpness;result.denoise=source.denoise;result.advanced?.detail=source.advanced?.detail
             case .glow:result.advanced?.glow=source.advanced?.glow
             case .vignette:result.vignette=source.vignette;result.schemaVersion=source.schemaVersion
             case .sunrays:result.advanced?.sunSettings=source.advanced?.sunSettings;result.sunrays=source.sunrays;result.sunX=source.sunX;result.sunY=source.sunY;result.sunLength=source.sunLength
             case .lut:result.advanced?.lutAsset=source.advanced?.lutAsset;result.advanced?.lutName=source.advanced?.lutName;result.advanced?.lutID=source.advanced?.lutID;result.lutAmount=source.lutAmount
             case .enhance:result.autoEnhance=source.autoEnhance
-            case .lens:result.lens=source.lens;result.defringe=source.defringe
+            case .lens:result.lens=source.lens;result.defringe=source.defringe;result.advanced?.autoCA=source.advanced?.autoCA
             case .geometry:result.crop=source.crop;result.rotation=source.rotation;result.flip=source.flip;result.straighten=source.straighten
-            case .retouch:result.retouch=source.retouch.map{var stroke=$0;stroke.id=UUID();return stroke}
+            case .retouch:result.retouch=source.retouch.map{var stroke=$0;stroke.id=UUID();return stroke};result.eyeFixes=source.eyeFixes.map{var fix=$0;fix.id=UUID();return fix}
             case .presence:result.clarity=source.clarity;result.texture=source.texture;result.dehaze=source.dehaze
             case .grading:result.colorGrading=source.colorGrading
             case .grain:result.grain=source.grain
@@ -98,7 +98,7 @@ public enum BatchEdits {
         }
         return BatchTransaction(sourceName:source.url.lastPathComponent,entries:entries)
     }
-    private static func needsModern(_ e:PhotoEdits)->Bool{!e.curves.isIdentity || e.neutralBalance != NeutralBalance() || e.optics.hasEffect || e.profile.hasEffect || e.calibration.hasEffect || !e.retouch.isEmpty || e.advanced?.masks.values.contains{$0.components != nil || $0.range != nil}==true}
+    private static func needsModern(_ e:PhotoEdits)->Bool{e.autoCA.hasEffect || !e.curves.isIdentity || e.neutralBalance != NeutralBalance() || e.optics.hasEffect || e.profile.hasEffect || e.calibration.hasEffect || !e.retouch.isEmpty || e.advanced?.masks.values.contains{$0.components != nil || $0.range != nil}==true}
     private static func journalURL(_ id:UUID,store:PhotoRecordStore)->URL{store.root.appendingPathComponent("BatchHistory/\(id.uuidString).json")}
     private static func save(_ transaction:BatchTransaction,store:PhotoRecordStore)throws {
         let path=journalURL(transaction.id,store:store);try FileManager.default.createDirectory(at:path.deletingLastPathComponent(),withIntermediateDirectories:true)
