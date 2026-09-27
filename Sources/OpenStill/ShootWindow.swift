@@ -561,7 +561,7 @@ extension ShootWindow {
         for column in MetadataColumn.allCases{
             guard let popup=metadataPopups[column] else{continue}
             let facets=libraryFilter.facets(base,column:column)
-            popup.removeAllItems();popup.addItem(withTitle:"All \(column.title.lowercased())s");popup.lastItem?.representedObject=nil
+            popup.removeAllItems();popup.addItem(withTitle:["All dates","All cameras","All lenses","All labels","All keywords"][MetadataColumn.allCases.firstIndex(of:column)!]);popup.lastItem?.representedObject=nil
             for f in facets.prefix(200){popup.addItem(withTitle:"\(f.value) (\(f.count))");popup.lastItem?.representedObject=f.value}
             if let chosen=libraryFilter.metadata[column],let i=popup.itemArray.firstIndex(where:{($0.representedObject as? String)==chosen}){popup.selectItem(at:i)}else{popup.selectItem(at:0)}
         }

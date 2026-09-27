@@ -21,7 +21,9 @@ final class LibraryRenderer {
         operation.addExecutionBlock { [weak self, weak operation] in
             guard operation?.isCancelled == false else { return }
             let image = try? autoreleasepool { try ModernRenderer.display(ModernRenderer.render(source: item.url, recipe: item.record.active.recipe, maximumDimension: size)) }
-            DispatchQueue.main.async { if let image { self?.cache.setObject(Box(image), forKey: key) }; if operation?.isCancelled == false { done(image) } }
+            // The queue lets go of a finished operation, so read cancellation here rather than on the main thread.
+            guard operation?.isCancelled == false else { return }
+            DispatchQueue.main.async { if let image { self?.cache.setObject(Box(image), forKey: key) }; done(image) }
         }
         queue.addOperation(operation)
     }
