@@ -339,7 +339,7 @@ extension ViewerController {
                 if let adjustmentMask {
                     let geometry = EditGeometry(size:size,edits:edits)
                     let selection = try adjustmentMask.coverage(geometry:geometry,lens:edits.optics,input:incoming,modern:renderer == .linear2020)
-                    guard let cg = CIContext().createCGImage(selection,from:geometry.extent) else { throw EditError.render }
+                    guard let cg = RenderContexts.utility.createCGImage(selection,from:geometry.extent) else { throw EditError.render }
                     maskImage = cg
                 }
                 if let maskImage { maskURL = try EditStorage.newAsset(); temporaryFiles.append(maskURL!); try PhotoEditor.write(maskImage,to:maskURL!) }

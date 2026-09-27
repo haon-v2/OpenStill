@@ -166,7 +166,7 @@ public enum EditError: LocalizedError {
     }
 }
 public enum PhotoEditor {
-    private static let context = CIContext(options: [.cacheIntermediates: false])
+    private static let context = RenderContexts.make([.cacheIntermediates: false])
     public static func render(_ original: CGImage, edits: PhotoEdits, lutOverride: CubeLUT? = nil, previewMaxDimension: Int? = nil) throws -> CGImage {
         let e = edits.sanitized
         var effective = e

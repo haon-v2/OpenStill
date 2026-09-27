@@ -246,3 +246,19 @@ Automated fixtures are generated and contain no user photographs. The real S9 fi
   - face grouping quality on real portraits;
   - the MapKit window;
   - tethering with a real camera.
+
+## Performance — September 27, 2026
+
+- **Changed:**
+  - Shared Metal-backed Core Image contexts, with no throwaway contexts.
+  - Accelerate for the RAW RGB→RGBA expansion, float un/premultiplication and face distances.
+  - Batch catalog indexing and a capture-date index.
+  - The library reads capture dates from the catalog.
+  - The library filter skips text matching when there's no search.
+  - Two thumbnail renders at a time on Macs with 8 or more cores.
+- **Automated tests (PerformanceTests):**
+  - A 50,000-photo catalog: indexing, reading, text search, smart rules, keyword counts, timeline, lookups by file, fetching by ID, and the library filter and sort by date and by name, each with a time limit.
+  - Grouping 5,000 faces of 50 people.
+  - Pixel conversions matching the simple loops, including NaN rejection and huge values.
+  - Renders reusing the shared contexts.
+- **Not done:** moving the Core Image kernels to precompiled Metal, and an MTKView canvas (see README → Performance).

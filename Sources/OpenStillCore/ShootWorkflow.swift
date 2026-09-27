@@ -21,18 +21,22 @@ public struct ShootItem:Identifiable {
     }
     public static func read(_ url:URL)throws->Self {
         let record=try EditStorage.record(url)
+        // The catalog already has the capture date for indexed photos, so the file isn't opened again.
+        let facts=EditStorage.records.catalog?.photo(record.id)
+        if let captured=facts?.captured{return Self(url:url,record:record,captured:captured,facts:facts)}
         var date=(try? url.resourceValues(forKeys:[.creationDateKey]).creationDate) ?? Date.distantPast
         if let io=CGImageSourceCreateWithURL(url as CFURL,nil),let props=CGImageSourceCopyPropertiesAtIndex(io,0,nil) as? [String:Any],
            let exif=props[kCGImagePropertyExifDictionary as String] as? [String:Any],let stamp=exif["DateTimeOriginal"] as? String {
             let parser=DateFormatter();parser.locale=Locale(identifier:"en_US_POSIX");parser.timeZone=TimeZone(secondsFromGMT:0);parser.dateFormat="yyyy:MM:dd HH:mm:ss";date=parser.date(from:stamp) ?? date
         }
-        return Self(url:url,record:record,captured:date,facts:EditStorage.records.catalog?.photo(record.id))
+        return Self(url:url,record:record,captured:date,facts:facts)
     }
 }
 public enum ShootWorkflow {
     public static func filter(_ items:[ShootItem],minimumRating:Int,flag:ShootFlagFilter,sort:ShootSort,label:ShootLabelFilter = nil,text:String = "")->[ShootItem] {
-        items.filter { item in
-            (label == nil || item.record.colorLabel == label) && item.matches(text:text) &&
+        let searching = !text.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty
+        return items.filter { item in
+            (label == nil || item.record.colorLabel == label) && (!searching || item.matches(text:text)) &&
             item.record.rating >= min(5,max(0,minimumRating)) && (flag == .all || (flag == .picks && item.record.flag == .pick) || (flag == .rejects && item.record.flag == .reject) || (flag == .unflagged && item.record.flag == .none))
         }.sorted {a,b in
             if sort == .rating && a.record.rating != b.record.rating{return a.record.rating>b.record.rating}

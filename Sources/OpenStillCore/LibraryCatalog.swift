@@ -303,6 +303,7 @@ public final class LibraryCatalog {
             edited INTEGER DEFAULT 0, title TEXT DEFAULT '', caption TEXT DEFAULT '');
         CREATE INDEX IF NOT EXISTS photos_path ON photos(path);
         CREATE INDEX IF NOT EXISTS photos_fingerprint ON photos(fingerprint);
+        CREATE INDEX IF NOT EXISTS photos_captured ON photos(captured);
         CREATE TABLE IF NOT EXISTS photo_keywords (photo_id TEXT NOT NULL REFERENCES photos(id) ON DELETE CASCADE, keyword TEXT NOT NULL, PRIMARY KEY(photo_id, keyword));
         CREATE INDEX IF NOT EXISTS keywords_keyword ON photo_keywords(keyword);
         CREATE TABLE IF NOT EXISTS collections (id TEXT PRIMARY KEY, name TEXT NOT NULL, rules TEXT, created REAL);
@@ -394,9 +395,15 @@ public final class LibraryCatalog {
         var n = 0; _ = try? run("SELECT count(*) FROM photos") { n = Int(sqlite3_column_int64($0, 0)) }; return n
     }
     /// Adds or refreshes one photo: file facts from `facts`, everything else from the record.
-    public func upsert(_ record: PhotoRecord, facts: CatalogPhoto) throws {
-        var p = facts; p.apply(record)
-        try transaction {
+    public func upsert(_ record: PhotoRecord, facts: CatalogPhoto) throws { try upsert([(record, facts)]) }
+    /// Many photos in one transaction: far faster than one transaction each when indexing a large library.
+    public func upsert(_ entries: [(record: PhotoRecord, facts: CatalogPhoto)]) throws {
+        try write(entries.map { entry in var p = entry.facts; p.apply(entry.record); return p })
+    }
+    /// Writes catalog rows (facts already merged with their records) in one transaction.
+    func write(_ photos: [CatalogPhoto]) throws {
+        guard !photos.isEmpty else { return }
+        try transaction { for p in photos {
             try run("""
             INSERT INTO photos(id, path, size, modified, fingerprint, captured, camera, lens, iso, focal, aperture, width, height, latitude, longitude, rating, flag, label, edited, title, caption)
             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
@@ -408,7 +415,7 @@ public final class LibraryCatalog {
                   .text(p.camera), .text(p.lens), optional(p.iso), optional(p.focalLength), optional(p.aperture), .int(Int64(p.width)), .int(Int64(p.height)),
                   optional(p.latitude), optional(p.longitude), .int(Int64(p.rating)), .text(p.flag.rawValue), .text(p.label.rawValue), .int(p.edited ? 1 : 0), .text(p.title), .text(p.caption)])
             try replaceKeywords(p.id, p.keywords)
-        }
+        } }
     }
     /// Mirrors a saved record (rating, flag, label, metadata, edited state) into an existing row.
     public func updateRecord(_ record: PhotoRecord) throws {

@@ -151,7 +151,7 @@ extension ViewerController {
                 let selection=try mask.coverage(geometry:geometry,lens:edits.optics,input:input,modern:recipe.renderer == .linear2020)
                 let overlay = CIImage(color:CIColor(red:1,green:0.08,blue:0.08,alpha:0.42)).cropped(to:geometry.extent)
                     .applyingFilter("CIBlendWithMask",parameters:[kCIInputBackgroundImageKey:CIImage(color:.clear).cropped(to:geometry.extent),kCIInputMaskImageKey:selection])
-                return CIContext().createCGImage(overlay,from:geometry.extent)
+                return RenderContexts.utility.createCGImage(overlay,from:geometry.extent)
             }
             DispatchQueue.main.async { guard let self, self.maskToken == token, self.activeMaskKey == key, self.maskVisible else { return }; self.canvas.maskOverlay = result ?? nil }
         }
@@ -168,7 +168,7 @@ extension ViewerController {
                 let base = try edits.baseAsset.map { try PhotoDecoder.decode(EditStorage.asset($0)) } ?? original
                 let scale = min(1,1600/Double(max(base.width,base.height)))
                 let ci = CIImage(cgImage:base).transformed(by:CGAffineTransform(scaleX:scale,y:scale))
-                guard let small = CIContext().createCGImage(ci,from:ci.extent) else { throw EditError.render }
+                guard let small = RenderContexts.utility.createCGImage(ci,from:ci.extent) else { throw EditError.render }
                 let mask = try VisionEditor.objectMask(small,at:point)
                 let asset = try EditStorage.newAsset(); try PhotoEditor.write(mask,to:asset); return asset
             }

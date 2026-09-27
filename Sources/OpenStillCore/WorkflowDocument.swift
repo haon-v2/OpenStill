@@ -173,12 +173,15 @@ public final class PhotoRecordStore {
     private func migrateIfNeeded(_ catalog: LibraryCatalog) {
         guard catalog.value("indexedRecords") == nil else { return }
         let files = (try? FileManager.default.contentsOfDirectory(at: records, includingPropertiesForKeys: nil)) ?? []
+        var batch: [(record: PhotoRecord, facts: CatalogPhoto)] = []
         for file in files where file.pathExtension == "json" {
             guard let id = UUID(uuidString: file.deletingPathExtension().lastPathComponent), let record = try? read(id) else { continue }
             let source = URL(fileURLWithPath: record.sourcePath)
             let facts = FileManager.default.fileExists(atPath: source.path) ? CatalogPhoto.read(source, id: id) : CatalogPhoto(id: id, path: record.sourcePath)
-            try? catalog.upsert(record, facts: facts)
+            batch.append((record, facts))
+            if batch.count == 500 { try? catalog.upsert(batch); batch.removeAll() }
         }
+        try? catalog.upsert(batch)
         try? catalog.setValue("1", for: "indexedRecords")
     }
     private var records: URL { root.appendingPathComponent("PhotoRecords", isDirectory: true) }

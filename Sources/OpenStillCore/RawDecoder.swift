@@ -44,9 +44,7 @@ public enum RawDecoder {
         let width = Int(output.width), height = Int(output.height)
         // LibRaw's RGB16 buffer has no alpha. Expand once at the decoding boundary,
         // retaining all 16 bits; subsequent edits remain floating-point CIImage graphs.
-        var rgba = [UInt16](repeating: UInt16.max, count: width*height*4)
-        for i in 0..<(width*height) { rgba[4*i] = pixels[3*i]; rgba[4*i+1] = pixels[3*i+1]; rgba[4*i+2] = pixels[3*i+2] }
-        let data = rgba.withUnsafeBytes { Data($0) }
+        let data = PixelConversion.rgb16ToRGBA16(pixels, width: width, height: height)
         let image = CIImage(bitmapData: data, bytesPerRow: width*8, size: CGSize(width: width, height: height), format: .RGBA16, colorSpace: ModernRenderer.workingSpace)
         let balance = withUnsafePointer(to: &output.camera_white_balance) { $0.withMemoryRebound(to: Float.self, capacity: 4) { Array(UnsafeBufferPointer(start: $0, count: 4)) } }
         return RawImage(image: image, sensorClippedFraction: output.sensor_clipped_fraction < 0 ? nil : output.sensor_clipped_fraction, cameraWhiteBalance: balance)

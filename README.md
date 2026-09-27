@@ -182,6 +182,20 @@ For **Google Drive, Dropbox, WeTransfer, Pixieset, and Pic-Time**, choose the we
 
 Sharing copies are kept in OpenStill's temporary sharing folder so other apps can finish reading them; copies older than seven days are cleaned up when preparing another share. Source photos are never changed. Batch preparation shows progress and keeps same-named photos as separate files. If any photo cannot be prepared, sharing is disabled and the failed filename is shown; no incomplete batch is silently sent. Saving to a folder reports how many copies succeeded if a later copy fails. No Google or Dropbox developer registration is required.
 
+## Performance
+
+- **Rendering:** all rendering goes through a few long-lived Core Image contexts on the Mac's Metal GPU. Masks, overlays and selections no longer create a new context each time.
+- **Pixel conversions:** RAW buffers and OpenStill's float intermediates are converted with Accelerate (vImage and vDSP) rather than per-pixel loops.
+- **Library catalog:**
+  - The library takes capture dates from the catalog instead of reopening each photo.
+  - Indexing writes photos in batches, and capture dates are indexed.
+  - Search skips per-photo work when the search box is empty.
+  - On Macs with 8 or more cores, the grid renders two thumbnails at a time.
+- **Benchmark:** `PerformanceTests` builds a 50,000-photo catalog on every test run. It times indexing, reading, search, smart collections, keyword counts, the timeline, lookups, the library filter and sort, and grouping 5,000 faces, and prints the timings in the test log.
+- **Not changed:**
+  - The Core Image kernels are still written in the Core Image Kernel Language. Core Image compiles them to Metal on the GPU. Moving them to precompiled Metal libraries would need a Metal build step that Swift Package Manager doesn't provide.
+  - The editing canvas still draws a GPU-rendered, display-sized image rather than using an MTKView.
+
 ## Build
 
 Requires macOS 13+ to run and the macOS 26 SDK with Swift 6+ to build (Xcode or Apple's Command Line Tools). Build tools: CMake, Ninja, Meson, pkg-config and Python 3. Native dependency sources and logo helper revisions are pinned; the build scripts download and compile missing dependencies. The built app bundles its native libraries and helper, requiring no Homebrew at runtime. Optional AI uses a separate Python runtime described below. Browsing and editing are local; optional sharing uses macOS services or your browser. The only other network request is the update check described below.

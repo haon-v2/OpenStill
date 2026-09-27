@@ -89,7 +89,8 @@ final class ShootWindow:NSWindowController,NSCollectionViewDataSource,NSCollecti
             content.translatesAutoresizingMaskIntoConstraints=false;root.addSubview(content)
             NSLayoutConstraint.activate([content.leadingAnchor.constraint(equalTo:root.leadingAnchor),content.trailingAnchor.constraint(equalTo:root.trailingAnchor),content.topAnchor.constraint(equalTo:root.topAnchor),content.bottomAnchor.constraint(equalTo:root.bottomAnchor)])
         }
-        queue.maxConcurrentOperationCount=1;queue.qualityOfService = .utility;cache.totalCostLimit=64*1024*1024
+        // Thumbnails render on the GPU; two at a time keeps the grid filling quickly on Macs with room to spare.
+        queue.maxConcurrentOperationCount=ProcessInfo.processInfo.activeProcessorCount>=8 ? 2:1;queue.qualityOfService = .utility;cache.totalCostLimit=64*1024*1024
         minimum.addItems(withTitles:["All ratings","1★ and up","2★ and up","3★ and up","4★ and up","5★"])
         flag.addItems(withTitles:["All flags","Picks","Rejects","Unflagged"]);sort.addItems(withTitles:["Filename","Capture date","Rating"])
         labelFilter.addItems(withTitles:Self.labelChoices.map{$0.map{$0 == ColorLabel.none ? "Unlabeled":$0.title} ?? "All labels"})
