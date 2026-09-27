@@ -3,7 +3,7 @@ import UniformTypeIdentifiers
 import OpenStillCore
 
 /// Watermark logos in three clearly separate modes:
-/// Design your own (manual, no AI), Generate with AI (a prompt, by your connected AI or the optional local model), and Import.
+/// Design your own (manual, no AI), Generate with AI (a prompt, run by the optional local model) and Import.
 final class LogoDesigner:NSWindowController,NSWindowDelegate,NSTextFieldDelegate,NSTextViewDelegate {
     var saved:((WatermarkLogo)->Void)?
     private enum Mode:Int { case design, generate, importing }
@@ -22,7 +22,6 @@ final class LogoDesigner:NSWindowController,NSWindowDelegate,NSTextFieldDelegate
     private var candidates:[LogoDesign]=[],logos:[WatermarkLogo]=[],downloader:LogoModelDownload?,inference:LogoInference?,busy=false,closed=false,generation=UUID()
     private var manifest:LogoModelManifest?{try? LogoModelManifest.load()}
     private var modelURL:URL{EditStorage.root.appendingPathComponent("Models/Logo/"+(manifest?.model.filename ?? "Qwen3-0.6B-Q8_0.gguf"))}
-    private var engine:LogoEngine{LogoEngine.choose(assistant:AssistantServer.shared.samplingClient,localModelInstalled:FileManager.default.fileExists(atPath:modelURL.path))}
     init(){
         let window=NSWindow(contentRect:NSRect(x:0,y:0,width:1050,height:770),styleMask:[.titled,.closable,.resizable],backing:.buffered,defer:false)
         super.init(window:window);window.title="Watermarks · Logo designer";window.minSize=NSSize(width:990,height:720);window.center();window.delegate=self;Appearance.configure(window)
@@ -56,7 +55,7 @@ final class LogoDesigner:NSWindowController,NSWindowDelegate,NSTextFieldDelegate
         Appearance.primary(generate)
         progress.isIndeterminate=false;progress.minValue=0;progress.maxValue=1;progress.style = .bar
         engineLabel.font = .systemFont(ofSize:11,weight:.medium)
-        let local=note("Optional local model: Qwen3-0.6B · 639 MB · Apache 2.0. Runs offline on this Mac. When an AI app connected through the OpenStill MCP can answer OpenStill’s requests, it’s used instead.")
+        let local=note("Generate with AI uses an optional local model: Qwen3-0.6B · 639 MB · Apache 2.0. Download it once; it runs offline on this Mac.")
         let generateBox=NSStackView(views:[note("AI chooses fonts, symbols, layout and colors from OpenStill’s set to match your prompt. Your exact name and tagline are always drawn by OpenStill, never by the AI."),
                                           label("Prompt"),promptScroll,promptHint,engineLabel,NSStackView(views:[generate,stop]),editChosen,local,download,progress,NSStackView(views:[remove,cpu])])
         editChosen.isEnabled=false
@@ -82,7 +81,6 @@ final class LogoDesigner:NSWindowController,NSWindowDelegate,NSTextFieldDelegate
         #if arch(x86_64)
         cpu.state = .on;cpu.isEnabled=false
         #endif
-        NotificationCenter.default.addObserver(self,selector:#selector(assistantChanged),name:AssistantServer.changed,object:nil)
         modeChanged();updateModelState()
     }
     required init?(coder:NSCoder){fatalError()}
@@ -96,7 +94,6 @@ final class LogoDesigner:NSWindowController,NSWindowDelegate,NSTextFieldDelegate
         if mode != .importing{changed()}
         updateModelState()
     }
-    @objc private func assistantChanged(){updateModelState()}
     private func color(_ well:NSColorWell)->LogoColor{let c=well.color.usingColorSpace(.sRGB) ?? .white;return LogoColor(String(format:"#%02X%02X%02X",Int(c.redComponent*255),Int(c.greenComponent*255),Int(c.blueComponent*255)))}
     private func design()->LogoDesign{var d=LogoDesign(name:name.stringValue,tagline:tagline.stringValue);d.suggestion.typography=LogoTypography.allCases[max(0,typography.indexOfSelectedItem)];d.suggestion.layout=LogoLayout.allCases[max(0,layout.indexOfSelectedItem)];d.suggestion.symbol=LogoSymbol.allCases[max(0,symbol.indexOfSelectedItem)];d.suggestion.spacing=spacing.doubleValue;d.suggestion.symbolSize=symbolSize.doubleValue;d.color=color(primary);d.accent=color(accent);return d}
     private func show(_ design:LogoDesign){name.stringValue=design.name;tagline.stringValue=design.tagline;typography.selectItem(at:LogoTypography.allCases.firstIndex(of:design.suggestion.typography)!);layout.selectItem(at:LogoLayout.allCases.firstIndex(of:design.suggestion.layout)!);symbol.selectItem(at:LogoSymbol.allCases.firstIndex(of:design.suggestion.symbol)!);spacing.doubleValue=design.suggestion.spacing;symbolSize.doubleValue=design.suggestion.symbolSize;primary.color=NSColor(cgColor:design.color.cg) ?? .white;accent.color=NSColor(cgColor:design.accent.cg) ?? .white;changed()}
@@ -107,10 +104,11 @@ final class LogoDesigner:NSWindowController,NSWindowDelegate,NSTextFieldDelegate
     @objc private func saveLogo(){do{let logo=try Watermarks.saveDesign(design());refreshLibrary();saved?(logo);status.stringValue="Saved reusable logo. Placement is controlled in Export."}catch{status.stringValue=error.localizedDescription}}
     @objc private func exportLogo(){guard let window else{return};let panel=NSSavePanel();panel.allowedContentTypes=[.svg,.pdf,.png];panel.nameFieldStringValue="photographer-logo.svg";panel.message="Choose .svg, .pdf, or .png. PNG keeps a transparent background.";let design=design();panel.beginSheetModal(for:window){[weak self] response in guard let self,response == .OK,let url=panel.url else{return};do{try Watermarks.export(design,to:url);self.status.stringValue="Exported "+url.lastPathComponent}catch{self.status.stringValue=error.localizedDescription}}}
     private func updateModelState(){
-        let exists=FileManager.default.fileExists(atPath:modelURL.path),engine=engine
+        let exists=FileManager.default.fileExists(atPath:modelURL.path)
         download.isEnabled = !busy && !exists;remove.isEnabled = !busy && exists;stop.isEnabled=busy
-        generate.isEnabled = !busy && engine != .unavailable
-        engineLabel.stringValue=engine.label;engineLabel.textColor = engine == .unavailable ? .secondaryLabelColor : .labelColor
+        generate.isEnabled = !busy && exists
+        engineLabel.stringValue=exists ? "Designed on this Mac with the local model." : "Download the local model below to generate designs."
+        engineLabel.textColor = exists ? .labelColor : .secondaryLabelColor
         editChosen.isEnabled = !busy && !candidates.isEmpty
     }
     @objc private func downloadModel(){guard let manifest,!busy else{return};busy=true;updateModelState();status.stringValue="Downloading optional model from the official Qwen repository…";let downloader=LogoModelDownload(manifest:manifest.model,destination:modelURL);self.downloader=downloader;downloader.progress = {[weak self] fraction,message in self?.progress.doubleValue=fraction;self?.status.stringValue=message};downloader.completion = {[weak self] result in guard let self else{return};self.busy=false;self.downloader=nil;self.updateModelState();switch result{case .success:self.status.stringValue="Local model ready. Generation works offline.";case .failure(let error):self.status.stringValue=(error as NSError).code == NSURLErrorCancelled ? "Download cancelled.":error.localizedDescription}};downloader.start()}
@@ -120,7 +118,7 @@ final class LogoDesigner:NSWindowController,NSWindowDelegate,NSTextFieldDelegate
         guard !busy else{return}
         do{_ = try LogoRenderer.vector(design())}catch{status.stringValue=error.localizedDescription;return}
         let d=design(),brief=String(prompt.string.trimmingCharacters(in:.whitespacesAndNewlines).prefix(500)),token=UUID();generation=token;busy=true
-        let chosen=engine;updateModelState()
+        updateModelState()
         func finish(_ result:Result<[LogoDesign],Error>,source:String){
             busy=false;inference=nil;updateModelState()
             guard !closed,generation==token,name.stringValue==d.name,tagline.stringValue==d.tagline else{status.stringValue="Generation cancelled or text changed. Your current text is preserved.";return}
@@ -130,25 +128,7 @@ final class LogoDesigner:NSWindowController,NSWindowDelegate,NSTextFieldDelegate
             case .failure(let error):status.stringValue=error.localizedDescription
             }
         }
-        switch chosen{
-        case .assistant(let assistant):
-            status.stringValue="Asking \(assistant) for three designs…"
-            do{
-                let request=try LogoInference.samplingRequest(name:d.name,tagline:d.tagline,style:brief,symbol:d.suggestion.symbol.rawValue,color:d.color,accent:d.accent)
-                AssistantServer.shared.sample(request){[weak self] result in
-                    guard let self else{return}
-                    let designs=Result<[LogoDesign],Error>{
-                        let answer=try result.get()
-                        let text=answer["content"]?["text"]?.string ?? answer["text"]?.string ?? ""
-                        return try LogoInference.decode(Data(text.utf8),name:d.name,tagline:d.tagline,color:d.color,accent:d.accent)
-                    }
-                    if case .failure=designs,FileManager.default.fileExists(atPath:self.modelURL.path){self.status.stringValue="\(assistant) couldn’t answer; using the local model instead.";self.runLocal(d,brief:brief,token:token,finish:finish);return}
-                    finish(designs,source:"from \(assistant)")
-                }
-            }catch{finish(.failure(error),source:"")}
-        case .local:runLocal(d,brief:brief,token:token,finish:finish)
-        case .unavailable:busy=false;updateModelState();status.stringValue=chosen.label
-        }
+        runLocal(d,brief:brief,token:token,finish:finish)
     }
     private func runLocal(_ d:LogoDesign,brief:String,token:UUID,finish:@escaping (Result<[LogoDesign],Error>,String)->Void){
         guard let manifest else{finish(.failure(LogoError.invalid("The local model manifest is missing.")),"");return}

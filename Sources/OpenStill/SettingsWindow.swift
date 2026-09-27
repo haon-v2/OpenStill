@@ -1,7 +1,7 @@
 import AppKit
 import OpenStillCore
 
-/// OpenStill → Settings… (⌘,): General (updates and library), Layout, Shortcuts and AI Assistant.
+/// OpenStill → Settings… (⌘,): General (updates and library), Layout, and Shortcuts.
 final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let general: GeneralSettings
     private let tabs = NSTabViewController()
@@ -10,7 +10,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         general = GeneralSettings(updates: updates)
         tabs.tabStyle = .toolbar
         tabs.transitionOptions = [.crossfade, .allowUserInteraction]
-        for (controller, title, symbol) in [(general as NSViewController, "General", "gearshape"), (LayoutSettings(), "Layout", "rectangle.split.3x1"), (ShortcutSettings(), "Shortcuts", "keyboard"), (AssistantSettings(), "AI Assistant", "sparkles")] {
+        for (controller, title, symbol) in [(general as NSViewController, "General", "gearshape"), (LayoutSettings(), "Layout", "rectangle.split.3x1"), (ShortcutSettings(), "Shortcuts", "keyboard")] {
             let item = NSTabViewItem(viewController: controller)
             item.label = title; item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: title)
             tabs.addTabViewItem(item)

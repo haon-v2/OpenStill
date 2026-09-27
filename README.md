@@ -286,7 +286,7 @@ Sharing copies are kept in OpenStill's temporary sharing folder so other apps ca
 - **Adaptive presets** (**Develop → Adaptive Presets**). Subject: Pop, Subject: Soften, Background: Soften, Background: Clear haze, Sky: Deepen and Sky: Soft.
   - They find the subject (Apple Vision, on this Mac) or the sky (local AI tools) in each photo and apply their settings only there.
   - The masks appear in each tool's Masking tab, where you can refine them.
-- **Identity plate** (**Develop → Identity Plate…**). Your own text or logo in place of "OpenStill" at the top left of the Lightroom layout.
+- **Identity plate** (**Develop → Identity Plate…**). Your own text or logo in place of "OpenStill" at the top left of the Lightroom layout. **Use Saved Logo** picks a logo made or imported in the watermark logo designer.
 
 ## Performance
 
@@ -438,9 +438,13 @@ History saves automatically in `~/Library/Application Support/OpenStill/PhotoRec
 
 In **Export → Watermarks**, choose **Import logo** or **Create logo**. Import transparent PNG/TIFF, JPEG, PDF, or static SVG; OpenStill stores a private asset copy. SVG paths, shapes, solid fills/strokes and transforms are supported. Active content, external references, text, filters and other unsupported SVG features produce an actionable error; export those files as outlined SVG or transparent PNG first.
 
-Manual design needs no model. Enter your exact name/initials and optional tagline, then adjust typography, symbol, layout, spacing and colors. Save reusable designs or export outlined SVG, vector PDF or transparent PNG. Emoji or glyphs without outlines are rejected rather than silently omitted.
+The designer has three separate modes, chosen at the top. Your exact name/initials and optional tagline are shared by the first two:
 
-The optional **Download local model · 639 MB** installs checksum-verified official Qwen3-0.6B Q8_0. It generates three editable layout suggestions using the bundled llama.cpp helper. Metal is used on Apple silicon; CPU mode is available and is the Intel default. Download/generation can be cancelled and the model removed. Inference stays offline; the model cannot execute code, supply arbitrary SVG, or change your exact text. This designer affects photographer watermarks only, not OpenStill's app icon.
+- **Design your own** needs no AI and no download. Adjust typography, symbol, layout, spacing and colors yourself. Save reusable designs or export outlined SVG, vector PDF or transparent PNG. Emoji or glyphs without outlines are rejected rather than silently omitted.
+- **Generate with AI** takes a **Prompt** (up to 500 characters: mood, style, colors…) and suggests three designs. The AI only chooses among OpenStill's fonts, symbols, layouts and colors; your exact name and tagline are always drawn by OpenStill. **Edit in Design your own** takes the chosen suggestion into the manual controls to fine-tune it.
+- **Import** uses a logo you already have, or one saved earlier.
+
+Generate with AI uses the optional **Download local model · 639 MB**, which installs checksum-verified official Qwen3-0.6B Q8_0 and runs it with the bundled llama.cpp helper. Metal is used on Apple silicon; CPU mode is available and is the Intel default. Download/generation can be cancelled and the model removed. Inference stays offline; the model cannot execute code, supply arbitrary SVG, or change your exact text. This designer affects photographer watermarks only, not OpenStill's app icon.
 
 Export placement offers nine anchors, percentage width, margin and opacity with a live preview. Watermarks belong to export presets and never enter editing masks or original files.
 

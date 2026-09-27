@@ -1,4 +1,4 @@
-name: Validate Assistant M15
+name: Validate Logo M15
 on:
   push:
     branches: [claude/gifted-lovelace-pbg8wv-m15]
@@ -19,16 +19,16 @@ jobs:
           swift build > build.log 2>&1; status=$?
           grep -E "error:" build.log | head -60
           [ $status -eq 0 ] || grep -v "warning:\|^ *|\|^ *\^" build.log | tail -60
-          grep -E "warning:" build.log | grep -E "AssistantProtocol|MCPInstall|AssistantServer|AssistantRouter|AssistantSettings|LogoDesigner|LogoInference|LUTLibrary|WorkspaceLayout|Shortcuts|SettingsWindow|ViewerController|EditorPanel|AppDelegate|ShootWindow|PhotoCanvas|Filmstrip|LightroomChrome|LightroomWorkspace|WorkspaceNavigation|Appearance|EditingController" | grep -v "init(source:)" | sort -u | head -40
+          grep -E "warning:" build.log | grep -E "LogoDesigner|LogoInference|LUTLibrary|WorkspaceLayout|Shortcuts|SettingsWindow|ViewerController|EditorPanel|AppDelegate|ShootWindow|PhotoCanvas|Filmstrip|LightroomChrome|LightroomWorkspace|WorkspaceNavigation|Appearance|EditingController" | grep -v "init(source:)" | sort -u | head -40
           exit $status
       - name: M15 tests alone
         run: |
           set +e
           export PKG_CONFIG_PATH="$PWD/.build/native/lib/pkgconfig"
-          perl -e 'alarm shift; exec @ARGV' 420 bash scripts/test.sh --filter AssistantTests --no-parallel > m8.log 2>&1
+          perl -e 'alarm shift; exec @ARGV' 420 bash scripts/test.sh --filter LogoPromptTests --no-parallel > m8.log 2>&1
           status=$?
           grep -E "⏱|Test .*(started|passed|failed)|✘|recorded an issue|error:" m8.log | tail -40
-          grep -nE "AssistantTests.swift:[0-9]+" m8.log | sort -u | head -30
+          grep -nE "LogoPromptTests.swift:[0-9]+" m8.log | sort -u | head -30
           echo "--- started but not finished ---"
           python3 - <<'PY'
           import re
