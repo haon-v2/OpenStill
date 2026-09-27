@@ -255,6 +255,37 @@ Sharing copies are kept in OpenStill's temporary sharing folder so other apps ca
 - **Rules:** menu shortcuts need ⌘, ⌃ or ⌥, or a function or arrow key, so they don't get in the way of typing.
 - **Fixed keys:** slideshow keys and the arrow keys that nudge the Sunrays source point can't be changed.
 
+## Workflow
+
+- **Edit In another app** (**Develop → Edit In App**, ⌘E).
+  - Sends the photo, with your edits, to Photoshop, Affinity Photo or any app you choose (**Edit In Other App…** picks it the first time).
+  - OpenStill writes a 16-bit ProPhoto TIFF named `-Edit` next to the original, adds it to the library with the original's rating, label and keywords, stacks it on top of the original, and opens it in the app.
+  - Save there and the file updates in OpenStill.
+- **After export** (Export panel).
+  - When an export finishes, OpenStill can show the files in Finder, open them in an app, or run a script you choose (it gets the exported files as arguments). The script runs on this Mac and nothing is uploaded.
+  - Saved export presets keep this choice.
+- **Smart Previews** (**Develop → Build Smart Previews**).
+  - A 2560-pixel copy of each selected photo, decoded but unedited, stored with the catalog.
+  - While a photo's drive isn't connected, you can still open and edit it from its Smart Preview; your edits apply to the original when it's back.
+  - Exporting still needs the original.
+  - **Discard Smart Previews** frees the space.
+- **Catalog.**
+  - **File → Back Up Catalog Now** copies the catalog, edit records and settings into a dated folder.
+  - **Catalog Settings…** schedules backups when OpenStill quits (every quit, daily or weekly), sets how many backups to keep, and can move the catalog to another folder (after a relaunch).
+  - **Export as Catalog…** saves the selected photos' edits (and, if you like, the originals) as a folder of portable edit packages; **Import Catalog…** brings one in.
+- **Secondary Display** (**Window → Secondary Display**, ⌘F11). A second window, on your other screen when there is one, showing the selected photo in Loupe, Compare or Survey. It follows the main window's selection.
+- **Book** (**Window → Book**, ⌥⌘4, or Book in the Lightroom module picker).
+  - Pages of one photo, full bleed, two or four photos, with captions.
+  - **Auto Layout** fills pages in order; any spot can be changed from its menu, and pages can be added, moved or removed.
+  - **Save PDF…** renders each photo at about 300 dpi. The book is made on this Mac; there's no print-service upload.
+- **Auto Sync** (**Develop → Auto Sync**). While it's on, each change to the photo you're editing also goes to the other photos selected in the filmstrip.
+  - Only the sliders you changed are copied, so changing Exposure doesn't overwrite another photo's Contrast.
+  - Crop, retouching and lens settings are never synced.
+- **Adaptive presets** (**Develop → Adaptive Presets**). Subject: Pop, Subject: Soften, Background: Soften, Background: Clear haze, Sky: Deepen and Sky: Soft.
+  - They find the subject (Apple Vision, on this Mac) or the sky (local AI tools) in each photo and apply their settings only there.
+  - The masks appear in each tool's Masking tab, where you can refine them.
+- **Identity plate** (**Develop → Identity Plate…**). Your own text or logo in place of "OpenStill" at the top left of the Lightroom layout.
+
 ## Performance
 
 - **Rendering:** all rendering goes through a few long-lived Core Image contexts on the Mac's Metal GPU. Masks, overlays and selections no longer create a new context each time.
