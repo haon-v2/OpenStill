@@ -587,9 +587,16 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         canvas.isHidden = isLibrary; canvas.hdrBackdrop.isHidden = isLibrary; libraryHost.isHidden = !isLibrary; shelf.isHidden = isLibrary
         sidebarWidth.constant = lr ? 250 : 216
         // Deactivate alternatives first, preventing transient constraint conflicts.
-        NSLayoutConstraint.deactivate([canvasToInspector,canvasToEdge,canvasToWindowEdge,centerToFolders,centerToRail,centerToShelf,centerToFooter,sidebarAboveShelf,sidebarAboveFooter] + luminarConstraints + lightroomConstraints)
-        NSLayoutConstraint.activate(lr ? lightroomConstraints + [isLibrary ? sidebarAboveFooter : sidebarAboveShelf] : luminarConstraints)
-        NSLayoutConstraint.activate([inspector ? canvasToInspector : (lr ? canvasToWindowEdge : canvasToEdge), leftPanel ? centerToFolders : centerToRail, isLibrary ? centerToFooter : centerToShelf])
+        var alternatives: [NSLayoutConstraint] = [canvasToInspector, canvasToEdge, canvasToWindowEdge, centerToFolders, centerToRail, centerToShelf, centerToFooter, sidebarAboveShelf, sidebarAboveFooter]
+        alternatives += luminarConstraints; alternatives += lightroomConstraints
+        NSLayoutConstraint.deactivate(alternatives)
+        var chosen: [NSLayoutConstraint] = lr ? lightroomConstraints : luminarConstraints
+        if lr { chosen.append(isLibrary ? sidebarAboveFooter : sidebarAboveShelf) }
+        let trailing: NSLayoutConstraint = inspector ? canvasToInspector : (lr ? canvasToWindowEdge : canvasToEdge)
+        let leading: NSLayoutConstraint = leftPanel ? centerToFolders : centerToRail
+        let bottom: NSLayoutConstraint = isLibrary ? centerToFooter : centerToShelf
+        chosen += [trailing, leading, bottom]
+        NSLayoutConstraint.activate(chosen)
         workspaceMode.selectedSegment = isLibrary ? 0 : 1
         leftRail.select(isLibrary ? "library" : "photo")
         if isLibrary { rightRail.select(nil) }
