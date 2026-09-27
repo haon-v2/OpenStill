@@ -260,7 +260,7 @@ Sharing copies are kept in OpenStill's temporary sharing folder so other apps ca
 - **Edit In another app** (**Develop → Edit In App**, ⌘E).
   - Sends the photo, with your edits, to Photoshop, Affinity Photo or any app you choose (**Edit In Other App…** picks it the first time).
   - OpenStill writes a 16-bit ProPhoto TIFF named `-Edit` next to the original, adds it to the library with the original's rating, label and keywords, stacks it on top of the original, and opens it in the app.
-  - Save there and the file updates in OpenStill.
+  - Save it there, then refresh the library to see your changes in OpenStill.
 - **After export** (Export panel).
   - When an export finishes, OpenStill can show the files in Finder, open them in an app, or run a script you choose (it gets the exported files as arguments). The script runs on this Mac and nothing is uploaded.
   - Saved export presets keep this choice.
