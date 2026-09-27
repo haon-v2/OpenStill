@@ -37,5 +37,16 @@
             <sparkle:fullReleaseNotesLink>https://github.com/haon-v2/OpenStill/releases/tag/v0.0.3</sparkle:fullReleaseNotesLink>
             <enclosure url="https://github.com/haon-v2/OpenStill/releases/download/v0.0.3/OpenStill-0.0.3.zip" sparkle:edSignature="5ePhXQdT2z8IoOR6NH7+gmFm1Oq2slEg56abxomjX3eGVd33/xSoJC3DMjd3wU+Zo9TbCGXsxfLSkSX8p7TXDQ==" length="31367330" type="application/octet-stream"/>
         </item>
+        <item>
+            <title>OpenStill 0.0.4</title>
+            <description><![CDATA[<h3>What’s new in 0.0.4</h3><ul><li>HDR editing and display, HDR/HEIF export with gain maps, and HDR, panorama and focus-stack merges</li><li>Print, slideshows with video export, web galleries, and publishing to a folder, Flickr or SmugMug</li><li>People (face grouping and naming), a map with drag-to-place and GPX geotagging, a timeline, and tethered capture</li><li>Faster rendering and library opening, tested on a 50,000-photo catalog</li></ul>]]></description>
+            <pubDate>Sun, 27 Sep 2026 04:31:53 GMT</pubDate>
+            <sparkle:version>20</sparkle:version>
+            <sparkle:shortVersionString>0.0.4</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <sparkle:fullReleaseNotesLink>https://github.com/haon-v2/OpenStill/releases/tag/v0.0.4</sparkle:fullReleaseNotesLink>
+            <enclosure url="https://github.com/haon-v2/OpenStill/releases/download/v0.0.4/OpenStill-0.0.4.zip" sparkle:edSignature="VPP6AWENLPYonYcY27lWWezEgbhTS4lAIlgr7vxru2+ZiaNnCsrQ7282ye56f+YgYf7b7Du/0ow9W3mlAsOGCA==" length="31890088" type="application/octet-stream"/>
+        </item>
     </channel>
 </rss>
