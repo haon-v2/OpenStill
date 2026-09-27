@@ -28,10 +28,10 @@ jobs:
         run: |
           set +e
           for layout in lightroom luminar; do
-            OPENSTILL_LAYOUT=$layout OPENSTILL_LAYOUT_DUMP=/tmp/dump-$layout perl -e 'alarm shift; exec @ARGV' 60 dist/OpenStill.app/Contents/MacOS/OpenStill /tmp/photos
+            defaults write org.openstill.viewer OpenStillWorkspaceLayout $layout
+            OPENSTILL_LAYOUT_DUMP=/tmp/dump-$layout perl -e 'alarm shift; exec @ARGV' 60 dist/OpenStill.app/Contents/MacOS/OpenStill /tmp/photos
             echo "== $layout exit $?"
-            cat /tmp/dump-$layout.txt | head -400
-            screencapture -x /tmp/screen-$layout.png 2>/dev/null
+            cat /tmp/dump-$layout.txt | cut -c1-170 | head -500
           done
           true
       - uses: actions/upload-artifact@v4

@@ -8,7 +8,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var settings = SettingsWindowController(updates: updates)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        if let layout = ProcessInfo.processInfo.environment["OPENSTILL_LAYOUT"] { WorkspaceLayout.current = WorkspaceLayout(rawValue: layout) ?? .luminar }
         createWindow()
         LayoutDump.runIfRequested(window: window)
         Shortcuts.registerKeys()
