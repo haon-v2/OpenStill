@@ -52,6 +52,10 @@ final class EditorPanel: GlassChrome {
     private var rawSource = false
     private let retouch = RetouchPanel()
     private let pointColor = PointColorPanel()
+    // Library (Lightroom layout): Quick Develop, Keyword Sets and the Keyword List.
+    let quickDevelopPanel = QuickDevelopPanel()
+    let keywordSetPanel = KeywordSetPanel()
+    let keywordListPanel = KeywordListPanel()
     /// Snapshots: in the History tab (Luminar) or their own left-panel section (Lightroom).
     private let snapshotStack = EditorStack()
     var retouchSettingsChanged:((RetouchSession)->Void)?
@@ -631,11 +635,19 @@ extension EditorPanel {
         lrCamera.font = .monospacedDigitSystemFont(ofSize: 10, weight: .regular); lrCamera.textColor = LRColors.dim; lrCamera.alignment = .center
         if module == .library {
             section("Histogram", open: true, pinned: true) { slot(histogram, in: $0) }
+            for panel in [quickDevelopPanel, keywordSetPanel, keywordListPanel] as [NSView] {
+                (panel as? QuickDevelopPanel)?.command = { [weak self] in self?.command?($0) }
+                (panel as? KeywordSetPanel)?.command = { [weak self] in self?.command?($0) }
+                (panel as? KeywordListPanel)?.command = { [weak self] in self?.command?($0) }
+            }
+            section("Quick Develop") { $0.add(quickDevelopPanel) }
             section("Keywording", open: true) { s in
                 lrKeywords.font = .systemFont(ofSize: 11); lrKeywords.textColor = LRColors.text; lrKeywords.maximumNumberOfLines = 6
                 s.add(lrKeywords); showKeywords(nil)
+                s.add(keywordSetPanel)
                 s.add(LRButton("Edit Keywords & Metadata…") { [weak self] in self?.command?("lr:metadata") })
             }
+            section("Keyword List") { $0.add(keywordListPanel) }
             section("Metadata", open: true) { slot(info, in: $0, height: 460) }
             column.setButtons([("Sync Metadata…", { [weak self] in self?.command?("lr:syncMetadata") }), ("Sync Settings…", { [weak self] in self?.command?("lr:syncSettings") })])
             lrSlots[module] = slots

@@ -33,6 +33,14 @@ import OpenStillCore
             ("library.pick", "Flag as pick", "p"), ("library.reject", "Flag as reject", "x"), ("library.unflag", "Remove flag", "u"), ("library.open", "Edit selected photo", "return"),
         ]
         for (id, title, key) in library { map.register(ShortcutCommand(id: id, title: title, group: "Library grid", scope: .library, defaultCombo: KeyCombo(key))) }
+        // Lightroom's Library views, filter bar, stacks and keyword sets.
+        var views: [(String, String, KeyCombo)] = [
+            ("library.loupe", "Loupe view (E)", KeyCombo("e")), ("library.compare", "Compare view (C)", KeyCombo("c")), ("library.survey", "Survey view (N)", KeyCombo("n")),
+            ("library.filterBar", "Show or hide the filter bar (\\)", KeyCombo("\\")), ("library.stack", "Open or close a stack (S)", KeyCombo("s")),
+            ("library.stackTop", "Move to top of stack (Shift-S)", KeyCombo("s", shift: true)),
+        ]
+        for i in 1...9 { views.append(("library.keywordSet\(i - 1)", "Keyword set keyword \(i) (⌥\(i))", KeyCombo("\(i)", option: true))) }
+        for (id, title, combo) in views { map.register(ShortcutCommand(id: id, title: title, group: "Library grid", scope: .library, defaultCombo: combo)) }
         let editor: [(String, String, KeyCombo?)] = [
             ("editor.clipping", "Show or hide clipping", KeyCombo("j")), ("editor.split", "Before / after split", KeyCombo("y")),
             ("editor.compare", "Compare with original", KeyCombo("\\")),

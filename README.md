@@ -66,6 +66,34 @@ OpenStill keeps a local SQLite catalog (`Catalog.sqlite`, next to your edit reco
 
 Moved or deleted files drop out of collections until they're found again.
 
+### Library views, filter bar, stacks and more (Lightroom layout)
+
+- **Views.** The toolbar under the grid switches between **Grid (G)**, **Loupe (E)**, **Compare (C)** and **Survey (N)**.
+  - **Loupe** shows the selected photo large; ← and → step through the photos.
+  - **Compare** puts the selected photo (the *select*) next to the next one (the *candidate*), with zoom and panning kept in step; ← and → change the candidate, and **Swap** trades them.
+  - **Survey** tiles all the selected photos; click one to make it active, or × to drop it from the survey.
+  - The **Thumbnails** slider sets the grid size.
+- **Filter bar (\\).** Adds Metadata columns under the search and attribute filters: **Date, Camera, Lens, Label** and **Keyword**, each with photo counts. Each column only offers what the columns to its left leave; **None** clears them.
+- **Stacks.**
+  - **Library → Group into Stack (⌘G)** stacks the selected photos; **Unstack (⇧⌘G)** breaks it up.
+  - A closed stack shows its top photo with a count; **S** opens or closes it, and **Shift-S** moves the selected photo to the top.
+  - **Auto-Stack by Capture Time…** stacks photos taken within a chosen number of seconds of each other.
+  - Stacks are kept in the catalog.
+- **Quick Develop** (right panel) nudges the selected photos' white balance, temperature, tint, exposure, contrast, highlights, shadows, whites, blacks, clarity and vibrance up or down, runs **Auto Tone** or **Reset All**. Each click is one batch that **Actions → Undo batch** reverses.
+- **Keywording and the Keyword List.**
+  - Type keywords to add them to the selected photos, or click a word in a **Keyword Set** (⌥1–⌥9) or a **Keyword Suggestion**, which comes from keywords that appear together on your photos. Recent Keywords is the first set.
+  - The **Keyword List** shows every keyword with its count: the checkbox adds or removes it on the selected photos, and › shows the photos that have it.
+- **Painter.** Turn on **Painter** in the toolbar, choose Keywords, Label, Rating or Flag and type the value, then click or drag across photos to apply it.
+- **Rename Photos (F2).**
+  - Renames the selected files on disk from a template: `{name}`, `{index}`, `{date}`, `{yyyy}`, `{MM}`, `{dd}`, `{camera}` or `{title}`, with a start number and a preview.
+  - Extensions stay the same, XMP sidecars are renamed too, and edits and collections follow the photos.
+  - Names that would clash with another file are refused.
+  - **Library → Undo Rename** puts the old names back.
+- **Auto Import.** **Library → Auto Import Settings…** watches a folder.
+  - Photos saved into it (for example by tethering software) are moved or copied into a destination folder, with optional keywords, while OpenStill is open.
+  - Only the folder's top level is watched, and a file is taken only once it has stopped changing.
+- **Reference View.** **Library → Reference View** keeps a chosen photo in its own window next to the one you're developing, for matching a look. **Use Current Photo as Reference** changes it.
+
 ## Importing from a card
 
 **File → Import Photos… (⇧⌘I)** copies photos from a camera card, or any folder, into your photo folders.
