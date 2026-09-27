@@ -70,5 +70,16 @@
             <sparkle:fullReleaseNotesLink>https://github.com/haon-v2/OpenStill/releases/tag/v0.0.6</sparkle:fullReleaseNotesLink>
             <enclosure url="https://github.com/haon-v2/OpenStill/releases/download/v0.0.6/OpenStill-0.0.6.zip" sparkle:edSignature="Dqkrm4IR9OAeUUoqw0k+ViPDwHZs2EjJqsC+oCYpUx8NoNZ4HBmqpM7Fw4CbQfQWYDF6Im3a7tVGLKT/+jqODQ==" length="32060041" type="application/octet-stream"/>
         </item>
+        <item>
+            <title>OpenStill 0.0.7</title>
+            <description><![CDATA[<h3>What’s new in 0.0.7</h3><ul><li>Fixed the Lightroom Classic layout showing an empty gray window</li><li>Develop&#x27;s left panel shows Presets, Versions and History again</li></ul>]]></description>
+            <pubDate>Sun, 27 Sep 2026 10:18:27 GMT</pubDate>
+            <sparkle:version>23</sparkle:version>
+            <sparkle:shortVersionString>0.0.7</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <sparkle:fullReleaseNotesLink>https://github.com/haon-v2/OpenStill/releases/tag/v0.0.7</sparkle:fullReleaseNotesLink>
+            <enclosure url="https://github.com/haon-v2/OpenStill/releases/download/v0.0.7/OpenStill-0.0.7.zip" sparkle:edSignature="W5yEqcLSdR/kqQUTFgRXwidPIihMPUfp83eXzjtrwZ0kJwPRgra+htsop2AYNTwH1rPpseO9Vpt3jVd38RrRBw==" length="32060351" type="application/octet-stream"/>
+        </item>
     </channel>
 </rss>
