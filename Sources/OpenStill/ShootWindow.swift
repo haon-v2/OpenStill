@@ -634,6 +634,8 @@ extension ShootWindow {
         }
         return true
     }
+    /// Gives the grid (or the Loupe / Compare / Survey stage) keyboard focus, e.g. after switching to the Library.
+    func focus(){(browserView.window ?? window)?.makeFirstResponder(viewMode == .grid ? grid:stage)}
     @objc fileprivate func viewModeChosen(){setViewMode(LibraryViewMode(rawValue:viewModes.selectedSegment) ?? .grid)}
     func setViewMode(_ mode:LibraryViewMode){
         if mode == .survey{surveyIDs=selectedItems.map(\.id);if surveyIDs.count<2{surveyIDs=Array(shown.prefix(max(2,surveyIDs.count)).map(\.id))}}

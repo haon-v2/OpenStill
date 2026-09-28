@@ -45,6 +45,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
     // Workflow: the second display window and Auto Sync.
     var secondaryWindow: SecondaryDisplayWindow?
     var autoSync = false
+    var workspaceKeyMonitor: Any?
     var libraryURLs: [URL] = []
     var folderURL: URL?
     /// The collection the library shows, when opened from the sidebar's Collections.
@@ -587,6 +588,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         isLibrary = true; foldersVisible = true
         if layoutMode == .lightroom { info.setLightroom(.library) }
         refreshLibrary(); updateWorkspaceLayout(); updateControls(); updateLibraryInspector()
+        withLibrary { $0.focus() }
     }
     @objc func showEditor() {
         let selectedItem = isLibrary ? libraryBrowser?.selectedItems.first : nil
@@ -868,6 +870,15 @@ extension ViewerController {
         librarySidebar.publish = { [weak self] in self?.withLibrary { $0.openPublish() } }
         canvas.viewportChanged = { [weak self] in self?.navigator.needsDisplay = true }
         Shortcuts.workspace = { [weak self] id in self?.handleWorkspaceKey(id) ?? false }
+        // Workspace keys (G, D, R, Q, L, T, Tab…) work wherever focus is in this window, except while typing in a text field.
+        // Before, only the photo, filmstrip and grid handled them, so after G hid the focused photo, D and G went nowhere.
+        if workspaceKeyMonitor == nil {
+            workspaceKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard let self, let window = self.view.window, event.window === window, window.attachedSheet == nil,
+                      !(window.firstResponder is NSText) else { return event }
+                return Shortcuts.performWorkspace(event) ? nil : event
+            }
+        }
     }
 
     /// Lightroom Classic's arrangement, with the panels the person has shown or hidden.
