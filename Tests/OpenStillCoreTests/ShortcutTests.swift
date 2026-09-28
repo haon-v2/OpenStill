@@ -91,15 +91,12 @@ import Testing
         #expect(m.search("zzz").isEmpty)
     }
 
-    @Test func layoutChoiceIsRemembered() {
+    @Test func thereIsOneLayout() {
         let key = WorkspaceLayout.defaultsKey, saved = UserDefaults.standard.string(forKey: key)
         defer { if let saved { UserDefaults.standard.set(saved, forKey: key) } else { UserDefaults.standard.removeObject(forKey: key) } }
-        UserDefaults.standard.removeObject(forKey: key)
-        #expect(WorkspaceLayout.current == .luminar)
-        WorkspaceLayout.current = .lightroom
-        #expect(WorkspaceLayout.current == .lightroom && UserDefaults.standard.string(forKey: key) == "lightroom")
-        UserDefaults.standard.set("something else", forKey: key)
-        #expect(WorkspaceLayout.current == .luminar)
-        #expect(WorkspaceLayout.lightroom.modeNames.edit == "Develop" && WorkspaceLayout.luminar.modeNames.library == "Catalog")
+        // An EZ Layout choice saved by an older version is ignored.
+        UserDefaults.standard.set("luminar", forKey: key)
+        #expect(WorkspaceLayout.current == .lightroom)
+        #expect(WorkspaceLayout.current.modeNames.library == "Library" && WorkspaceLayout.current.modeNames.edit == "Develop")
     }
 }

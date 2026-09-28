@@ -1,7 +1,7 @@
 import AppKit
 import OpenStillCore
 
-/// OpenStill → Settings… (⌘,): General (updates and library), Layout, and Shortcuts.
+/// OpenStill → Settings… (⌘,): General (updates and library) and Shortcuts.
 final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let general: GeneralSettings
     private let tabs = NSTabViewController()
@@ -10,7 +10,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         general = GeneralSettings(updates: updates)
         tabs.tabStyle = .toolbar
         tabs.transitionOptions = [.crossfade, .allowUserInteraction]
-        for (controller, title, symbol) in [(general as NSViewController, "General", "gearshape"), (LayoutSettings(), "Layout", "rectangle.split.3x1"), (ShortcutSettings(), "Shortcuts", "keyboard")] {
+        for (controller, title, symbol) in [(general as NSViewController, "General", "gearshape"), (ShortcutSettings(), "Shortcuts", "keyboard")] {
             let item = NSTabViewItem(viewController: controller)
             item.label = title; item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: title)
             tabs.addTabViewItem(item)
@@ -86,122 +86,6 @@ private final class GeneralSettings: NSViewController {
     @objc private func toggleAutomatic() { updates.automaticChecks = automatic.state == .on; refresh() }
     @objc private func check() { updates.checkForUpdates(self); refresh() }
     @objc private func openReleases() { NSWorkspace.shared.open(UpdateCheck.releasesPage) }
-}
-
-// MARK: - Layout
-
-/// A clickable card with a small drawing of the layout.
-private final class LayoutCard: NSView {
-    let layout: WorkspaceLayout
-    var chosen: ((WorkspaceLayout) -> Void)?
-    var selected = false { didSet { needsDisplay = true; setAccessibilitySelected(selected) } }
-    private var hovering = false { didSet { needsDisplay = true } }
-    init(_ layout: WorkspaceLayout) {
-        self.layout = layout
-        super.init(frame: NSRect(x: 0, y: 0, width: 250, height: 170))
-        setAccessibilityRole(.radioButton); setAccessibilityLabel(layout.title.hasSuffix("Layout") ? layout.title : layout.title + " layout"); setAccessibilityHelp(layout.summary)
-        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect], owner: self))
-    }
-    required init?(coder: NSCoder) { fatalError() }
-    override var intrinsicContentSize: NSSize { NSSize(width: 250, height: 170) }
-    override func mouseEntered(with event: NSEvent) { hovering = true }
-    override func mouseExited(with event: NSEvent) { hovering = false }
-    override func mouseDown(with event: NSEvent) { chosen?(layout) }
-    override func accessibilityPerformPress() -> Bool { chosen?(layout); return true }
-    override var acceptsFirstResponder: Bool { true }
-    override func keyDown(with event: NSEvent) { if event.keyCode == 49 || event.keyCode == 36 { chosen?(layout) } else { super.keyDown(with: event) } }
-
-    override func draw(_ dirtyRect: NSRect) {
-        let frame = bounds.insetBy(dx: 3, dy: 3)
-        let card = NSBezierPath(roundedRect: frame, xRadius: 14, yRadius: 14)
-        NSColor.controlBackgroundColor.withAlphaComponent(0.9).setFill(); card.fill()
-        (selected ? Appearance.accent : (hovering ? NSColor.secondaryLabelColor : NSColor.separatorColor)).setStroke()
-        card.lineWidth = selected ? 3 : 1; card.stroke()
-
-        // The window: a dark workspace with panels, a photo and a filmstrip.
-        let screen = frame.insetBy(dx: 16, dy: 16)
-        NSColor(calibratedWhite: 0.13, alpha: 1).setFill(); NSBezierPath(roundedRect: screen, xRadius: 8, yRadius: 8).fill()
-        let inner = screen.insetBy(dx: 6, dy: 6)
-        let panel = NSColor(calibratedWhite: 0.32, alpha: 1), rail = NSColor(calibratedWhite: 0.24, alpha: 1)
-        func box(_ r: NSRect, _ color: NSColor, radius: CGFloat = 3) { color.setFill(); NSBezierPath(roundedRect: r, xRadius: radius, yRadius: radius).fill() }
-        func photo(_ r: NSRect) {
-            NSGradient(colors: [NSColor(calibratedRed: 0.98, green: 0.62, blue: 0.35, alpha: 1), NSColor(calibratedRed: 0.55, green: 0.35, blue: 0.75, alpha: 1), NSColor(calibratedRed: 0.12, green: 0.2, blue: 0.45, alpha: 1)])?
-                .draw(in: NSBezierPath(roundedRect: r, xRadius: 3, yRadius: 3), angle: -90)
-            // A little mountain range and sun.
-            NSColor(calibratedWhite: 0.08, alpha: 0.85).setFill()
-            let m = NSBezierPath(); m.move(to: NSPoint(x: r.minX, y: r.minY)); m.line(to: NSPoint(x: r.minX + r.width * 0.3, y: r.minY + r.height * 0.45))
-            m.line(to: NSPoint(x: r.minX + r.width * 0.5, y: r.minY + r.height * 0.25)); m.line(to: NSPoint(x: r.minX + r.width * 0.72, y: r.minY + r.height * 0.55))
-            m.line(to: NSPoint(x: r.maxX, y: r.minY + r.height * 0.2)); m.line(to: NSPoint(x: r.maxX, y: r.minY)); m.close(); m.fill()
-            NSColor(calibratedRed: 1, green: 0.9, blue: 0.7, alpha: 0.95).setFill()
-            NSBezierPath(ovalIn: NSRect(x: r.minX + r.width * 0.62, y: r.minY + r.height * 0.6, width: r.height * 0.18, height: r.height * 0.18)).fill()
-        }
-        func strip(_ r: NSRect) {
-            box(r, rail)
-            let count = 6, gap: CGFloat = 3, w = (r.width - gap * CGFloat(count + 1)) / CGFloat(count)
-            for i in 0..<count { box(NSRect(x: r.minX + gap + CGFloat(i) * (w + gap), y: r.minY + 3, width: w, height: r.height - 6), NSColor(calibratedWhite: 0.45 + 0.05 * CGFloat(i % 2), alpha: 1), radius: 2) }
-        }
-        switch layout {
-        case .luminar:
-            let railW: CGFloat = 8, toolsW = inner.width * 0.26, stripH = inner.height * 0.18
-            box(NSRect(x: inner.minX, y: inner.minY, width: railW, height: inner.height), rail)
-            box(NSRect(x: inner.maxX - railW, y: inner.minY, width: railW, height: inner.height), rail)
-            let tools = NSRect(x: inner.maxX - railW - 4 - toolsW, y: inner.minY, width: toolsW, height: inner.height); box(tools, panel)
-            for i in 0..<5 { box(NSRect(x: tools.minX + 5, y: tools.maxY - 12 - CGFloat(i) * 11, width: tools.width - 10, height: 4), NSColor(calibratedWhite: 0.55, alpha: 1), radius: 2) }
-            let photoArea = NSRect(x: inner.minX + railW + 4, y: inner.minY + stripH + 4, width: tools.minX - 4 - (inner.minX + railW + 4), height: inner.height - stripH - 4)
-            photo(photoArea)
-            strip(NSRect(x: photoArea.minX, y: inner.minY, width: photoArea.width, height: stripH))
-        case .lightroom:
-            let sideW = inner.width * 0.2, stripH = inner.height * 0.18, barH: CGFloat = 8
-            box(NSRect(x: inner.minX, y: inner.maxY - barH, width: inner.width, height: barH), rail, radius: 2)
-            let top = inner.maxY - barH - 4, bottom = inner.minY + stripH + 4
-            let left = NSRect(x: inner.minX, y: bottom, width: sideW, height: top - bottom), right = NSRect(x: inner.maxX - sideW, y: bottom, width: sideW, height: top - bottom)
-            box(left, panel); box(right, panel)
-            for i in 0..<4 {
-                box(NSRect(x: left.minX + 4, y: left.maxY - 10 - CGFloat(i) * 10, width: left.width * (i % 2 == 0 ? 0.8 : 0.55), height: 4), NSColor(calibratedWhite: 0.55, alpha: 1), radius: 2)
-                box(NSRect(x: right.minX + 4, y: right.maxY - 10 - CGFloat(i) * 10, width: right.width - 8, height: 4), NSColor(calibratedWhite: 0.55, alpha: 1), radius: 2)
-            }
-            photo(NSRect(x: left.maxX + 4, y: bottom, width: right.minX - left.maxX - 8, height: top - bottom))
-            strip(NSRect(x: inner.minX, y: inner.minY, width: inner.width, height: stripH))
-        }
-        if selected {
-            let badge = NSRect(x: frame.maxX - 30, y: frame.maxY - 30, width: 22, height: 22)
-            Appearance.accent.setFill(); NSBezierPath(ovalIn: badge).fill()
-            if let check = NSImage(systemSymbolName: "checkmark", accessibilityDescription: nil)?.withSymbolConfiguration(.init(pointSize: 11, weight: .bold)) {
-                let tinted = NSImage(size: check.size, flipped: false) { r in check.draw(in: r); NSColor.white.set(); r.fill(using: .sourceAtop); return true }
-                tinted.draw(in: NSRect(x: badge.midX - check.size.width / 2, y: badge.midY - check.size.height / 2, width: check.size.width, height: check.size.height))
-            }
-        }
-    }
-}
-
-private final class LayoutSettings: NSViewController {
-    private var cards: [LayoutCard] = []
-    override func loadView() {
-        title = "Layout"
-        let intro = note("Choose how OpenStill arranges its panels. Your photos, edits and shortcuts stay the same; switch any time, also from View → Lightroom Classic Layout (⌃⌘1) or EZ Layout (⌃⌘2).")
-        intro.widthAnchor.constraint(equalToConstant: 540).isActive = true
-        let row = NSStackView(); row.spacing = 18; row.alignment = .top
-        for layout in [WorkspaceLayout.luminar, .lightroom] {
-            let card = LayoutCard(layout); card.chosen = { [weak self] in self?.choose($0) }; cards.append(card)
-            let name = NSTextField(labelWithString: layout.title); name.font = .systemFont(ofSize: 13, weight: .semibold)
-            let summary = note(layout.summary); summary.widthAnchor.constraint(equalToConstant: 250).isActive = true
-            let column = NSStackView(views: [card, name, summary]); column.orientation = .vertical; column.alignment = .leading; column.spacing = 6
-            row.addArrangedSubview(column)
-        }
-        let stack = NSStackView(views: [heading("Workspace layout"), intro, row])
-        stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 12
-        stack.edgeInsets = NSEdgeInsets(top: 22, left: 24, bottom: 26, right: 24); stack.setCustomSpacing(20, after: intro)
-        view = stack
-        preferredContentSize = stack.fittingSize
-        refresh()
-        NotificationCenter.default.addObserver(forName: .workspaceLayoutChanged, object: nil, queue: .main) { [weak self] _ in MainActor.assumeIsolated { self?.refresh() } }
-    }
-    private func choose(_ layout: WorkspaceLayout) {
-        guard layout != WorkspaceLayout.current else { return }
-        WorkspaceLayout.current = layout
-        NotificationCenter.default.post(name: .workspaceLayoutChanged, object: nil)
-    }
-    private func refresh() { for card in cards { card.selected = card.layout == WorkspaceLayout.current } }
 }
 
 // MARK: - Shortcuts

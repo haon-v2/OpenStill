@@ -279,8 +279,6 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
     }
 
     // MARK: Layout (Lightroom Classic or EZ Layout)
-    @objc func useLightroomLayout() { WorkspaceLayout.current = .lightroom; NotificationCenter.default.post(name: .workspaceLayoutChanged, object: nil) }
-    @objc func useLuminarLayout() { WorkspaceLayout.current = .luminar; NotificationCenter.default.post(name: .workspaceLayoutChanged, object: nil) }
     func applyLayout(_ layout: WorkspaceLayout) {
         layoutMode = layout
         let lr = layout == .lightroom
@@ -730,8 +728,6 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
             && NSApp.keyWindow === view.window
     }
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
-        if menuItem.action == #selector(useLightroomLayout) { menuItem.state = layoutMode == .lightroom ? .on : .off; return true }
-        if menuItem.action == #selector(useLuminarLayout) { menuItem.state = layoutMode == .luminar ? .on : .off; return true }
         if menuItem.action == #selector(trashPhoto) { return canTrashPhoto }
         if menuItem.action == #selector(sharePhoto) { return !selectedURLs.isEmpty && NSApp.keyWindow === view.window && view.window?.attachedSheet == nil }
         if menuItem.action == #selector(selectAllPhotos) { return !urls.isEmpty && NSApp.keyWindow === view.window && view.window?.attachedSheet == nil }
