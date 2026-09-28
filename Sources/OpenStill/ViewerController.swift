@@ -672,12 +672,12 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         window.showWindow(nil); window.window?.makeKeyAndOrderFront(nil)
     }
     /// Folders panel → Import to This Folder…
-    func importPhotos(into folder: URL) { importPhotos(); photoImport?.importInto(folder) }
+    func importPhotosInto(_ folder: URL) { importPhotos(); photoImport?.importInto(folder) }
     /// Folders panel right-click: Show in Finder, Import to This Folder…, Synchronize Folder.
     func folderCommand(_ id: String, _ folder: URL) {
         switch id {
         case "finder": NSWorkspace.shared.activateFileViewerSelecting([folder])
-        case "import": importPhotos(into: folder)
+        case "import": importPhotosInto(folder)
         case "sync":
             // Re-reads the folder: new photos join the library and the counts are refreshed.
             open([folder]); showLibrary()
