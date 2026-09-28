@@ -2,7 +2,7 @@
 
 A free, open-source macOS photo viewer and editor. A little space for your photographs.
 
-OpenStill 0.6 combines a native photo browser with nondestructive editing, local AI tools, complete ImageIO-readable metadata, and sharing. Originals are preserved.
+OpenStill 0.6 combines a native photo browser with nondestructive editing, optional on-device AI, complete ImageIO-readable metadata, and sharing. Originals are preserved.
 
 ## Use
 
@@ -105,18 +105,40 @@ Moved or deleted files drop out of collections until they're found again.
   - Only the folder's top level is watched, and a file is taken only once it has stopped changing.
 - **Reference View.** **Library → Reference View** keeps a chosen photo in its own window next to the one you're developing, for matching a look. **Use Current Photo as Reference** changes it.
 
-## Importing from a card
+## Importing photos
 
-**File → Import Photos… (⇧⌘I)** copies photos from a camera card, or any folder, into your photo folders.
+**File → Import Photos… (⇧⌘I)** works like Lightroom's import. Choose at the top:
+- **Copy**: copies the photos into your photo folders and adds the copies. The originals stay where they are.
+- **Move**: moves the photos into your photo folders. On the same drive the files are simply moved; from another drive each copy is verified first, and only then does the original go to the Trash.
+- **Add**: adds the photos to the library where they are. Nothing is copied or moved, so the folder and name settings are hidden.
+
+From a camera card only **Copy** is offered, so nothing on the card is changed. Right-click a folder in **Folders** and choose **Import to This Folder…** to copy photos straight into it. When the import finishes, the window says which folders the photos are in, with **Show in Library** and **Show in Finder**.
 - **Source.** Cards and other removable drives are listed automatically, with ones holding a `DCIM` folder first; **Choose folder…** picks any folder. Subfolders are included and hidden files skipped.
 - **Already imported.** Photos whose contents are already in your library (same size and SHA-256) are marked and unchecked. Check or uncheck any photo; with several rows selected, one checkbox changes them all.
 - **Folders and names.** The folder template (for example `{yyyy}/{yyyy}-{MM}-{dd}`) and name template (for example `{date}_{name}`) use `{yyyy} {MM} {dd} {date} {time} {name} {index} {camera}`, with a live example. Dates come from the capture time recorded by the camera. An existing file is never replaced; a clash gets `-1`, `-2`…
 - **Second copy.** Optionally write a backup copy, with the same folders and names, to another drive.
 - **Apply on import.** A metadata preset, extra keywords, and a develop preset (`.openstillpreset`) applied to each photo's first version. A develop preset doesn't change crop, rotation or lens corrections.
-- **Verified.** Every copy is written to a temporary file, read back, and compared with the original's SHA-256 before it gets its final name. A copy that doesn't match is removed and reported. XMP sidecars come along with their photos. Nothing on the card is ever changed or deleted.
+- **Verified.** Every copy is written to a temporary file, read back, and compared with the original's SHA-256 before it gets its final name. A copy that doesn't match is removed and reported. XMP sidecars come along with their photos. Copy and Add never change the source.
 - **Eject** the card when the import finishes without errors (optional).
 
 Imported photos open in the library.
+
+## Catalog: compared with Lightroom Classic
+
+What OpenStill's catalog has, checked against the code, and what's still to come:
+
+| Lightroom Classic | OpenStill |
+| --- | --- |
+| Folders panel with drives, hierarchy and counts | Yes, with Show in Finder, Import to This Folder and Synchronize Folder |
+| Import: Copy / Move / Add | Yes. Copy as DNG isn't offered |
+| Collections and smart collections | Yes |
+| Stacks | Yes (Library → Group into Stack, ⌘G) |
+| Virtual copies | Versions: named alternatives of one photo's edits, but not separate thumbnails in the grid |
+| Missing-file badges ("!" on photos whose file moved) | Not yet: drives that aren't connected are dimmed in Folders, and Lightroom catalog imports can be relinked |
+| Synchronize Folder removing photos deleted outside the app | Not yet: it adds new photos and refreshes counts |
+| Find missing folder / Update folder location | Not yet |
+| Collection sets (folders of collections) | Not yet |
+
 
 ## Duplicates
 
@@ -222,19 +244,28 @@ For **Google Drive, Dropbox, WeTransfer, Pixieset, and Pic-Time**, choose the we
 
 Sharing copies are kept in OpenStill's temporary sharing folder so other apps can finish reading them; copies older than seven days are cleaned up when preparing another share. Source photos are never changed. Batch preparation shows progress and keeps same-named photos as separate files. If any photo cannot be prepared, sharing is disabled and the failed filename is shown; no incomplete batch is silently sent. Saving to a folder reports how many copies succeeded if a later copy fails. No Google or Dropbox developer registration is required.
 
-## Layouts and keyboard shortcuts
+## Layout and keyboard shortcuts
 
-**Settings → Layout** (or **View → Lightroom Classic Layout** ⌃⌘1 / **EZ Layout** ⌃⌘2) switches how the window is arranged. Your photos, edits and shortcuts stay the same.
-- **EZ Layout** (the default) puts the photo first. There are icon rails at both edges and one tool panel on the right, with the filmstrip under the photo. The workspaces are called **Catalog** and **Edit**. It suits quick edits.
-- **Lightroom Classic** follows Lightroom Classic's window, with flat dark-gray panels and square corners:
+OpenStill has one layout, modeled on Lightroom Classic's window, with flat dark-gray panels and square corners. (The EZ Layout of earlier versions is gone; a saved EZ Layout choice is ignored.)
+- **The window:**
   - **Module picker** across the top: the identity plate on the left, **Library | Develop | Map | Slideshow | Print | Web** on the right. Map, Slideshow, Print and Web open their windows for the selected photos (⌥⌘3, ⌥⌘5, ⌥⌘6, ⌥⌘7). OpenStill has no Book module.
   - **Left panel:**
     - The **Navigator** sits at the top: the whole photo, with a frame around the zoomed-in area. Click or drag in it to move around, or use **FIT / 100% / 200%**.
     - Library has **Catalog, Folders, Collections** and **Publish Services**, with **Import… / Export…** at the bottom.
+    - **Folders** works like Lightroom's: each drive (the startup disk first, then external drives, dimmed when not connected), then the folders that hold your library's photos, with photo counts. Click a triangle to open or close a folder, click a folder to show its photos, and right-click it for **Show in Finder**, **Import to This Folder…** and **Synchronize Folder**. Folders above your photos that hold nothing else are skipped, so the list starts where your photos are.
     - Develop has **Presets, Versions** and **History**, with **Copy… / Paste**. Versions take the place of Lightroom's Snapshots and are OpenStill's named alternatives.
   - **Right panel:**
     - Library has **Histogram, Keywording** and **Metadata** for the photo selected in the grid, with **Sync Metadata… / Sync Settings…**.
-    - Develop has the **Histogram** with the camera settings under it, then the **Crop / Remove / Masking** tool strip. Below that are **Basic** (Treatment, HDR, Profile, White Balance, Tone, Presence), **Tone Curve, HSL / Color, Color Grading, Detail, Lens Corrections, Transform, Effects, Lens Blur** and **Calibration**. OpenStill's own tools (Structure, Glow, Sunrays, Sky Replacement, Layers, Local AI) come after them.
+    - Develop has the **Histogram** with the camera settings under it, then the **Crop / Remove / Red Eye / Masking** tool strip. Below that, in Lightroom's order:
+      - **Basic**: the **Profile** first, then Treatment, White Balance, Tone, Presence and HDR;
+      - **Tone Curve**, **HSL / Color**, **B&W Mix** and **Color Grading**;
+      - **Detail**: sharpening, noise reduction, chromatic aberration, defringe and the AI enhancements;
+      - **Geometry**: Crop & Straighten, Lens Corrections and Transform together;
+      - **Effects**: vignetting, grain, **Lens Blur**, Glow, Sunrays and Structure;
+      - **Calibration**;
+      - then OpenStill's own **Sky Replacement**, **Layers** and **On-Device AI**.
+
+      Only Basic starts open; the others remember whether you left them open.
     - At the bottom of Develop are **Previous**, which copies the last photo's settings but not its crop, retouching, lens or transform, and **Reset**.
   - **Panels:**
     - Headers open and close sections. Option-click a header, or Control-click it and choose **Solo Mode**, so opening one section closes the rest. **Expand All / Collapse All** are in the same menu.
@@ -257,7 +288,7 @@ Sharing copies are kept in OpenStill's temporary sharing folder so other apps ca
 
     You can change them all in **Settings → Shortcuts → Workspace**.
   - **Masking works like Lightroom's.** **New mask** (Brush, Linear, Radial, Subject, Sky, Background, People, Object, Color / Luminance / Depth range) adds a mask with its own Exposure, Contrast, Highlights, Shadows, Whites, Blacks, Temperature, Tint, Saturation, Clarity, Texture, Dehaze, Sharpness and Noise sliders. Add as many as you like; each one changes only its own area. Rename, duplicate, invert, hide or delete a mask from its list. Below the list you can still limit a whole tool (Develop, Clarity, Color grading…) to a mask, as before.
-  - **Return finishes a tool.** In Crop, Remove, Red Eye and Masking, Return (or **Done**) applies the crop or ends painting and closes the panel. Escape closes it too. In the EZ Layout, Return takes a tool's Masking tab back to its adjustments, and closes the Masks tool or a tool you were drawing with.
+  - **Return finishes a tool.** In Crop, Remove, Red Eye and Masking, Return (or **Done**) applies the crop or ends painting and closes the panel. Escape closes it too.
   - **Look and behavior are close to Lightroom Classic, not a copy.** The panel names, order and keys follow it, and the controls are OpenStill's own. There are no Adobe icons or artwork, and slider scales are OpenStill's (for example, Contrast runs 0.5–1.5), not Lightroom's −100 to +100.
 
 **Settings → Shortcuts** lists every command and its shortcut:
@@ -295,7 +326,7 @@ Sharing copies are kept in OpenStill's temporary sharing folder so other apps ca
   - Only the sliders you changed are copied, so changing Exposure doesn't overwrite another photo's Contrast.
   - Crop, retouching and lens settings are never synced.
 - **Adaptive presets** (**Develop → Adaptive Presets**). Subject: Pop, Subject: Soften, Background: Soften, Background: Clear haze, Sky: Deepen and Sky: Soft.
-  - They find the subject (Apple Vision, on this Mac) or the sky (local AI tools) in each photo and apply their settings only there.
+  - They find the subject (Apple Vision, on this Mac) or the sky (on-device AI) in each photo and apply their settings only there.
   - The masks appear in each tool's Masking tab, where you can refine them.
 - **Identity plate** (**Develop → Identity Plate…**). Your own text or logo in place of "OpenStill" at the top left of the Lightroom layout. **Use Saved Logo** picks a logo made or imported in the watermark logo designer.
 
@@ -361,15 +392,15 @@ The Lightroom-desktop-inspired workspace has a slim local-library rail on the le
 - B&W mix: with Black & white on, eight sliders (red to magenta) brighten or darken each color's gray. **Auto mix** sets them from the photo's colors.
 - Detail: Sharpening has **Radius**, **Detail** and **Masking** (Masking 0 sharpens everything; higher values sharpen only edges). Noise reduction has Luminance **Detail** and **Contrast**, plus **Color** and **Color detail** for color blotches. Photos edited before these sliders existed look the same until you change one.
 - Remove chromatic aberration (Lens corrections): measures the red and blue fringing toward the corners of this photo and lines the colors up again. It works without a lens profile. Measuring again replaces the old values; **Turn off chromatic aberration removal** removes it.
-- Red eye and Pet eye (tool strip in Lightroom, **Red eye** tool in the EZ Layout): drag an ellipse over an eye. Red eye darkens and desaturates the red pupil; Pet eye fills the pupil and can add a catchlight. **Pupil size** and **Darken** change the last eye. Eyes follow crop, rotation and flips.
+- Red eye and Pet eye (the Red Eye button in the Develop tool strip): drag an ellipse over an eye. Red eye darkens and desaturates the red pupil; Pet eye fills the pupil and can add a catchlight. **Pupil size** and **Darken** change the last eye. Eyes follow crop, rotation and flips.
 - Visualize spots (Retouch / Remove): shows the photo as a black-and-white edge map so dust and small blemishes stand out; the slider sets how much detail it shows. It is never exported.
-- Snapshots (left panel in Lightroom, History in the EZ Layout): **New snapshot…** saves the current edits under a name. Click one to go back to it in one undo step; Control-click it to rename or delete it. Snapshots belong to the version and are saved with it.
+- Snapshots (Develop's left panel): **New snapshot…** saves the current edits under a name. Click one to go back to it in one undo step; Control-click it to rename or delete it. Snapshots belong to the version and are saved with it.
 - Color: global saturation/vibrance plus eight visible swatches for red, orange, yellow, green, aqua, blue, purple, and magenta. Each color remembers its Saturation or HSL view. HSL provides Hue, Saturation, and Lightness with shade-gradient tracks and a live color indicator; switching views keeps your adjustments. Reset this color clears only the selected band.
 - Black & white: monochrome strength plus separate Blacks and Whites tonal sliders.
 - Vignette: negative darkens the edges, zero is neutral, positive lightens them.
 - Lens blur: a depth-driven blur, like a wide-aperture lens. First choose the depth:
   - **Use the photo's depth data** (iPhone Portrait mode);
-  - **Estimate depth** (local AI);
+  - **Estimate depth** (on-device AI);
   - **Keep the subject sharp** (Vision's subject selection, for any photo).
 
   Then set **Blur amount**, **Focus distance** (1 = nearest) and **Focus range**, and whether nearer things blur too. The blur grows with distance from the focus band and scales with the photo, so previews match exports. It is OpenStill's own variable blur, not an optical bokeh simulation: there are no shaped highlights or cat's-eye bokeh. The Masking tab can limit it.
@@ -384,7 +415,7 @@ The Lightroom-desktop-inspired workspace has a slim local-library rail on the le
 
 ### Masks
 
-**Masks** (EZ Layout) and **Masking** (Lightroom) make mask layers: each new mask has its own set of sliders, so you can brighten the sky and darken the ground with two masks. The sections below describe the selection tools every mask uses.
+**Masking** (Shift-W) makes mask layers: each new mask has its own set of sliders, so you can brighten the sky and darken the ground with two masks. The sections below describe the selection tools every mask uses.
 
 ### Per-feature masks
 
@@ -401,8 +432,8 @@ Masks belong to their individual tool. Switching tools ends the active brush/sel
   - **People**, or **Person 1–4** counted from the left: person segmentation with soft hair edges. Individual people need macOS 14.
   - **Face**, **Eyes**, **Eyebrows** and **Lips**: from Vision's face landmarks. The face shape runs from the jaw line to the top of the forehead.
   - **Skin**: people coverage limited to skin tones. The tone range covers light and dark complexions, but warm-colored clothing next to skin can be included; subtract a brush where needed.
-  - **Sky**: the local AI tools' U2-Net model, as a mask only, without replacing anything.
-  - **Depth range**: selects part of the scene by distance. The depth comes from the photo's own depth data (iPhone Portrait-mode HEIC) or, when set up, the local AI estimate (Depth Anything V2 Small). The luminance bounds choose the band (white = near).
+  - **Sky**: the on-device AI's U2-Net model, as a mask only, without replacing anything.
+  - **Depth range**: selects part of the scene by distance. The depth comes from the photo's own depth data (iPhone Portrait-mode HEIC) or, when set up, the on-device AI estimate (Depth Anything V2 Small). The luminance bounds choose the band (white = near).
 
   AI components are saved as mask images in the photo's orientation. Like other components, they follow crop, rotation, lens corrections and Transform, and can be added, subtracted, intersected, inverted or refined with a brush.
 - **Feather**, **Invert**, and **Show/hide** control the mask. The red overlay is never exported. **Back to adjustments** or Escape ends drawing and keeps the mask; **Mask actions → Clear mask** restores the adjustment to the whole photo. Choosing a new shape updates the selected component. Add another named component to combine selections.
@@ -459,11 +490,13 @@ Generate with AI uses the optional **Download local model · 639 MB**, which ins
 
 Export placement offers nine anchors, percentage width, margin and opacity with a live preview. Watermarks belong to export presets and never enter editing masks or original files.
 
-## Local AI tools
+## On-device AI (optional)
+
+Optional AI for sky and subject masks, object removal, noise reduction, detail and depth. Nothing is set up until you ask, it downloads about 450 MB once, and it runs only on this Mac: photos are never uploaded.
 
 Five local models are integrated: sky segmentation/replacement (U2-Net), object removal (LaMa), noise removal (SCUNet), detail restoration and 2× super resolution (Real-ESRGAN), and depth estimation (Depth Anything V2 Small, for Lens blur and depth masks). These are independent open-source implementations, not Luminar's proprietary engines. Results depend on the photograph and mask; review fine texture at 100% and undo when needed.
 
-Choose **Set up local AI tools…** once. This downloads approximately 450 MB of pinned, SHA-256-verified model files plus the Python packages. When a new version adds a model, the tool that needs it asks you to run setup again, which downloads only what's missing; no account or API key is needed. This Mac has already been set up. For a fresh installation, install Python 3.11 or 3.12 at a supported Homebrew or `/usr/local/bin` location, then run setup. AI's pinned NumPy wheels require macOS 14+ on Apple Silicon; the native viewer/editor targets macOS 13+. Other architectures/macOS versions have not been validated for AI.
+Choose **Set up on-device AI…** (Develop → On-Device AI) once. This downloads approximately 450 MB of pinned, SHA-256-verified model files plus the Python packages. When a new version adds a model, the tool that needs it asks you to run setup again, which downloads only what's missing; no account or API key is needed. This Mac has already been set up. For a fresh installation, install Python 3.11 or 3.12 at a supported Homebrew or `/usr/local/bin` location, then run setup. AI's pinned NumPy wheels require macOS 14+ on Apple Silicon; the native viewer/editor targets macOS 13+. Other architectures/macOS versions have not been validated for AI.
 
 - **Erase AI**: create a brush, linear, radial, or AI object mask over the unwanted area, then **Remove selected area**. LaMa processes a padded region around the mask. Cover the object including its edges. Brush refinement and feathering are available.
 - **Sky replacement AI**: choose your own replacement sky photograph. The model detects a sky boundary, blends the replacement into that area, and rejects masks with no reliable boundary. There is no automatic foreground relighting or reflection replacement.
