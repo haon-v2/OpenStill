@@ -81,3 +81,16 @@ import Testing
         #expect(abs(imported.highlightsAmount - 0.3) < 1e-9 && abs(imported.shadowsAmount + 0.2) < 1e-9)
     }
 }
+
+@Suite struct ImportFoldersTests {
+    @Test func foldersAreListedAndGroupedWhenThereAreMany() {
+        let few = ["/Users/a/Pictures/2024/Rome/1.raf", "/Users/a/Pictures/2024/Rome/2.raf", "/Users/a/Pictures/2024/Paris/3.arw"]
+        let rows = LightroomCatalog.folders(of: few)
+        #expect(rows.map(\.folder) == ["/Users/a/Pictures/2024/Paris", "/Users/a/Pictures/2024/Rome"] && rows.map(\.count) == [1, 2])
+        // Many folders collapse to their shared parents, never more than the limit.
+        let many = (1...40).map { "/Volumes/Photos/\($0 % 3 == 0 ? "Travel" : "Family")/Shoot \($0)/img.raf" }
+        let grouped = LightroomCatalog.folders(of: many, limit: 5)
+        #expect(grouped.count <= 5 && grouped.map(\.folder) == ["/Volumes/Photos/Family", "/Volumes/Photos/Travel"] && grouped.map(\.count).reduce(0, +) == 40)
+        #expect(LightroomCatalog.folders(of: []).isEmpty)
+    }
+}

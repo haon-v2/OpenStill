@@ -678,6 +678,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
     @objc func importPhotos() {
         let window = photoImport ?? ImportWindow(); photoImport = window
         window.imported = { [weak self] urls in guard let self, !urls.isEmpty else { return }; self.open(urls); self.showLibrary() }
+        window.showFolder = { [weak self] folder in self?.open([folder]); self?.showLibrary() }
         window.showWindow(nil); window.window?.makeKeyAndOrderFront(nil)
     }
     private var tether: TetherWindow?
@@ -699,6 +700,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
     @objc func importLightroomCatalog() {
         let window = lightroomImport ?? LightroomImportWindow(); lightroomImport = window
         window.completed = { [weak self] in guard let self else { return }; self.librarySidebar.reloadCollections(); self.libraryBrowser?.refresh() }
+        window.showFolder = { [weak self] folder in self?.open([folder]); self?.showLibrary() }
         window.showWindow(nil); window.window?.makeKeyAndOrderFront(nil)
     }
     private func escapeView() {

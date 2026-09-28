@@ -6,6 +6,8 @@ import OpenStillCore
 /// The source is never changed or deleted.
 final class ImportWindow: NSWindowController, NSWindowDelegate, NSTableViewDataSource, NSTableViewDelegate {
     var imported: (([URL]) -> Void)?
+    /// Opens a folder in the Library (set by the main window).
+    var showFolder: ((URL) -> Void)?
     private var source: URL?
     private var candidates: [ImportCandidate] = []
     private var destination: URL?
@@ -262,8 +264,19 @@ final class ImportWindow: NSWindowController, NSWindowDelegate, NSTableViewDataS
                     catch { text += "\n\nThe card couldn’t be ejected: \(error.localizedDescription)" }
                 }
                 if !report.imported.isEmpty { self.imported?(report.imported) }
+                // Say exactly where the copies landed.
+                let landed = LightroomCatalog.folders(of: report.imported.map(\.path), limit: 6)
+                if !landed.isEmpty { text += "\n\nCopied to:\n" + landed.map { ($0.folder as NSString).abbreviatingWithTildeInPath + "  (\($0.count))" }.joined(separator: "\n") }
                 let alert = NSAlert(); alert.messageText = report.imported.isEmpty ? "Nothing imported" : "Import finished"; alert.informativeText = text
-                alert.beginSheetModal(for: window)
+                alert.addButton(withTitle: "OK")
+                if let first = landed.first {
+                    alert.addButton(withTitle: "Show in Library"); alert.addButton(withTitle: "Show in Finder")
+                    alert.beginSheetModal(for: window) { [weak self] response in
+                        let folder = URL(fileURLWithPath: first.folder)
+                        if response == .alertSecondButtonReturn { self?.showFolder?(folder) }
+                        if response == .alertThirdButtonReturn { NSWorkspace.shared.activateFileViewerSelecting(report.imported.isEmpty ? [folder] : [report.imported[0]]) }
+                    }
+                } else { alert.beginSheetModal(for: window) }
                 if let source = self.source, eject == nil { self.scan(source) } else { self.candidates = []; self.table.reloadData(); self.updateSummary(); self.reloadSources() }
             }
         }

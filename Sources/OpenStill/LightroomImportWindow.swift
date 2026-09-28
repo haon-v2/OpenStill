@@ -6,6 +6,10 @@ import OpenStillCore
 /// collections and develop settings into OpenStill. Photos stay where they are; moved drives can be relinked.
 final class LightroomImportWindow: NSWindowController, NSWindowDelegate {
     var completed: (() -> Void)?
+    /// Opens a folder in the Library (set by the main window).
+    var showFolder: ((URL) -> Void)?
+    /// After an import: where the photos are, since nothing is copied or moved.
+    private var importedFolders: [(folder: String, count: Int)] = []
     private var catalog: LightroomCatalog?
     private var relink: [String: String] = [:]
     private let summary = NSTextField(wrappingLabelWithString: "Choose a Lightroom Classic catalog (.lrcat). It is only read; Lightroom’s copy isn’t changed.")
@@ -91,6 +95,21 @@ final class LightroomImportWindow: NSWindowController, NSWindowDelegate {
     private func rebuildRoots() {
         roots.arrangedSubviews.forEach { $0.removeFromSuperview() }
         guard let catalog else { return }
+        if !importedFolders.isEmpty {
+            let heading = NSTextField(wrappingLabelWithString: "Your photos weren’t copied or moved. They’re still in these folders, now in OpenStill’s Library:")
+            heading.font = .systemFont(ofSize: 12, weight: .semibold); roots.addArrangedSubview(heading)
+            heading.widthAnchor.constraint(equalTo: roots.widthAnchor).isActive = true
+            for (index, entry) in importedFolders.enumerated() {
+                let label = NSTextField(labelWithString: (entry.folder as NSString).abbreviatingWithTildeInPath + "  ·  \(entry.count) photo" + (entry.count == 1 ? "" : "s"))
+                label.font = .systemFont(ofSize: 11); label.lineBreakMode = .byTruncatingMiddle; label.toolTip = entry.folder
+                label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+                let finder = NSButton(title: "Show in Finder", target: self, action: #selector(revealFolder(_:))), library = NSButton(title: "Show in Library", target: self, action: #selector(openFolder(_:)))
+                for button in [finder, library] { button.bezelStyle = .rounded; button.controlSize = .small; button.tag = index }
+                let row = NSStackView(views: [label, NSView(), finder, library]); row.spacing = 6
+                roots.addArrangedSubview(row); row.widthAnchor.constraint(equalTo: roots.widthAnchor).isActive = true
+            }
+            return
+        }
         let resolver = options
         for root in catalog.roots {
             let inRoot = catalog.photos.filter { $0.path.hasPrefix(root) }
@@ -105,6 +124,14 @@ final class LightroomImportWindow: NSWindowController, NSWindowDelegate {
             let row = NSStackView(views: [label, NSView(), button]); row.spacing = 6
             roots.addArrangedSubview(row); row.widthAnchor.constraint(equalTo: roots.widthAnchor).isActive = true
         }
+    }
+    @objc private func revealFolder(_ sender: NSButton) {
+        guard importedFolders.indices.contains(sender.tag) else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: importedFolders[sender.tag].folder)])
+    }
+    @objc private func openFolder(_ sender: NSButton) {
+        guard importedFolders.indices.contains(sender.tag) else { return }
+        showFolder?(URL(fileURLWithPath: importedFolders[sender.tag].folder))
     }
     @objc private func relinkRoot(_ sender: NSButton) {
         guard let root = sender.identifier?.rawValue, let window else { return }
@@ -130,6 +157,8 @@ final class LightroomImportWindow: NSWindowController, NSWindowDelegate {
                 self.running = false; self.chooseButton.isEnabled = true; self.importButton.isEnabled = true; self.progress.doubleValue = 1
                 var text = result.summary
                 if !result.missingPaths.isEmpty { text += "\n\nNot found:\n" + result.missingPaths.prefix(50).joined(separator: "\n") + (result.missing > 50 ? "\n…" : "") }
+                let found = catalog.photos.map { options.resolvedPath($0.path) }.filter { FileManager.default.fileExists(atPath: $0) }
+                self.importedFolders = result.imported > 0 ? LightroomCatalog.folders(of: found) : []
                 self.show(text); self.rebuildRoots(); self.completed?()
             }
         }
