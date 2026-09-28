@@ -27,7 +27,7 @@ import Testing
         #expect(folders.map(\.name) == ["Shoot"] && folders[0].count == 3 && folders[0].children.map(\.name) == ["Selects"])
         // Names sort like Finder: 2 before 10.
         let numbered = FolderTree.volumes(["/p/Roll 10/a.jpg", "/p/Roll 2/b.jpg"], startupName: "Disk", exists: { _ in true })[0].folders
-        #expect(numbered.map(\.name) == ["Roll 2", "Roll 10"])
+        #expect(numbered.map(\.name) == ["p"] && numbered[0].children.map(\.name) == ["Roll 2", "Roll 10"])
     }
 }
 
