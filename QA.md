@@ -454,3 +454,17 @@ Automated fixtures are generated and contain no user photographs. The real S9 fi
   - **Faster RAF:** the camera's embedded preview shows while a RAW file develops; Fuji X-Trans uses the one-pass demosaic on screen, and three-pass for exports.
 - **Automated tests:** ToneRegionsTests (recover and brighten on a ramp without reversing, monotonic, darker half untouched, shadows mirror, hue kept, centred sliders, older edits unchanged, adoption, JSON round-trip, sanitizing, Quick Develop, Camera Raw); ImportFoldersTests (folder list and grouping); XMPImportTests updated.
 - **Not yet verified by hand on a Mac:** RAF timings on real X-Trans files; Open With with several apps installed; G / D after clicking in a side panel.
+
+## One layout, Develop order, Folders, import modes — September 28, 2026
+
+- **Changed:**
+  - **One layout.** The EZ Layout is gone, and so are Settings → Layout and View → Lightroom Classic Layout / EZ Layout (⌃⌘1 / ⌃⌘2). A saved EZ Layout choice is ignored. With it goes the catalog controls shown three times (left, right and top) in that layout.
+  - **Develop's right panel, in Lightroom's order:** Basic with the **Profile first**, Tone Curve, HSL / Color, B&W Mix, Color Grading, Detail (sharpening, noise, chromatic aberration, defringe, AI enhance), **Geometry** (Crop & Straighten, Lens Corrections, Transform), **Effects** (vignetting, grain, **Lens Blur**, Glow, Sunrays, Structure) and Calibration, then Sky Replacement, Layers and On-Device AI. Only Basic starts open.
+  - **On-device AI** replaces "local AI tools" in every label and message, with a plain explanation: optional, about 450 MB once, runs only on this Mac. (One message said 350 MB; the models add up to about 450 MB.)
+  - **Secondary windows** (Import, Export, Metadata, Duplicates…) are flat panels instead of a floating glass card.
+- **Added:**
+  - **Folders like Lightroom's:** drives (startup disk first, external drives dimmed when not connected), then the library's folders with photo counts, expandable. Right-click a folder: Show in Finder, Import to This Folder…, Synchronize Folder, Expand / Collapse.
+  - **Import: Copy / Move / Add.** Move renames on the same drive; across drives it verifies each copy and only then puts the original in the Trash. Add leaves photos where they are. From a camera card only Copy is offered.
+  - README: a table comparing OpenStill's catalog with Lightroom Classic's, with what's still missing (missing-file badges, virtual copies as grid thumbnails, removing deleted photos on Synchronize, Find Missing Folder, collection sets).
+- **Automated tests:** FolderTreeTests (drives first, skipped single-folder chains, counts, offline drives, Finder-style sorting); ImportModeTests (Add leaves files untouched and applies metadata, Move takes photos and sidecars, settings saved before modes default to Copy); ShortcutTests checks a saved EZ Layout choice is ignored.
+- **Not yet verified by hand on a Mac:** Move from an external drive to the startup disk (Trash step); Folders with thousands of folders; Import to This Folder from the Folders menu.
