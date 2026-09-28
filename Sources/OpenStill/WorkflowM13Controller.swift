@@ -185,11 +185,11 @@ extension ViewerController {
         guard !isLibrary, let original = renderedPhoto?.image, let source = currentSource, !aiPreparing, !localAI.isRunning else { info.status("Open a photo in Develop to apply an adaptive preset."); return }
         let edits = currentEdits
         if preset.target == .sky {
-            guard LocalAI.ready else { info.status("Sky presets use the local AI tools. Choose Set up local AI tools first."); return }
+            guard LocalAI.ready else { info.status("Sky presets use on-device AI. Choose Set up on-device AI first."); return }
             do {
                 let input = try EditStorage.newAsset(), output = try EditStorage.newAsset()
                 try PhotoEditor.write(try aiBaseImage(edits, original: original, maximum: 3072), to: input)
-                info.status("Finding the sky with local AI…", busy: true)
+                info.status("Finding the sky with on-device AI…", busy: true)
                 localAI.run(tool: "skymask", arguments: ["--input", input.path, "--output", output.path], status: { [weak self] text in self?.info.status(text, busy: true) }) { [weak self] result in
                     try? FileManager.default.removeItem(at: input)
                     guard let self, self.currentSource == source else { return }

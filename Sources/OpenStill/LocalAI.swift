@@ -29,15 +29,15 @@ final class LocalAI {
         if tool == "setup" {
             let candidates = ["/opt/homebrew/bin/python3.12", "/opt/homebrew/bin/python3.11", "/usr/local/bin/python3.12", "/usr/local/bin/python3.11", "/usr/bin/python3"]
             guard let path = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) else {
-                completion(.failure(NSError(domain: "OpenStill", code: 1, userInfo: [NSLocalizedDescriptionKey: "Install Python 3.10–3.12, then choose Set up local AI tools again."]))); return
+                completion(.failure(NSError(domain: "OpenStill", code: 1, userInfo: [NSLocalizedDescriptionKey: "Install Python 3.10–3.12, then choose Set up on-device AI again."]))); return
             }
             executable = URL(fileURLWithPath: path)
         } else {
-            guard Self.ready else { completion(.failure(NSError(domain: "OpenStill", code: 1, userInfo: [NSLocalizedDescriptionKey: "Choose Set up local AI tools first. The one-time download is about 350 MB."]))); return }
+            guard Self.ready else { completion(.failure(NSError(domain: "OpenStill", code: 1, userInfo: [NSLocalizedDescriptionKey: "Choose Set up on-device AI first. The one-time download is about 450 MB."]))); return }
             executable = Self.python
             let model = ["skymask": "sky", "depth": "depth", "upscale": "detail", "rawdenoise": "denoise"][tool] ?? tool
             if !Self.hasModel(model) {
-                completion(.failure(NSError(domain: "OpenStill", code: 1, userInfo: [NSLocalizedDescriptionKey: "This tool needs a model added in this version of OpenStill. Choose Set up local AI tools again to download it."]))); return
+                completion(.failure(NSError(domain: "OpenStill", code: 1, userInfo: [NSLocalizedDescriptionKey: "This tool needs a model added in this version of OpenStill. Choose Set up on-device AI again to download it."]))); return
             }
         }
         let task = Process(); task.executableURL = executable; task.arguments = [Self.script.path, tool] + arguments
@@ -59,7 +59,7 @@ final class LocalAI {
                 if finished.terminationStatus == 0 { completion(.success(())) }
                 else {
                     let detail = finished.terminationReason == .uncaughtSignal ? "Processing cancelled. Your previous edit is unchanged." : String(log.text.suffix(1400))
-                    completion(.failure(NSError(domain: "OpenStillAI", code: Int(finished.terminationStatus), userInfo: [NSLocalizedDescriptionKey: detail.isEmpty ? "Local AI processing failed." : detail])))
+                    completion(.failure(NSError(domain: "OpenStillAI", code: Int(finished.terminationStatus), userInfo: [NSLocalizedDescriptionKey: detail.isEmpty ? "On-device AI processing failed." : detail])))
                 }
             }
         }

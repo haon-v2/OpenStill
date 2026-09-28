@@ -208,13 +208,13 @@ final class EditorPanel: GlassChrome {
         tool("Lens blur", symbol: "scope", in: tools) { content in
             self.help("Blurs the photo by distance, like a wide-aperture lens. First choose where the depth comes from.", to: content)
             self.action("Use the photo’s depth data", "lensBlur:camera", to: content)
-            self.action("Estimate depth (local AI)", "lensBlur:ai", to: content)
+            self.action("Estimate depth (on-device AI)", "lensBlur:ai", to: content)
             self.action("Keep the subject sharp", "lensBlur:subject", to: content)
             self.slider("Blur amount", path: \.lensBlurAmount, range: 0...1, in: content)
             self.slider("Focus distance", path: \.lensBlurFocus, range: 0...1, in: content)
             self.slider("Focus range", path: \.lensBlurRange, range: 0...1, in: content)
             self.toggle("Blur the foreground too", path: \.lensBlurForeground, in: content)
-            self.help("Focus distance 1 is the nearest part of the scene, 0 the farthest. Portrait-mode iPhone photos carry depth data; other photos can use the local AI estimate or keep the subject sharp.", to: content)
+            self.help("Focus distance 1 is the nearest part of the scene, 0 the farthest. Portrait-mode iPhone photos carry depth data; other photos can use the on-device AI estimate or keep the subject sharp.", to: content)
             self.action("Remove lens blur", "lensBlur:remove", to: content)
         }
         tool("Develop", symbol: "sun.max", in: tools, expanded: false) { content in
@@ -344,7 +344,7 @@ final class EditorPanel: GlassChrome {
         }
         addTitle("LANDSCAPE", to: tools)
         tool("Sky replacement  AI", symbol: "cloud", in: tools) { content in
-            self.help("Choose your own sky photograph. Local AI finds the sky boundary and blends it into the current photo.", to: content)
+            self.help("Choose your own sky photograph. On-device AI finds the sky boundary and blends it into the current photo.", to: content)
             self.action("Choose sky & replace…", "ai:sky", to: content)
         }
         tool("Sunrays", symbol: "sun.max", in: tools) { content in
@@ -358,7 +358,7 @@ final class EditorPanel: GlassChrome {
             self.sunrays.command = { [weak self] in self?.command?($0) }
         }
         addTitle("ON THIS MAC", to: tools)
-        action("Set up local AI tools…", "setupAI", to: tools)
+        action("Set up on-device AI…", "setupAI", to: tools)
         action("Cancel AI processing", "cancelAI", to: tools)
         let presets = installScroll(presetScroll)
         addTitle("LUT LIBRARY", to: presets)
@@ -721,13 +721,13 @@ extension EditorPanel {
         help("A tool mask limits that whole tool (for example Glow or a LUT) to an area.", to: masking)
         fullWidth(maskSlot, in: masking)
 
+        // Lightroom's order: Basic (profile first), Tone Curve, HSL / Color, B&W Mix, Color Grading, Detail, Geometry, Effects, Calibration.
+        // Only Basic starts open; the others remember whether you left them open.
         section("Basic", open: true) { s in
-            treatment.target = self; treatment.action = #selector(treatmentChanged); treatment.controlSize = .small; treatment.setAccessibilityLabel("Treatment")
-            let row = NSStackView(views: [labelView("Treatment"), treatment]); row.spacing = 8; s.add(row)
-            toggle("HDR", path: \.hdrEnabled, in: s.body)
-            slider("HDR headroom (stops)", path: \.hdrHeadroom, range: 0.5...4, in: s.body)
             label("Profile", in: s); slot(profilePanel, in: s)
             slider("Profile amount", path: \.profileAmount, range: 0...2, in: s.body)
+            treatment.target = self; treatment.action = #selector(treatmentChanged); treatment.controlSize = .small; treatment.setAccessibilityLabel("Treatment")
+            let row = NSStackView(views: [labelView("Treatment"), treatment]); row.spacing = 8; s.add(row)
             label("White Balance", in: s)
             action("WB eyedropper", "whiteBalance", to: s.body); action("As Shot", "resetWhiteBalance", to: s.body)
             slider("Temp", path: \.temperature, range: 2500...10000, in: s.body)
@@ -745,6 +745,9 @@ extension EditorPanel {
             slider("Dehaze", path: \.dehaze, range: -1...1, in: s.body)
             slider("Vibrance", path: \.vibrance, range: -1...1, in: s.body)
             slider("Saturation", path: \.saturation, range: 0...2, in: s.body)
+            label("HDR", in: s)
+            toggle("Edit in HDR", path: \.hdrEnabled, in: s.body)
+            slider("HDR headroom (stops)", path: \.hdrHeadroom, range: 0.5...4, in: s.body)
         }
         section("Tone Curve") { s in slot(curves, in: s); action("Targeted adjustment (drag on photo)", "tat:curve", to: s.body) }
         section("HSL / Color") { s in
@@ -758,14 +761,12 @@ extension EditorPanel {
             slider("Blending", path: \.gradeBlending, range: 0...1, in: s.body)
             slider("Balance", path: \.gradeBalance, range: -1...1, in: s.body)
         }
+        // Image quality: sharpening, noise, chromatic aberration and fringes, and the AI enhancements.
         section("Detail") { s in
             label("Sharpening", in: s); slider("Amount", path: \.sharpness, range: 0...2, in: s.body); addSharpeningDetail(to: s.body)
             label("Noise Reduction", in: s); slider("Luminance", path: \.denoise, range: 0...1, in: s.body); addNoiseDetail(to: s.body)
             action("Denoise with AI…", "ai:denoise", to: s.body); action("Denoise RAW data (keeps edits)", "ai:rawdenoise", to: s.body)
-            label("Enhance", in: s); action("Restore detail (AI)", "ai:detail", to: s.body); action("Super Resolution 2×", "ai:upscale", to: s.body)
-        }
-        section("Lens Corrections") { s in
-            slot(lens, in: s)
+            label("Chromatic Aberration", in: s)
             action("Remove Chromatic Aberration", "autoCA", to: s.body); action("Turn off chromatic aberration removal", "autoCA:off", to: s.body)
             label("Defringe", in: s)
             slider("Purple amount", path: \.defringePurple, range: 0...1, in: s.body)
@@ -774,9 +775,15 @@ extension EditorPanel {
             slider("Green amount", path: \.defringeGreen, range: 0...1, in: s.body)
             slider("Green hue from (°)", path: \.defringeGreenLow, range: 30...200, in: s.body)
             slider("Green hue to (°)", path: \.defringeGreenHigh, range: 30...200, in: s.body)
+            label("Enhance", in: s); action("Restore detail (AI)", "ai:detail", to: s.body); action("Super Resolution 2×", "ai:upscale", to: s.body)
         }
-        section("Transform") { s in
-            slot(transformPanel, in: s)
+        // Geometry: everything that changes the frame — crop and straighten, the lens profile and perspective.
+        section("Geometry") { s in
+            label("Crop & Straighten", in: s)
+            s.add(LRButton("Crop & Straighten… (R)") { [weak self] in self?.lrStrip.select("crop") })
+            slider("Angle", path: \.straighten, range: -20...20, in: s.body)
+            label("Lens Corrections", in: s); slot(lens, in: s)
+            label("Transform", in: s); slot(transformPanel, in: s)
             slider("Vertical", path: \.transformVertical, range: -1...1, in: s.body)
             slider("Horizontal", path: \.transformHorizontal, range: -1...1, in: s.body)
             slider("Rotate", path: \.transformRotate, range: -15...15, in: s.body)
@@ -793,16 +800,19 @@ extension EditorPanel {
             slider("Amount", path: \.grainAmount, range: 0...1, in: s.body)
             slider("Size", path: \.grainSize, range: 0...1, in: s.body)
             slider("Roughness", path: \.grainRoughness, range: 0...1, in: s.body)
-        }
-        section("Lens Blur") { s in
+            label("Lens Blur", in: s)
             action("Use the photo’s depth data", "lensBlur:camera", to: s.body)
-            action("Estimate depth (local AI)", "lensBlur:ai", to: s.body)
+            action("Estimate depth (on-device AI)", "lensBlur:ai", to: s.body)
             action("Keep the subject sharp", "lensBlur:subject", to: s.body)
             slider("Blur Amount", path: \.lensBlurAmount, range: 0...1, in: s.body)
             slider("Focus distance", path: \.lensBlurFocus, range: 0...1, in: s.body)
             slider("Focus range", path: \.lensBlurRange, range: 0...1, in: s.body)
             toggle("Blur the foreground too", path: \.lensBlurForeground, in: s.body)
             action("Remove lens blur", "lensBlur:remove", to: s.body)
+            label("Glow", in: s); slot(glow, in: s)
+            label("Sunrays", in: s); slot(sunrays, in: s)
+            label("Structure", in: s)
+            slider("Structure", path: \.structure, range: 0...1, in: s.body); toggle("Auto light & color", path: \.autoEnhance, in: s.body)
         }
         section("Calibration") { s in
             slider("Shadows Tint", path: \.calibrationShadowsTint, range: -1...1, in: s.body)
@@ -814,9 +824,6 @@ extension EditorPanel {
             slider("Hue", path: \.calibrationBlueHue, range: -1...1, in: s.body); slider("Saturation", path: \.calibrationBlueSaturation, range: -1...1, in: s.body)
         }
         // OpenStill's own tools, after Lightroom's panels.
-        section("Structure") { s in slider("Structure", path: \.structure, range: 0...1, in: s.body); toggle("Auto light & color", path: \.autoEnhance, in: s.body) }
-        section("Glow") { slot(glow, in: $0) }
-        section("Sunrays") { slot(sunrays, in: $0) }
         section("Sky Replacement") { s in action("Choose sky & replace…", "ai:sky", to: s.body) }
         section("Layers") { s in
             slider("Edit strength", path: \.opacity, range: 0...1, in: s.body)
@@ -825,7 +832,10 @@ extension EditorPanel {
             action("Normal blend", "blendNormal", to: s.body); action("Screen blend", "blendScreen", to: s.body); action("Multiply blend", "blendMultiply", to: s.body)
             action("Remove image layer", "removeLayer", to: s.body)
         }
-        section("Local AI") { s in action("Set up local AI tools…", "setupAI", to: s.body); action("Cancel AI processing", "cancelAI", to: s.body) }
+        section("On-Device AI") { s in
+            help("Optional AI for sky and subject masks, object removal, noise reduction and depth. It downloads about 450 MB once and runs only on this Mac; nothing is uploaded.", to: s.body)
+            action("Set up on-device AI…", "setupAI", to: s.body); action("Cancel AI processing", "cancelAI", to: s.body)
+        }
         column.setButtons([("Previous", { [weak self] in self?.command?("previousSettings") }), ("Reset", { [weak self] in self?.command?("reset") })])
         lrSlots[module] = slots
         buildLeftDevelop()

@@ -18,7 +18,7 @@ final class MaskComponentPanel:NSStackView {
     private let luminance=NSStackView(),colors=NSStackView()
     private let componentActions=NSPopUpButton(frame:.zero,pullsDown:true)
     private let aiActions=NSPopUpButton(frame:.zero,pullsDown:true)
-    private static let aiChoices:[(String,String)]=[("Subject","subject"),("Background","background"),("People","people"),("Person 1","person.1"),("Person 2","person.2"),("Person 3","person.3"),("Person 4","person.4"),("Face","face"),("Eyes","eyes"),("Eyebrows","eyebrows"),("Lips","lips"),("Skin","skin"),("Sky (local AI)","sky"),("Depth range","depth")]
+    private static let aiChoices:[(String,String)]=[("Subject","subject"),("Background","background"),("People","people"),("Person 1","person.1"),("Person 2","person.2"),("Person 3","person.3"),("Person 4","person.4"),("Face","face"),("Eyes","eyes"),("Eyebrows","eyebrows"),("Lips","lips"),("Skin","skin"),("Sky (on-device AI)","sky"),("Depth range","depth")]
     private static var clipboard:AdjustmentMask?
     /// Rows about the selected component, hidden while the mask has none so no empty controls show.
     private var componentRows:[NSView]=[]

@@ -86,13 +86,13 @@ extension ViewerController {
 
     /// Runs a mask-producing tool of the local AI worker on the base image and adds the result as a component.
     private func runWorkerMask(_ tool: String, title: String, key: String) {
-        guard LocalAI.ready else { info.status("Sky selection uses the local AI tools. Choose Set up local AI tools first."); return }
+        guard LocalAI.ready else { info.status("Sky selection uses on-device AI. Choose Set up on-device AI first."); return }
         guard let original = renderedPhoto?.image, let source = currentSource else { return }
         let edits = currentEdits
         do {
             let input = try EditStorage.newAsset(), output = try EditStorage.newAsset()
             try PhotoEditor.write(try aiBaseImage(edits, original: original, maximum: 3072), to: input)
-            info.status("Selecting \(title.lowercased()) with local AI…", busy: true)
+            info.status("Selecting \(title.lowercased()) with on-device AI…", busy: true)
             localAI.run(tool: tool, arguments: ["--input", input.path, "--output", output.path], status: { [weak self] text in self?.info.status(text, busy: true) }) { [weak self] result in
                 try? FileManager.default.removeItem(at: input)
                 guard let self, self.currentSource == source else { try? FileManager.default.removeItem(at: output); return }
@@ -106,7 +106,7 @@ extension ViewerController {
         } catch { info.status(error.localizedDescription) }
     }
 
-    /// A depth map asset (near = white): the photo's own depth data, else the local AI estimate when available.
+    /// A depth map asset (near = white): the photo's own depth data, else the on-device AI estimate when available.
     private func makeDepthMap(preferAI: Bool, completion: @escaping (Result<String, Error>) -> Void) {
         guard let original = renderedPhoto?.image, let source = currentSource else { return }
         let edits = currentEdits
@@ -128,7 +128,7 @@ extension ViewerController {
         do {
             let input = try EditStorage.newAsset(), output = try EditStorage.newAsset()
             try PhotoEditor.write(try aiBaseImage(edits, original: original, maximum: 2048), to: input)
-            info.status("Estimating depth with local AI…", busy: true)
+            info.status("Estimating depth with on-device AI…", busy: true)
             localAI.run(tool: "depth", arguments: ["--input", input.path, "--output", output.path], status: { [weak self] text in self?.info.status(text, busy: true) }) { [weak self] result in
                 try? FileManager.default.removeItem(at: input)
                 guard self?.currentSource == source else { try? FileManager.default.removeItem(at: output); return }
@@ -156,7 +156,7 @@ extension ViewerController {
         case "remove":
             var edits = currentEdits; edits.lensBlur = LensBlurSettings(); changeEdits(edits, title: "Remove lens blur", commit: true)
         case "camera", "ai":
-            if choice == "ai" && !(LocalAI.ready && LocalAI.hasModel("depth")) { info.status("Depth estimation uses the local AI tools. Choose Set up local AI tools (it downloads the depth model), then try again."); return }
+            if choice == "ai" && !(LocalAI.ready && LocalAI.hasModel("depth")) { info.status("Depth estimation uses on-device AI. Choose Set up on-device AI (it downloads the depth model), then try again."); return }
             aiPreparing = true
             let finish: (Result<String, Error>) -> Void = { [weak self] result in
                 guard let self, self.currentSource == source else { return }
