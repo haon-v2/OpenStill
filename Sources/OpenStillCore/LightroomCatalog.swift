@@ -163,6 +163,22 @@ public final class LightroomCatalog {
         }
         return out
     }
+    /// The folders the photos are in, with how many each holds: every folder when there are few,
+    /// grouped under their shared parent folders when there are many (at most `limit` rows).
+    public static func folders(of paths: [String], limit: Int = 12) -> [(folder: String, count: Int)] {
+        let parents = paths.map { ($0 as NSString).deletingLastPathComponent }
+        guard !parents.isEmpty else { return [] }
+        let deepest = parents.map { $0.split(separator: "/").count }.max() ?? 0
+        var depth = deepest
+        while true {
+            var counts: [String: Int] = [:]
+            for parent in parents { counts["/" + parent.split(separator: "/").prefix(depth).joined(separator: "/"), default: 0] += 1 }
+            if counts.count <= limit || depth <= 1 {
+                return counts.map { (folder: $0.key, count: $0.value) }.sorted { $0.folder.localizedStandardCompare($1.folder) == .orderedAscending }
+            }
+            depth -= 1
+        }
+    }
     /// Photos whose files can't be found (to be relinked).
     public var missing: [Photo] { photos.filter { !FileManager.default.fileExists(atPath: $0.path) } }
 }

@@ -37,6 +37,16 @@ Press **Delete** while browsing, use **File → Move to Trash… (⌘Delete)**, 
 
 After confirmation, OpenStill uses macOS Trash and advances to a remaining photo. You can recover the file from Finder's Trash. If the device is read-only or does not support Trash, OpenStill shows an error and never falls back to permanent deletion. No files are removed from the viewer until the Trash operation succeeds. Holding Delete does not repeatedly trigger deletion.
 
+## Right-click menu
+
+Right-click a photo in the library grid, the filmstrip or the viewer. The clicked photo is selected first if it wasn't already. The menu has:
+- **Open in Develop** (from the Library);
+- **Open With ▸**: the apps macOS offers for that file, the default app first, plus **Other…**. The original file is opened;
+- **Edit In ▸**: your saved external editor, or **Choose App…** (the same as **Photo → Edit In**);
+- **Show in Finder**, and **Show in Folder**, which opens the photo's folder in the Library with the photo selected;
+- **Set Rating**, **Set Flag** and **Set Color Label**;
+- **Share** and **Move to Trash…**.
+
 ## Metadata
 
 The Info panel reads embedded EXIF, TIFF, and auxiliary metadata through Apple's ImageIO framework:
@@ -49,7 +59,7 @@ The camera, lens, ISO, focal length, aperture, and shutter remain visible above 
 
 Missing fields say **Not recorded**. Capture time is the camera's recorded local time; its offset is shown when embedded. Images exported without EXIF cannot reveal settings that were removed. Proprietary maker notes and lens-ID databases are not parsed. XMP sidecars are read into the library (see **XMP sidecars and Lightroom** below), not shown in the Info panel.
 
-Common formats include JPEG, PNG, HEIC, TIFF, and other formats supported by the installed macOS ImageIO decoders. Sensor RAW development uses bundled LibRaw 0.22.2. Unsupported files show a capability error. Animated/multipage images show the first frame/page. EXIF orientation is applied. Images retain their embedded color space for display, but HDR editing and HDR proofing are outside this release.
+Common formats include JPEG, PNG, HEIC, TIFF, and other formats supported by the installed macOS ImageIO decoders. Sensor RAW development uses bundled LibRaw 0.22.2. While a RAW file develops, the camera's embedded preview shows straight away. Fujifilm X-Trans files (`.RAF`) use LibRaw's one-pass X-Trans interpolation on screen, which is several times faster; exports, Edit In and full-quality renders keep the three-pass one. Unsupported files show a capability error. Animated/multipage images show the first frame/page. EXIF orientation is applied. Images retain their embedded color space for display, but HDR editing and HDR proofing are outside this release.
 
 ## Library and catalog
 
@@ -188,6 +198,7 @@ OpenStill reads and writes `.xmp` sidecars, the files Lightroom, Bridge and Came
   - develop settings, as a version named "Lightroom";
   - regular collections.
   Photos stay where they are. If they've moved (for example to a new drive), **Relink…** points a top-level folder of the catalog to its new location. Smart collections and virtual copies are skipped. Custom label names other than Red, Yellow, Green, Blue and Purple aren't imported. Importing the same catalog again updates ratings and metadata but doesn't add a second "Lightroom" version.
+  After the import, the window lists the folders your photos are in, with **Show in Finder** and **Show in Library** for each. Nothing is copied or moved. A normal **Import** also names the folders it copied to, with the same two buttons.
 
 ## Lumix S9 and Real Time LUT
 
@@ -234,7 +245,7 @@ Sharing copies are kept in OpenStill's temporary sharing folder so other apps ca
 
     | Key | Action |
     | --- | --- |
-    | G / D | Library grid / Develop |
+    | G / D | Library grid / Develop (anywhere in the window, except while typing in a field) |
     | R | Crop |
     | Q | Remove |
     | Shift-W | Masking |

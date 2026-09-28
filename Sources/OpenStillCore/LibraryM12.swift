@@ -248,8 +248,8 @@ public enum QuickDevelop {
         switch step {
         case .exposure(let v): e.exposure = clamp(e.exposure + v, -4, 4)
         case .contrast(let v): e.contrast = clamp(e.contrast + v, 0.5, 1.5); e.usesSmartContrast = true
-        case .highlights(let v): e.highlights = clamp(e.highlights + v, 0, 1)
-        case .shadows(let v): e.shadows = clamp(e.shadows + v, 0, 1)
+        case .highlights(let v): e.highlightsAmount = clamp(e.highlightsAmount + v, -1, 1)
+        case .shadows(let v): e.shadowsAmount = clamp(e.shadowsAmount + v, -1, 1)
         case .whites(let v): e.whites = clamp(e.whites + v, -1, 1)
         case .blacks(let v): e.blacks = clamp(e.blacks + v, -1, 1)
         case .clarity(let v): e.clarity = clamp(e.clarity + v, -1, 1)

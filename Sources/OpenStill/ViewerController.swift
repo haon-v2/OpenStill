@@ -45,6 +45,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
     // Workflow: the second display window and Auto Sync.
     var secondaryWindow: SecondaryDisplayWindow?
     var autoSync = false
+    var workspaceKeyMonitor: Any?
     var libraryURLs: [URL] = []
     var folderURL: URL?
     /// The collection the library shows, when opened from the sidebar's Collections.
@@ -508,6 +509,16 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
             }
             self.updateControls()
         }
+        // RAW files can take a moment to develop (Fuji X-Trans most of all): show the camera's own preview meanwhile.
+        if RawDecoder.isRAW(url) {
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                guard let preview = try? RawDecoder.cameraPreview(url), let image = try? ModernRenderer.display(preview) else { return }
+                DispatchQueue.main.async {
+                    guard let self, self.generation == token, self.renderedPhoto == nil else { return }
+                    self.canvas.image = image; self.canvas.message = ""
+                }
+            }
+        }
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let metadata = PhotoMetadata.read(url)
             DispatchQueue.main.async {
@@ -547,7 +558,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         hint.stringValue = hasPhotos ? "\(canvas.isFit ? "Fit" : "\(canvas.zoomPercent)%") · ⌘-click or Shift-click to select photos" : ""
     }
     var libraryExportItems: [ShootItem]? { isLibrary ? (libraryBrowser?.selectedItems ?? []) : nil }
-    private var selectedURLs: [URL] {
+    var selectedURLs: [URL] {
         if isLibrary { return libraryBrowser?.selectedItems.map(\.url) ?? [] }
         return collection.selectionIndexPaths.map(\.item).sorted().filter { urls.indices.contains($0) }.map { urls[$0] }
     }
@@ -587,6 +598,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         isLibrary = true; foldersVisible = true
         if layoutMode == .lightroom { info.setLightroom(.library) }
         refreshLibrary(); updateWorkspaceLayout(); updateControls(); updateLibraryInspector()
+        withLibrary { $0.focus() }
     }
     @objc func showEditor() {
         let selectedItem = isLibrary ? libraryBrowser?.selectedItems.first : nil
@@ -663,6 +675,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         browser.keywordsChanged = { [weak self] in self?.updateLibraryPanels() }
         browser.keywordSetKey = { [weak self] i in self?.info.keywordSetPanel.applySetKeyword(i) }
         browser.trashRequested = { [weak self] items in self?.trashLibraryPhotos(items) }
+        browser.contextMenu = { [weak self] in self?.makePhotoMenu() }
         browser.recordsChanged = { [weak self] in
             guard let self,let id=self.photoRecord?.id,let latest=try? EditStorage.records.read(id) else{return}
             let changed=self.photoRecord?.active.revision != latest.active.revision || self.photoRecord?.activeVersionID != latest.activeVersionID
@@ -675,6 +688,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
     @objc func importPhotos() {
         let window = photoImport ?? ImportWindow(); photoImport = window
         window.imported = { [weak self] urls in guard let self, !urls.isEmpty else { return }; self.open(urls); self.showLibrary() }
+        window.showFolder = { [weak self] folder in self?.open([folder]); self?.showLibrary() }
         window.showWindow(nil); window.window?.makeKeyAndOrderFront(nil)
     }
     private var tether: TetherWindow?
@@ -696,6 +710,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
     @objc func importLightroomCatalog() {
         let window = lightroomImport ?? LightroomImportWindow(); lightroomImport = window
         window.completed = { [weak self] in guard let self else { return }; self.librarySidebar.reloadCollections(); self.libraryBrowser?.refresh() }
+        window.showFolder = { [weak self] folder in self?.open([folder]); self?.showLibrary() }
         window.showWindow(nil); window.window?.makeKeyAndOrderFront(nil)
     }
     private func escapeView() {
@@ -724,16 +739,9 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
     }
     private func makePhotoMenu() -> NSMenu? {
         guard !selectedURLs.isEmpty, !trashInProgress, view.window?.attachedSheet == nil else { return nil }
-        let menu = NSMenu()
-        let share = NSMenuItem(title: selectedURLs.count > 1 ? "Share \(selectedURLs.count) Photos…" : "Share Photo…", action: #selector(sharePhoto), keyEquivalent: "")
-        share.target = self
-        menu.addItem(share)
-        let item = NSMenuItem(title: selectedURLs.count > 1 ? "Move to Trash (select one photo)" : "Move to Trash…", action: #selector(trashPhoto), keyEquivalent: "")
-        item.target = self
-        item.image = Appearance.symbol("trash")
-        menu.addItem(item)
-        return menu
+        return photoContextMenu(for: selectedURLs)
     }
+
     @objc func trashPhoto() {
         guard canTrashPhoto, let window = view.window else { return }
         let url = urls[selected]
@@ -868,6 +876,15 @@ extension ViewerController {
         librarySidebar.publish = { [weak self] in self?.withLibrary { $0.openPublish() } }
         canvas.viewportChanged = { [weak self] in self?.navigator.needsDisplay = true }
         Shortcuts.workspace = { [weak self] id in self?.handleWorkspaceKey(id) ?? false }
+        // Workspace keys (G, D, R, Q, L, T, Tab…) work wherever focus is in this window, except while typing in a text field.
+        // Before, only the photo, filmstrip and grid handled them, so after G hid the focused photo, D and G went nowhere.
+        if workspaceKeyMonitor == nil {
+            workspaceKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard let self, let window = self.view.window, event.window === window, window.attachedSheet == nil,
+                      !(window.firstResponder is NSText) else { return event }
+                return Shortcuts.performWorkspace(event) ? nil : event
+            }
+        }
     }
 
     /// Lightroom Classic's arrangement, with the panels the person has shown or hidden.

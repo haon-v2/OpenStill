@@ -309,9 +309,9 @@ public enum AutoTone {
         let top = shifted(p99), bottom = shifted(p01), low = shifted(p05)
         var next = edits
         next.exposure = (ev * 100).rounded() / 100
-        next.highlights = top > 0.97 ? max(0.45, 1 - (top - 0.9) * 2.5) : 1
+        next.highlightsAmount = top > 0.97 ? -min(0.55, (top - 0.9) * 2.5) : 0
         next.whites = top < 0.9 ? min(0.5, (0.95 - top) * 2) : (top > 1 ? -min(0.4, (top - 1) * 2) : 0)
-        next.shadows = low < 0.1 ? min(0.5, (0.12 - low) * 3) : 0
+        next.shadowsAmount = low < 0.1 ? min(0.5, (0.12 - low) * 3) : 0
         next.blacks = bottom > 0.05 ? -min(0.5, (bottom - 0.02) * 3) : (bottom < 0.004 ? 0.08 : 0)
         let spread = shifted(p90) - shifted(p10)
         next.contrast = spread < 0.55 ? 1 + min(0.25, (0.6 - spread) * 0.6) : (spread > 0.85 ? 0.92 : 1)

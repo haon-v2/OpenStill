@@ -38,7 +38,7 @@ final class PhotoStore {
             guard operation?.isCancelled == false else { return }
             let result = Result { () -> DecodedPhoto in
                 if !thumbnail, let version, version.renderer == .linear2020 {
-                    let source = try ModernRenderer.source(url, mode:version.sourceMode, raw:version.raw)
+                    let source = try ModernRenderer.source(url, mode:version.sourceMode, raw:version.raw, fast:true)
                     return DecodedPhoto(image:try ModernRenderer.display(source), rendering:version.sourceMode == .raw ? .rawDevelopment : (version.sourceMode == .cameraLook ? .cameraPreview : .original), sourceImage:source)
                 }
                 return try PhotoDecoder.render(url, maxPixelSize: thumbnail ? 240 : nil)

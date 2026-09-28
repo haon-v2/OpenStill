@@ -16,6 +16,7 @@ typedef struct {
     float noise_threshold; // wavelet denoise threshold, 0 off
     int median_passes;     // color noise median filter passes after demosaicing
     int fbdd;              // FBDD impulse noise reduction: 0 off, 1 light, 2 full
+    int fast_xtrans;       // 1: one-pass X-Trans demosaic (about 3× faster) when no demosaic is chosen; for on-screen editing
 } OSRawOptions;
 // RGB16, linear Rec.2020, oriented. Caller releases pixels with os_raw_release. options may be NULL.
 int os_raw_decode(const char *path, const float *white_balance, int highlights, double temperature, double tint, int half_size,

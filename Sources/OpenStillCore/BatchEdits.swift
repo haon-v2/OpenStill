@@ -52,7 +52,7 @@ public enum BatchEdits {
         var result=target;result.ensureAdvanced()
         for group in options.groups {
             switch group {
-            case .develop:result.exposure=source.exposure;result.contrast=source.contrast;result.advanced?.contrastModel=source.advanced?.contrastModel;result.highlights=source.highlights;result.shadows=source.shadows;result.temperature=source.temperature;result.tint=source.tint;result.advanced?.whiteBalanceModel=source.advanced?.whiteBalanceModel;result.advanced?.neutralBalance=source.advanced?.neutralBalance
+            case .develop:result.exposure=source.exposure;result.contrast=source.contrast;result.advanced?.contrastModel=source.advanced?.contrastModel;result.highlights=source.highlights;result.shadows=source.shadows;result.advanced?.toneModel=source.advanced?.toneModel;result.advanced?.toneHighlights=source.advanced?.toneHighlights;result.advanced?.toneShadows=source.advanced?.toneShadows;result.temperature=source.temperature;result.tint=source.tint;result.advanced?.whiteBalanceModel=source.advanced?.whiteBalanceModel;result.advanced?.neutralBalance=source.advanced?.neutralBalance
             case .curves:result.advanced?.curves=source.advanced?.curves
             case .color:result.saturation=source.saturation;result.vibrance=source.vibrance;result.advanced?.colors=source.advanced?.colors ?? AdvancedEdits().colors;result.advanced?.pointColors=source.advanced?.pointColors
             case .monochrome:result.blackAndWhite=source.blackAndWhite;result.monochrome=source.monochrome;result.blacks=source.blacks;result.whites=source.whites;result.advanced?.grayMix=source.advanced?.grayMix

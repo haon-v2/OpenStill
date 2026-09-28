@@ -266,14 +266,14 @@ extension ViewerController {
     }
     private func applyPreset(_ name: String) {
         var e = currentEdits
-        e.highlights = 1; e.shadows = 0; e.exposure = 0; e.contrast = 1; e.saturation = 1; e.vibrance = 0; e.temperature = 6500; e.tint = 0; e.monochrome = 0; e.blacks = 0; e.whites = 0; e.advanced!.colors = [ColorBand](repeating:ColorBand(),count:8); e.autoEnhance = false
+        e.highlightsAmount = 0; e.shadowsAmount = 0; e.exposure = 0; e.contrast = 1; e.saturation = 1; e.vibrance = 0; e.temperature = 6500; e.tint = 0; e.monochrome = 0; e.blacks = 0; e.whites = 0; e.advanced!.colors = [ColorBand](repeating:ColorBand(),count:8); e.autoEnhance = false
         e.clarity = 0; e.texture = 0; e.dehaze = 0; e.colorGrading = ColorGrading()
         e.grayMix = PhotoEdits.neutralGrayMix; e.pointColors = []
         switch name {
         case "Warm light": e.temperature = 7800; e.vibrance = 0.15; e.contrast = 1.05
-        case "Cool shadows": e.temperature = 5200; e.shadows = 0.2; e.contrast = 1.05
+        case "Cool shadows": e.temperature = 5200; e.shadowsAmount = 0.2; e.contrast = 1.05
         case "Vivid": e.vibrance = 0.35; e.saturation = 1.12; e.contrast = 1.12; e.clarity = 0.15
-        case "Soft portrait": e.contrast = 0.9; e.shadows = 0.2; e.saturation = 0.95; e.temperature = 6900
+        case "Soft portrait": e.contrast = 0.9; e.shadowsAmount = 0.2; e.saturation = 0.95; e.temperature = 6900
         case "Monochrome": e.monochrome = 1; e.contrast = 1.2
         default: break
         }

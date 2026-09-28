@@ -47,6 +47,8 @@ int os_raw_decode(const char *path, const float *wb, int highlights, double temp
         p.threshold = std::clamp(options->noise_threshold, 0.0f, 1000.0f);
         p.med_passes = std::clamp(options->median_passes, 0, 10);
         p.fbdd_noiserd = std::clamp(options->fbdd, 0, 2);
+        // Fuji X-Trans: LibRaw runs its 3-pass interpolation at the default quality; quality 2 selects the 1-pass one.
+        if (options->fast_xtrans && options->demosaic < 0 && raw.imgdata.idata.filters == 9) p.user_qual = 2;
     }
     if (wb || temperature != 6500 || tint != 0) {
         p.use_camera_wb = 0;

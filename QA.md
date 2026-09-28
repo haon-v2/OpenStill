@@ -442,3 +442,15 @@ Automated fixtures are generated and contain no user photographs. The real S9 fi
 - **Automated tests (LogoPromptTests):** the prompt reaches the model as data and is limited to 500 characters; the instructions keep the exact name and tagline in OpenStill's hands; bad model output is refused.
 - **Paused:** the AI assistant (OpenStill MCP) work is kept on its own branch until its repository exists.
 - **Not yet verified by hand on a Mac:** generating with a prompt using the local model; Use Saved Logo on the identity plate.
+
+## Tone sliders, G / D keys, right-click menu, import locations, faster RAF — September 28, 2026
+
+- **Fixed:**
+  - **Highlights ran backwards.** Highlights and Shadows are now −100…+100 sliders centred at 0, like Lightroom's. Lowering Highlights recovers bright areas without greying them; raising it brightens them. Shadows mirrors it. They use a new tone kernel. Photos edited before keep their look until one of the two sliders moves. Quick Develop, Auto Tone, presets, Auto Sync, mask layers and Camera Raw import (`Highlights2012` / `Shadows2012`) use the same scale.
+  - **G then D stopped responding.** The workspace keys (G, D, R, Q, Shift-W, L, T, Tab) now work anywhere in the main window, not only when the photo, filmstrip or grid has focus. Text fields keep their keys. Showing the Library also focuses the grid.
+- **Added:**
+  - A right-click menu on the library grid, the filmstrip and the photo: Open in Develop, **Open With ▸**, **Edit In ▸**, Show in Finder, **Show in Folder**, rating, flag, label, Share and Move to Trash.
+  - After a Lightroom catalog import, the folders your photos are in, with Show in Finder and Show in Library. A normal import names the folders it copied to.
+  - **Faster RAF:** the camera's embedded preview shows while a RAW file develops; Fuji X-Trans uses the one-pass demosaic on screen, and three-pass for exports.
+- **Automated tests:** ToneRegionsTests (recover and brighten on a ramp without reversing, monotonic, darker half untouched, shadows mirror, hue kept, centred sliders, older edits unchanged, adoption, JSON round-trip, sanitizing, Quick Develop, Camera Raw); ImportFoldersTests (folder list and grouping); XMPImportTests updated.
+- **Not yet verified by hand on a Mac:** RAF timings on real X-Trans files; Open With with several apps installed; G / D after clicking in a side panel.

@@ -37,9 +37,9 @@ public enum ModernRenderer {
         guard let image = CIImage(contentsOf: url, options: [.applyOrientationProperty: true]), !image.extent.isEmpty else { throw PhotoReadError.unreadable }
         return image
     }
-    public static func source(_ url: URL, mode: SourceMode, raw: RawSettings = RawSettings(), halfSize:Bool = false) throws -> CIImage {
+    public static func source(_ url: URL, mode: SourceMode, raw: RawSettings = RawSettings(), halfSize:Bool = false, fast:Bool = false) throws -> CIImage {
         let rawKey = raw.cacheKey
-        let key = "\(url.standardizedFileURL.path)|\(EditStorage.fingerprint(url))|\(mode.rawValue)|\(rawKey)|\(halfSize)" as NSString
+        let key = "\(url.standardizedFileURL.path)|\(EditStorage.fingerprint(url))|\(mode.rawValue)|\(rawKey)|\(halfSize)|\(fast)" as NSString
         if let cached = sourceCache.object(forKey:key) { return cached.image }
         let image:CIImage
         if let preview = SmartPreviews.stand(in: url) {
@@ -48,7 +48,7 @@ public enum ModernRenderer {
         } else if RawDecoder.isRAW(url) {
             switch mode {
             case .raw:
-                let result = try RawDecoder.decode(url, settings:raw,halfSize:halfSize); image = result.image
+                let result = try RawDecoder.decode(url, settings:raw,halfSize:halfSize,fast:fast); image = result.image
                 if let fraction = result.sensorClippedFraction { sensorCache.setObject(NSNumber(value:fraction),forKey:(url.path+EditStorage.fingerprint(url)) as NSString) }
             case .cameraLook: image = try RawDecoder.cameraPreview(url)
             case .original: throw RawDecodeError(message:"Choose RAW or Camera Look for this file")
@@ -86,7 +86,7 @@ public enum ModernRenderer {
             }
             return try process(base, edits:edits, maximumDimension:maximumDimension, lutOverride:lutOverride, stopBeforeTool:stopBeforeTool)
         }
-        let input = try source(url, mode:recipe.sourceMode, raw:recipe.raw,halfSize:maximumDimension.map{$0<=2048} ?? false)
+        let input = try source(url, mode:recipe.sourceMode, raw:recipe.raw,halfSize:maximumDimension.map{$0<=2048} ?? false,fast:maximumDimension != nil)
         if recipe.sourceMode == .raw { edits.temperature = 6500; edits.tint = 0; edits.neutralBalance = NeutralBalance() }
         return try process(input, edits:edits, maximumDimension:maximumDimension, lutOverride:lutOverride, stopBeforeTool:stopBeforeTool)
     }

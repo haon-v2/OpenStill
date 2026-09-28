@@ -37,10 +37,11 @@ public struct CameraRawImport {
         if let v = take("Exposure2012") ?? take("Exposure") { edits.exposure = v }
         if let v = take("Contrast2012") ?? take("Contrast") { edits.contrast = 1 + v / 200; edits.usesSmartContrast = true }
         if let v = take("Highlights2012") ?? take("HighlightRecovery") {
-            if v < 0 || crs["Highlights2012"] == nil { edits.highlights = 1 - abs(v) / 100 } else { applied -= 1; unsupported.append("Highlights +\(Int(v)) (OpenStill’s Highlights only recovers)") }
+            // HighlightRecovery (older process versions) only ever recovered.
+            edits.highlightsAmount = crs["Highlights2012"] == nil ? -abs(v) / 100 : max(-1, min(1, v / 100))
         }
         if let v = take("Shadows2012") ?? take("FillLight") {
-            if v > 0 { edits.shadows = v / 100 } else { edits.blacks = max(-1, edits.blacks + v / 200); approximated.append("Shadows \(Int(v)) (applied as Blacks)") }
+            edits.shadowsAmount = max(-1, min(1, v / 100))
         }
         if let v = take("Whites2012") { edits.whites = v / 100 }
         if let v = take("Blacks2012") { edits.blacks = v / 100 }

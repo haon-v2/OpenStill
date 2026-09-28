@@ -9,6 +9,13 @@ private final class ShootCollection:NSCollectionView {
     var handleKey:((String)->Bool)?
     /// While the Painter is on, clicking or dragging over photos sprays onto them instead of selecting.
     var paint:((IndexPath)->Void)?
+    /// The right-click menu for the selected photos; a right-click on an unselected photo selects it first.
+    var contextMenu:(()->NSMenu?)?
+    override func menu(for event:NSEvent)->NSMenu?{
+        guard paint == nil,let path=indexPathForItem(at:convert(event.locationInWindow,from:nil)) else{return nil}
+        if !selectionIndexPaths.contains(path){selectionIndexPaths=[path];delegate?.collectionView?(self,didSelectItemsAt:[path])}
+        return contextMenu?()
+    }
     private var painted=Set<IndexPath>()
     private func paint(at event:NSEvent){
         guard let paint,let path=indexPathForItem(at:convert(event.locationInWindow,from:nil)),painted.insert(path).inserted else{return}
@@ -134,6 +141,8 @@ final class ShootWindow:NSWindowController,NSCollectionViewDataSource,NSCollecti
     var keywordSetKey:((Int)->Void)?
     /// Delete in the grid: the viewer confirms, then moves the selected photos to the Trash.
     var trashRequested:(([ShootItem])->Void)?
+    /// The right-click menu for the selected photos (set by the main window).
+    var contextMenu:(()->NSMenu?)?
     private let grid=ShootCollection(),scroll=NSScrollView(),message=NSTextField(labelWithString:"Reading photographs…")
     private let minimum=NSPopUpButton(frame:.zero,pullsDown:false),flag=NSPopUpButton(frame:.zero,pullsDown:false),sort=NSPopUpButton(frame:.zero,pullsDown:false),labelFilter=NSPopUpButton(frame:.zero,pullsDown:false)
     /// Label filter choices: nil = all, then each label, then unlabeled.
@@ -200,6 +209,7 @@ final class ShootWindow:NSWindowController,NSCollectionViewDataSource,NSCollecti
         let flow=flowLayout;flow.itemSize=NSSize(width:210,height:205);flow.minimumInteritemSpacing=12;flow.minimumLineSpacing=12;flow.sectionInset=NSEdgeInsets(top:12,left:16,bottom:16,right:16)
         grid.collectionViewLayout=flow;grid.isSelectable=true;grid.allowsMultipleSelection=true;grid.dataSource=self;grid.delegate=self;grid.backgroundColors=[.clear];grid.register(ShootCell.self,forItemWithIdentifier:NSUserInterfaceItemIdentifier("shoot"))
         grid.handleKey = {[weak self] id in self?.handleLibraryKey(id) ?? false}
+        grid.contextMenu = {[weak self] in self?.contextMenu?()}
         grid.mark = {[weak self] rating,flag in self?.mark(rating:rating,flag:flag)};grid.setLabel = {[weak self] label in self?.toggleLabel(label)};grid.openSelection = {[weak self] in self?.openSelected()}
         scroll.documentView=grid;scroll.hasVerticalScroller=true;scroll.drawsBackground=false
         message.font = .systemFont(ofSize:11);message.textColor = .secondaryLabelColor
@@ -634,6 +644,8 @@ extension ShootWindow {
         }
         return true
     }
+    /// Gives the grid (or the Loupe / Compare / Survey stage) keyboard focus, e.g. after switching to the Library.
+    func focus(){(browserView.window ?? window)?.makeFirstResponder(viewMode == .grid ? grid:stage)}
     @objc fileprivate func viewModeChosen(){setViewMode(LibraryViewMode(rawValue:viewModes.selectedSegment) ?? .grid)}
     func setViewMode(_ mode:LibraryViewMode){
         if mode == .survey{surveyIDs=selectedItems.map(\.id);if surveyIDs.count<2{surveyIDs=Array(shown.prefix(max(2,surveyIDs.count)).map(\.id))}}

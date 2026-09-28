@@ -76,6 +76,7 @@ public struct PhotoEdits: Codable, Equatable {
             if let fixes = e.advanced!.eyeFixes { e.eyeFixes = fixes }
             if let layers = e.advanced!.localAdjustments { e.localAdjustments = layers }
             e.monochrome = clamp(e.monochrome,0,1); e.blacks = clamp(e.blacks,-1,1); e.whites = clamp(e.whites,-1,1)
+            if let v = e.advanced!.toneHighlights { e.advanced!.toneHighlights = clamp(v,-1,1) }; if let v = e.advanced!.toneShadows { e.advanced!.toneShadows = clamp(v,-1,1) }
             e.straighten = clamp(e.straighten,-20,20); e.lutAmount = clamp(e.lutAmount,0,1); e.sunLength = clamp(e.sunLength,0,1)
             e.advanced!.colors = Array((e.advanced!.colors + [ColorBand](repeating:ColorBand(),count:8)).prefix(8))
             for i in 0..<8 { e.advanced!.colors[i].hue = clamp(e.advanced!.colors[i].hue,-1,1); e.advanced!.colors[i].saturation = clamp(e.advanced!.colors[i].saturation,-1,1); if let lightness = e.advanced!.colors[i].lightness { e.advanced!.colors[i].lightness = clamp(lightness,-1,1) } }
@@ -248,7 +249,8 @@ public enum PhotoEditor {
             let (neutral, target) = e.usesCorrectedWhiteBalance ? (CIVector(x:e.temperature,y:e.tint), CIVector(x:6500,y:0)) : (CIVector(x:6500,y:0), CIVector(x:e.temperature,y:e.tint))
             image = image.applyingFilter("CITemperatureAndTint",parameters:["inputNeutral":neutral,"inputTargetNeutral":target])
         }
-        if e.highlights != 1 || e.shadows != 0 { image = image.applyingFilter("CIHighlightShadowAdjust",parameters:["inputHighlightAmount":e.highlights,"inputShadowAmount":e.shadows]) }
+        if e.usesToneRegions { image = try ToneRegions.apply(image, highlights: e.highlightsAmount, shadows: e.shadowsAmount) }
+        else if e.highlights != 1 || e.shadows != 0 { image = image.applyingFilter("CIHighlightShadowAdjust",parameters:["inputHighlightAmount":e.highlights,"inputShadowAmount":e.shadows]) }
         if e.contrast != 1 {
             if e.usesSmartContrast { image = try SmartContrast.apply(image, contrast: e.contrast) }
             else { image = image.applyingFilter("CIColorControls",parameters:[kCIInputContrastKey:e.contrast]) }
