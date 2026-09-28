@@ -136,5 +136,16 @@
             <sparkle:fullReleaseNotesLink>https://github.com/haon-v2/OpenStill/releases/tag/v0.0.12</sparkle:fullReleaseNotesLink>
             <enclosure url="https://github.com/haon-v2/OpenStill/releases/download/v0.0.12/OpenStill-0.0.12.zip" sparkle:edSignature="ciP9wI7zWslAmecKWqQ02sy/G13AR5Ks/+jmXBqnHOhIan4ByRLAt5uBG5LiOr12qFeKwNh8K1q5GEYktD0PAA==" length="32635219" type="application/octet-stream"/>
         </item>
+        <item>
+            <title>OpenStill 0.0.13</title>
+            <description><![CDATA[<h3>What’s new in 0.0.13</h3><ul><li>Highlights and Shadows are now -100 to +100 sliders like Lightroom (Highlights no longer runs backwards)</li><li>G and D work anywhere in the window</li><li>right-click menu with Open With, Edit In, Show in Finder and Show in Folder</li><li>imports show where your photos are</li><li>Fuji RAF files open faster</li></ul>]]></description>
+            <pubDate>Mon, 28 Sep 2026 10:52:18 GMT</pubDate>
+            <sparkle:version>29</sparkle:version>
+            <sparkle:shortVersionString>0.0.13</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <sparkle:fullReleaseNotesLink>https://github.com/haon-v2/OpenStill/releases/tag/v0.0.13</sparkle:fullReleaseNotesLink>
+            <enclosure url="https://github.com/haon-v2/OpenStill/releases/download/v0.0.13/OpenStill-0.0.13.zip" sparkle:edSignature="y8ntS3SiLStoNiUnlx88oDR8R3K5xDeZtberISHko70QkWm2j7UTHuhEfWGbTYQ/p5B4E5qZcMCpXq7T2UBlAg==" length="32663922" type="application/octet-stream"/>
+        </item>
     </channel>
 </rss>
