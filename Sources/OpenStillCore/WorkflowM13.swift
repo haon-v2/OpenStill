@@ -337,7 +337,7 @@ public enum AutoSync {
         })
     }
     /// Simple sliders are synced one by one, so changing Exposure doesn't also copy Contrast.
-    static let sliders: [WritableKeyPath<PhotoEdits, Double>] = [\.exposure, \.contrast, \.highlights, \.shadows, \.whites, \.blacks, \.temperature, \.tint,
+    static let sliders: [WritableKeyPath<PhotoEdits, Double>] = [\.exposure, \.contrast, \.highlightsAmount, \.shadowsAmount, \.whites, \.blacks, \.temperature, \.tint,
         \.saturation, \.vibrance, \.clarity, \.texture, \.dehaze, \.structure, \.sharpness, \.denoise, \.vignette]
     /// Another photo's edits with just what changed copied from `after`.
     public static func apply(from before: PhotoEdits, to after: PhotoEdits, onto target: PhotoEdits) -> PhotoEdits {

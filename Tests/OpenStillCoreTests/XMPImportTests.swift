@@ -96,7 +96,7 @@ import Testing
         #expect(xmp.hasDevelopSettings)
         let result = CameraRawImport(xmp, raw: false)
         let e = result.edits
-        #expect(close(e.exposure, 0.5) && close(e.contrast, 1.1) && close(e.highlights, 0.6) && close(e.shadows, 0.3))
+        #expect(close(e.exposure, 0.5) && close(e.contrast, 1.1) && close(e.highlightsAmount, -0.4) && close(e.shadowsAmount, 0.3) && e.usesToneRegions)
         #expect(close(e.whites, 0.1) && close(e.blacks, -0.15) && close(e.vibrance, 0.25) && close(e.saturation, 0.9))
         #expect(close(e.clarity, 0.35) && close(e.texture, 0.1) && close(e.dehaze, 0.2))
         let colors = try #require(e.advanced?.colors)

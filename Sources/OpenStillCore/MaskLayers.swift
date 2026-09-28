@@ -71,18 +71,16 @@ public enum LocalAdjustments {
             image = image.applyingFilter("CITemperatureAndTint", parameters: ["inputNeutral": CIVector(x: 6500, y: 0), "inputTargetNeutral": CIVector(x: 6500 - s.temperature * 2000, y: -s.tint * 50)])
         }
         if s.exposure != 0 { image = image.applyingFilter("CIExposureAdjust", parameters: [kCIInputEVKey: s.exposure]) }
-        if s.highlights < 0 || s.shadows > 0 {
-            image = image.applyingFilter("CIHighlightShadowAdjust", parameters: ["inputHighlightAmount": 1 + min(0, s.highlights), "inputShadowAmount": max(0, s.shadows)])
-        }
+        // The same Lightroom-style Highlights and Shadows as the main sliders, both directions.
+        image = try ToneRegions.apply(image, highlights: s.highlights, shadows: s.shadows)
         if s.contrast != 0 { image = image.applyingFilter("CIColorControls", parameters: [kCIInputContrastKey: 1 + s.contrast * 0.5]) }
-        // Brighter highlights, deeper shadows, whites and blacks as a gentle tone curve.
-        let lift = max(0, s.highlights), crush = min(0, s.shadows)
-        if lift != 0 || crush != 0 || s.whites != 0 || s.blacks != 0 {
+        // Whites and blacks as a gentle tone curve.
+        if s.whites != 0 || s.blacks != 0 {
             image = image.applyingFilter("CIToneCurve", parameters: [
                 "inputPoint0": CIVector(x: 0, y: max(0, s.blacks * 0.15)),
-                "inputPoint1": CIVector(x: 0.25, y: 0.25 + crush * 0.08 + s.blacks * 0.05),
+                "inputPoint1": CIVector(x: 0.25, y: 0.25 + s.blacks * 0.05),
                 "inputPoint2": CIVector(x: 0.5, y: 0.5),
-                "inputPoint3": CIVector(x: 0.75, y: 0.75 + lift * 0.08 + s.whites * 0.05),
+                "inputPoint3": CIVector(x: 0.75, y: 0.75 + s.whites * 0.05),
                 "inputPoint4": CIVector(x: 1, y: 1 + min(0, s.whites) * 0.15)])
         }
         if s.saturation != 0 { image = image.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 1 + s.saturation]) }
