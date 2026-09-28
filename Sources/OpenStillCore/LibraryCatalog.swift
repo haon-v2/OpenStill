@@ -463,6 +463,12 @@ public final class LibraryCatalog {
         return order.compactMap { byID[$0] }
     }
     public func photo(_ id: UUID) -> CatalogPhoto? { photos(ids: [id]).first }
+    /// Every photo's path, for the Folders panel.
+    public func photoPaths() -> [String] {
+        var out: [String] = []
+        _ = try? run("SELECT path FROM photos") { out.append(Self.text($0, 0)) }
+        return out
+    }
     /// Every keyword in use and how many photos carry it.
     public func keywordCounts() -> [(String, Int)] {
         var out: [(String, Int)] = []

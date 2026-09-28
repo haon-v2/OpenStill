@@ -21,8 +21,7 @@ extension ViewerController {
         case .browse: break
         default: finishMaskEditing(); canvas.clearTool()
         }
-        let closedLuminar = layoutMode == .luminar && info.finishLuminarTool(canvasToolWasActive: active)
-        guard open != nil || active || closedLuminar else { return }
+        guard open != nil || active else { return }
         closeLightroomTool()
         info.status("Done. Edits are saved on this Mac.")
     }

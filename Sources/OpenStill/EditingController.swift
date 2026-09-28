@@ -320,17 +320,17 @@ extension ViewerController {
     private func setupAI() {
         guard !localAI.isRunning, !aiPreparing else { return }
         let missing = LocalAI.missingModels
-        info.status(missing.isEmpty ? "Setting up local AI tools. Downloading about 450 MB of models…" : "Downloading new AI models: " + missing.joined(separator: ", ") + "…", busy: true)
+        info.status(missing.isEmpty ? "Setting up on-device AI. Downloading about 450 MB of models…" : "Downloading new AI models: " + missing.joined(separator: ", ") + "…", busy: true)
         localAI.run(tool: "setup", status: { [weak self] text in self?.info.status(text, busy: true) }) { [weak self] result in
             switch result {
-            case .success: self?.info.status("Local AI tools are ready. Photos stay on this Mac.")
+            case .success: self?.info.status("On-device AI is ready. Photos stay on this Mac.")
             case .failure(let error): self?.info.status(error.localizedDescription)
             }
         }
     }
     private func runAI(_ tool: String, sky: URL? = nil) {
         guard let source = currentSource, renderedPhoto != nil, !localAI.isRunning, !aiPreparing else { return }
-        guard LocalAI.ready else { info.status("Choose Set up local AI tools first (one-time download, about 350 MB)."); return }
+        guard LocalAI.ready else { info.status("Choose Set up on-device AI first (one-time download, about 450 MB)."); return }
         let keys = ["sky":"Sky replacement", "erase":"Erase", "denoise":"Noise removal", "detail":"Detail restoration", "upscale":"Super resolution", "rawdenoise":"Noise removal"]
         guard let key = keys[tool] else { return }
         let edits = currentEdits, size = editSourceSize()
@@ -344,7 +344,7 @@ extension ViewerController {
         if tool == "rawdenoise" && edits.baseAsset != nil { info.status("This version already has an AI result. Start from a version without one to denoise the RAW data."); return }
         aiPreparing = true; editWork?.cancel(); editToken = UUID()
         let token = editToken
-        info.status("Preparing full-resolution photo for local AI…", busy: true)
+        info.status("Preparing full-resolution photo for on-device AI…", busy: true)
         editQueue.async { [weak self] in
             var temporaryFiles: [URL] = []
             let prepared = Result { () -> (URL, URL, URL?, URL?) in

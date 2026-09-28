@@ -30,7 +30,7 @@ public enum AIMaskError: LocalizedError {
         switch self {
         case .nothingFound(let what): return "No \(what) was found in this photo."
         case .systemVersion: return "This selection needs macOS 14 or later."
-        case .noDepth: return "This photo has no depth information. Portrait-mode HEIC photos from an iPhone include it; for other photos, set up the local AI tools to estimate depth."
+        case .noDepth: return "This photo has no depth information. Portrait-mode HEIC photos from an iPhone include it; for other photos, set up on-device AI to estimate depth."
         }
     }
 }

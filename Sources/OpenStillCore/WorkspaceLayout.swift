@@ -7,11 +7,9 @@ public enum WorkspaceLayout: String, CaseIterable, Sendable {
     /// Folders and collections (Library) or presets and history (Develop) on the left, adjustments on the right, filmstrip across the bottom.
     case lightroom
 
+    /// Where older versions saved the layout choice. It's ignored now: OpenStill has one layout, Lightroom Classic's.
     public static let defaultsKey = "OpenStillWorkspaceLayout"
-    public static var current: WorkspaceLayout {
-        get { UserDefaults.standard.string(forKey: defaultsKey).flatMap(WorkspaceLayout.init(rawValue:)) ?? .luminar }
-        set { UserDefaults.standard.set(newValue.rawValue, forKey: defaultsKey) }
-    }
+    public static var current: WorkspaceLayout { .lightroom }
     public var title: String { self == .luminar ? "EZ Layout" : "Lightroom Classic" }
     public var summary: String {
         switch self {

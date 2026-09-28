@@ -133,6 +133,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         info.sectionChanged = { [weak self] index in self?.rightRail.select(["edit", "presets", "history", "info"][index]) }
         librarySidebar.browse = { [weak self] in self?.openPanel() }
         librarySidebar.open = { [weak self] url in self?.open([url]) }
+        librarySidebar.folderCommand = { [weak self] id, url in self?.folderCommand(id, url) }
         librarySidebar.filter = { [weak self] index in self?.showLibrary(); self?.libraryBrowser?.setFlagFilter(index) }
         librarySidebar.subfoldersChanged = { [weak self] _ in if let self, let folder = self.folderURL, self.openCollection == nil { self.open([folder]) } }
         librarySidebar.openCollection = { [weak self] collection in self?.open(collection: collection) }
@@ -278,27 +279,22 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         }
     }
 
-    // MARK: Layout (Lightroom Classic or EZ Layout)
-    @objc func useLightroomLayout() { WorkspaceLayout.current = .lightroom; NotificationCenter.default.post(name: .workspaceLayoutChanged, object: nil) }
-    @objc func useLuminarLayout() { WorkspaceLayout.current = .luminar; NotificationCenter.default.post(name: .workspaceLayoutChanged, object: nil) }
+    // MARK: Layout (Lightroom Classic's, the only one)
     func applyLayout(_ layout: WorkspaceLayout) {
         layoutMode = layout
-        let lr = layout == .lightroom
-        if !lr { lights = .normal }
-        // Lightroom Classic: flat dark-gray panels with square corners. EZ Layout: soft glass.
-        view.window?.appearance = lr ? NSAppearance(named: .darkAqua) : nil
-        view.window?.toolbar?.isVisible = !lr
-        workspaceContent.color = lr ? LRColors.backdrop : .clear
-        shelf.flatColor = lr ? LRColors.strip : nil
-        librarySidebar.lightroom = lr
-        for chrome in [librarySidebar, info, shelf] as [GlassChrome] { chrome.cornerRadius = lr ? 0 : 22 }
-        for child in [canvas.hdrBackdrop, canvas, libraryHost] { child.layer?.cornerRadius = lr ? 0 : 16 }
-        canvas.backdrop = lr ? LRColors.canvas : NSColor(calibratedWhite: 0.055, alpha: 1)
-        libraryHost.layer?.backgroundColor = (lr ? LRColors.canvas : NSColor.windowBackgroundColor).cgColor
+        // Flat dark-gray panels with square corners.
+        view.window?.appearance = NSAppearance(named: .darkAqua)
+        view.window?.toolbar?.isVisible = false
+        workspaceContent.color = LRColors.backdrop
+        shelf.flatColor = LRColors.strip
+        librarySidebar.lightroom = true
+        for chrome in [librarySidebar, info, shelf] as [GlassChrome] { chrome.cornerRadius = 0 }
+        for child in [canvas.hdrBackdrop, canvas, libraryHost] { child.layer?.cornerRadius = 0 }
+        canvas.backdrop = LRColors.canvas
+        libraryHost.layer?.backgroundColor = LRColors.canvas.cgColor
         workspaceMode.setLabel(layout.modeNames.library, forSegment: 0); workspaceMode.setLabel(layout.modeNames.edit, forSegment: 1)
         workspaceMode.sizeToFit()
-        info.setLightroom(lr ? (isLibrary ? .library : .develop) : nil)
-        if !lr { info.showTab(isLibrary ? 3 : info.selectedTab) }
+        info.setLightroom(isLibrary ? .library : .develop)
         updateWorkspaceLayout()
     }
 
@@ -628,28 +624,12 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         rightRail.select(id)
     }
     private func updateWorkspaceLayout() {
-        let lr = layoutMode == .lightroom
-        let lightroomViews: [NSView] = [modulePicker, navigatorBox, libraryButtons, info.leftDevelopColumn, filmstripBar, developToolbar] + PanelEdge.allCases.compactMap { edges[$0] }
         // Deactivate every alternative first, preventing transient constraint conflicts.
         NSLayoutConstraint.deactivate([canvasToInspector, canvasToEdge, centerToFolders, centerToRail, centerToShelf, centerToFooter] + luminarConstraints + lightroomConstraints)
         lightroomConstraints = []
         canvas.isHidden = isLibrary; canvas.hdrBackdrop.isHidden = isLibrary; libraryHost.isHidden = !isLibrary
         workspaceMode.selectedSegment = isLibrary ? 0 : 1
-        if lr { layoutLightroom(); return }
-        lightroomViews.forEach { $0.isHidden = true }
-        footer.isHidden = false; leftRail.isHidden = false; rightRail.isHidden = false
-        for v in [librarySidebar, info, shelf, center] as [NSView] { v.alphaValue = 1 }
-        let inspector = infoVisible && !isLibrary
-        info.isHidden = !inspector
-        librarySidebar.isHidden = !foldersVisible
-        shelf.isHidden = isLibrary
-        sidebarWidth.constant = 216; infoWidth.constant = 320; shelfHeight.constant = 112
-        let trailing: NSLayoutConstraint = inspector ? canvasToInspector : canvasToEdge
-        let leading: NSLayoutConstraint = foldersVisible ? centerToFolders : centerToRail
-        let bottom: NSLayoutConstraint = isLibrary ? centerToFooter : centerToShelf
-        NSLayoutConstraint.activate(luminarConstraints + [trailing, leading, bottom])
-        leftRail.select(isLibrary ? "library" : "photo")
-        if isLibrary { rightRail.select(nil) }
+        layoutLightroom()
     }
     /// A merged photo (HDR, panorama, focus stack) joins the open folder's photos.
     func addMergedPhoto(_ url: URL) {
@@ -691,6 +671,20 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         window.showFolder = { [weak self] folder in self?.open([folder]); self?.showLibrary() }
         window.showWindow(nil); window.window?.makeKeyAndOrderFront(nil)
     }
+    /// Folders panel → Import to This Folder…
+    func importPhotosInto(_ folder: URL) { importPhotos(); photoImport?.importInto(folder) }
+    /// Folders panel right-click: Show in Finder, Import to This Folder…, Synchronize Folder.
+    func folderCommand(_ id: String, _ folder: URL) {
+        switch id {
+        case "finder": NSWorkspace.shared.activateFileViewerSelecting([folder])
+        case "import": importPhotosInto(folder)
+        case "sync":
+            // Re-reads the folder: new photos join the library and the counts are refreshed.
+            open([folder]); showLibrary()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in self?.librarySidebar.reloadFolders() }
+        default: break
+        }
+    }
     private var tether: TetherWindow?
     @objc func tetheredCapture() {
         let window = tether ?? TetherWindow(); tether = window
@@ -730,8 +724,6 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
             && NSApp.keyWindow === view.window
     }
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
-        if menuItem.action == #selector(useLightroomLayout) { menuItem.state = layoutMode == .lightroom ? .on : .off; return true }
-        if menuItem.action == #selector(useLuminarLayout) { menuItem.state = layoutMode == .luminar ? .on : .off; return true }
         if menuItem.action == #selector(trashPhoto) { return canTrashPhoto }
         if menuItem.action == #selector(sharePhoto) { return !selectedURLs.isEmpty && NSApp.keyWindow === view.window && view.window?.attachedSheet == nil }
         if menuItem.action == #selector(selectAllPhotos) { return !urls.isEmpty && NSApp.keyWindow === view.window && view.window?.attachedSheet == nil }
@@ -935,23 +927,16 @@ extension ViewerController {
 
     /// Lights Out (L): dims the panels, then turns them off, leaving the photo.
     fileprivate func applyLights() {
-        let lr = layoutMode == .lightroom
-        let level = lr ? lights : .normal
+        let level = lights
         for v in lightroomChrome where v !== info && v !== shelf && v !== librarySidebar { v.alphaValue = level.chromeOpacity }
-        for v in [info, shelf, librarySidebar] as [NSView] { v.alphaValue = lr ? level.chromeOpacity : 1 }
-        guard lr else { return }
+        for v in [info, shelf, librarySidebar] as [NSView] { v.alphaValue = level.chromeOpacity }
         workspaceContent.color = level == .normal ? LRColors.backdrop : .black
         canvas.backdrop = [LRColors.canvas, NSColor(calibratedWhite: 0.05, alpha: 1), .black][level.rawValue]
     }
 
     /// Shows or hides a panel (the edge triangles and F5–F8). In the Luminar layout the side panels map to the folders and inspector.
     fileprivate func togglePanel(_ edge: PanelEdge) {
-        if layoutMode == .lightroom { LightroomState.shared.update { $0.toggle(edge) }; updateWorkspaceLayout(); return }
-        switch edge {
-        case .left: foldersVisible.toggle(); updateWorkspaceLayout()
-        case .right: toggleInspector()
-        default: break
-        }
+        LightroomState.shared.update { $0.toggle(edge) }; updateWorkspaceLayout()
     }
     @objc func toggleModulePicker() { togglePanel(.top) }
     @objc func toggleFilmstripPanel() { togglePanel(.bottom) }
@@ -985,7 +970,6 @@ extension ViewerController {
     /// Lightroom's single keys: G, D, R, Q, Shift-W, L, T, Tab and Shift-Tab.
     fileprivate func handleWorkspaceKey(_ id: String) -> Bool {
         guard view.window?.isKeyWindow == true, view.window?.attachedSheet == nil else { return false }
-        let lr = layoutMode == .lightroom
         switch id {
         case "workspace.grid": if isLibrary { libraryBrowser?.setViewMode(.grid) }; showLibrary()
         case "workspace.develop": if isLibrary { showEditor() }
@@ -993,30 +977,20 @@ extension ViewerController {
         case "workspace.remove": openTool("remove")
         case "workspace.masking": openTool("masking")
         case "workspace.lightsOut":
-            guard lr else { return false }
             lights = lights.next; applyLights()
         case "workspace.toolbar":
-            guard lr else { return false }
             LightroomState.shared.update { $0.toolbarHidden.toggle() }; updateWorkspaceLayout()
         case "workspace.sidePanels", "workspace.allPanels":
-            if lr {
-                let all = id == "workspace.allPanels"
-                LightroomState.shared.update { panels in if all { panels.toggleAllPanels() } else { panels.toggleSidePanels() } }
-                updateWorkspaceLayout()
-            }
-            else { toggleInspector() }
+            let all = id == "workspace.allPanels"
+            LightroomState.shared.update { panels in if all { panels.toggleAllPanels() } else { panels.toggleSidePanels() } }
+            updateWorkspaceLayout()
         default: return false
         }
         return true
     }
-    /// Crop, Remove or Masking: the Lightroom tool strip, or the matching tool in the Luminar panel.
+    /// Crop, Remove or Masking: the Develop tool strip.
     fileprivate func openTool(_ id: String) {
         if isLibrary { showEditor() }
-        guard layoutMode == .lightroom else {
-            infoVisible = true; updateWorkspaceLayout()
-            switch id { case "crop": info.openTool("Crop & rotate"); case "remove": info.openTool("Retouch"); default: info.openCurrentMask() }
-            return
-        }
         if !lrPanels.isVisible(.right) { LightroomState.shared.update { $0.hidden.remove(.right) }; updateWorkspaceLayout() }
         let next = info.lightroomToolOpen == id ? nil : id
         info.showLightroomTool(next); lightroomToolChanged(next)
