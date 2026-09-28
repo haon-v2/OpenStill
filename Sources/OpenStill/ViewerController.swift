@@ -548,7 +548,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         hint.stringValue = hasPhotos ? "\(canvas.isFit ? "Fit" : "\(canvas.zoomPercent)%") · ⌘-click or Shift-click to select photos" : ""
     }
     var libraryExportItems: [ShootItem]? { isLibrary ? (libraryBrowser?.selectedItems ?? []) : nil }
-    private var selectedURLs: [URL] {
+    var selectedURLs: [URL] {
         if isLibrary { return libraryBrowser?.selectedItems.map(\.url) ?? [] }
         return collection.selectionIndexPaths.map(\.item).sorted().filter { urls.indices.contains($0) }.map { urls[$0] }
     }
@@ -665,6 +665,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         browser.keywordsChanged = { [weak self] in self?.updateLibraryPanels() }
         browser.keywordSetKey = { [weak self] i in self?.info.keywordSetPanel.applySetKeyword(i) }
         browser.trashRequested = { [weak self] items in self?.trashLibraryPhotos(items) }
+        browser.contextMenu = { [weak self] in self?.makePhotoMenu() }
         browser.recordsChanged = { [weak self] in
             guard let self,let id=self.photoRecord?.id,let latest=try? EditStorage.records.read(id) else{return}
             let changed=self.photoRecord?.active.revision != latest.active.revision || self.photoRecord?.activeVersionID != latest.activeVersionID
@@ -726,16 +727,9 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
     }
     private func makePhotoMenu() -> NSMenu? {
         guard !selectedURLs.isEmpty, !trashInProgress, view.window?.attachedSheet == nil else { return nil }
-        let menu = NSMenu()
-        let share = NSMenuItem(title: selectedURLs.count > 1 ? "Share \(selectedURLs.count) Photos…" : "Share Photo…", action: #selector(sharePhoto), keyEquivalent: "")
-        share.target = self
-        menu.addItem(share)
-        let item = NSMenuItem(title: selectedURLs.count > 1 ? "Move to Trash (select one photo)" : "Move to Trash…", action: #selector(trashPhoto), keyEquivalent: "")
-        item.target = self
-        item.image = Appearance.symbol("trash")
-        menu.addItem(item)
-        return menu
+        return photoContextMenu(for: selectedURLs)
     }
+
     @objc func trashPhoto() {
         guard canTrashPhoto, let window = view.window else { return }
         let url = urls[selected]
