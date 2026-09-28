@@ -509,6 +509,16 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
             }
             self.updateControls()
         }
+        // RAW files can take a moment to develop (Fuji X-Trans most of all): show the camera's own preview meanwhile.
+        if RawDecoder.isRAW(url) {
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                guard let preview = try? RawDecoder.cameraPreview(url), let image = try? ModernRenderer.display(preview) else { return }
+                DispatchQueue.main.async {
+                    guard let self, self.generation == token, self.renderedPhoto == nil else { return }
+                    self.canvas.image = image; self.canvas.message = ""
+                }
+            }
+        }
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let metadata = PhotoMetadata.read(url)
             DispatchQueue.main.async {

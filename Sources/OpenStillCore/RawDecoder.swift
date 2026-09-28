@@ -30,12 +30,12 @@ public enum RawDecoder {
         if balance[3] <= 0 { balance[3] = balance[1] }
         return balance
     }
-    public static func decode(_ url: URL, settings: RawSettings = RawSettings(), halfSize:Bool = false) throws -> RawImage {
+    public static func decode(_ url: URL, settings: RawSettings = RawSettings(), halfSize:Bool = false, fast:Bool = false) throws -> RawImage {
         let settings = settings.sanitized
         var output = OSRawImage(); var error = [CChar](repeating: 0, count: 512)
         let status: Int32
         let o = settings.options ?? RawOptions()
-        var options = OSRawOptions(demosaic: settings.options == nil ? -1 : o.demosaic.libraw, noise_threshold: o.waveletThreshold, median_passes: Int32(o.colorNoise), fbdd: Int32(o.impulseNoise))
+        var options = OSRawOptions(demosaic: settings.options == nil ? -1 : o.demosaic.libraw, noise_threshold: o.waveletThreshold, median_passes: Int32(o.colorNoise), fbdd: Int32(o.impulseNoise), fast_xtrans: fast ? 1 : 0)
         if let wb = settings.whiteBalance {
             status = wb.withUnsafeBufferPointer { os_raw_decode(url.path, $0.baseAddress, Int32(settings.highlightRecovery), settings.temperature ?? 6500, settings.tint ?? 0, halfSize ? 1:0, &options, &output, &error, error.count) }
         } else { status = os_raw_decode(url.path, nil, Int32(settings.highlightRecovery), settings.temperature ?? 6500, settings.tint ?? 0, halfSize ? 1:0, &options, &output, &error, error.count) }
