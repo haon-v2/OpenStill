@@ -6,12 +6,12 @@ final class ActionMenuItem: NSMenuItem {
     private let run: () -> Void
     init(_ title: String, symbol: String? = nil, _ run: @escaping () -> Void) {
         self.run = run
-        super.init(title: title, action: #selector(perform), keyEquivalent: "")
+        super.init(title: title, action: #selector(runAction), keyEquivalent: "")
         target = self
         if let symbol { image = Appearance.symbol(symbol) }
     }
     required init(coder: NSCoder) { fatalError() }
-    @objc private func perform() { run() }
+    @objc private func runAction() { run() }
 }
 
 /// The right-click menu for photos, the same in the library grid, the filmstrip and on the photo:
