@@ -25,19 +25,12 @@ enum Appearance {
         window.isOpaque = false
         window.appearance = nil
     }
-    /// Float secondary-window content above a system backdrop, including behind glass.
+    /// A secondary window's content: a flat, opaque panel like Lightroom's dialogs (no floating glass).
     static func panel(in window: NSWindow) -> NSView {
-        let root = workspace()
+        let root = NSView()
         window.contentView = root
-        let chrome = glass()
-        chrome.cornerRadius = 18
-        chrome.translatesAutoresizingMaskIntoConstraints = false
-        root.addSubview(chrome)
-        NSLayoutConstraint.activate([
-            chrome.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 12), chrome.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -12),
-            chrome.topAnchor.constraint(equalTo: root.topAnchor, constant: 8), chrome.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -12)
-        ])
-        return chrome.contentView
+        window.isOpaque = true
+        return root
     }
     /// Public AppKit tint properties keep native control drawing and accessibility.
     static func applyAccent(in view: NSView) {

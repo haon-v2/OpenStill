@@ -133,6 +133,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         info.sectionChanged = { [weak self] index in self?.rightRail.select(["edit", "presets", "history", "info"][index]) }
         librarySidebar.browse = { [weak self] in self?.openPanel() }
         librarySidebar.open = { [weak self] url in self?.open([url]) }
+        librarySidebar.folderCommand = { [weak self] id, url in self?.folderCommand(id, url) }
         librarySidebar.filter = { [weak self] index in self?.showLibrary(); self?.libraryBrowser?.setFlagFilter(index) }
         librarySidebar.subfoldersChanged = { [weak self] _ in if let self, let folder = self.folderURL, self.openCollection == nil { self.open([folder]) } }
         librarySidebar.openCollection = { [weak self] collection in self?.open(collection: collection) }
@@ -688,6 +689,20 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         window.imported = { [weak self] urls in guard let self, !urls.isEmpty else { return }; self.open(urls); self.showLibrary() }
         window.showFolder = { [weak self] folder in self?.open([folder]); self?.showLibrary() }
         window.showWindow(nil); window.window?.makeKeyAndOrderFront(nil)
+    }
+    /// Folders panel → Import to This Folder…
+    func importPhotos(into folder: URL) { importPhotos(); photoImport?.importInto(folder) }
+    /// Folders panel right-click: Show in Finder, Import to This Folder…, Synchronize Folder.
+    func folderCommand(_ id: String, _ folder: URL) {
+        switch id {
+        case "finder": NSWorkspace.shared.activateFileViewerSelecting([folder])
+        case "import": importPhotos(into: folder)
+        case "sync":
+            // Re-reads the folder: new photos join the library and the counts are refreshed.
+            open([folder]); showLibrary()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in self?.librarySidebar.reloadFolders() }
+        default: break
+        }
     }
     private var tether: TetherWindow?
     @objc func tetheredCapture() {

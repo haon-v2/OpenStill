@@ -17,8 +17,30 @@ public struct ImportCandidate: Identifiable, Equatable {
 }
 
 /// Destination folders, file names, a second copy and what to apply to imported photos.
+/// Lightroom's three ways to import.
+public enum ImportMode: String, Codable, CaseIterable, Sendable {
+    /// Copy the photos into the destination; the originals stay where they are.
+    case copy
+    /// Move the photos into the destination. Each copy is verified before the original goes to the Trash
+    /// (on the same drive the file is simply moved).
+    case move
+    /// Leave the photos where they are and add them to the library.
+    case add
+    public var title: String { switch self { case .copy: "Copy"; case .move: "Move"; case .add: "Add" } }
+    public var explanation: String {
+        switch self {
+        case .copy: return "Copies the photos to the destination and adds the copies to the library. The originals stay where they are."
+        case .move: return "Moves the photos to the destination and adds them to the library. Each copy is checked before the original is put in the Trash."
+        case .add: return "Adds the photos to the library where they are. Nothing is copied or moved."
+        }
+    }
+}
+
 public struct ImportSettings: Codable, Equatable {
     public var destination: URL
+    /// Copy (nil, the default for settings saved before modes existed), Move or Add.
+    public var mode: ImportMode?
+    public var importMode: ImportMode { get { mode ?? .copy } set { mode = newValue } }
     /// Folders inside the destination, e.g. "{yyyy}/{yyyy}-{MM}-{dd}". Empty puts files directly in the destination.
     public var folderTemplate = "{yyyy}/{yyyy}-{MM}-{dd}"
     /// File name without extension. Tokens: {name} {yyyy} {MM} {dd} {date} {time} {index} {camera}.
@@ -41,13 +63,18 @@ public struct ImportReport: Equatable {
     public var failed: [String] = []
     public var backupFailed: [String] = []
     public var cancelled = false
+    public var mode: ImportMode = .copy
+    /// Moved photos whose original couldn't be put in the Trash (for example on a locked card): copied, original kept.
+    public var originalsKept: [String] = []
     public var summary: String {
-        var lines = ["\(imported.count) photo\(imported.count == 1 ? "" : "s") imported and verified."]
+        let n = "\(imported.count) photo\(imported.count == 1 ? "" : "s")"
+        var lines = [mode == .add ? n + " added to the library, left where they are." : (mode == .move ? n + " moved and verified." : n + " imported and verified.")]
         if skipped > 0 { lines.append("\(skipped) already in your library, skipped.") }
         if !failed.isEmpty { lines.append("\(failed.count) couldn’t be imported:\n" + failed.prefix(20).map { "• " + $0 }.joined(separator: "\n")) }
         if !backupFailed.isEmpty { lines.append("The backup copy failed for \(backupFailed.count):\n" + backupFailed.prefix(20).map { "• " + $0 }.joined(separator: "\n")) }
+        if !originalsKept.isEmpty { lines.append("\(originalsKept.count) were copied, but the original couldn’t be put in the Trash:\n" + originalsKept.prefix(20).map { "• " + $0 }.joined(separator: "\n")) }
         if cancelled { lines.append("Stopped before the end. Photos already copied are kept.") }
-        lines.append("Nothing was deleted from the source.")
+        lines.append(mode == .move ? "Photos moved from another drive: their originals are in the Trash." : "Nothing was deleted from the source.")
         return lines.joined(separator: "\n\n")
     }
 }
@@ -159,7 +186,7 @@ public enum PhotoImport {
     /// Copies the included candidates into the destination (and backup), verifying every copy, then adds them to the library.
     public static func run(_ candidates: [ImportCandidate], settings: ImportSettings, store: PhotoRecordStore = EditStorage.records,
                            progress: (Int, Int) -> Void = { _, _ in }, cancelled: () -> Bool = { false }) -> ImportReport {
-        var report = ImportReport()
+        var report = ImportReport(); report.mode = settings.importMode
         let chosen = candidates.filter { $0.include && !(settings.skipAlreadyImported && $0.alreadyImported) }
         report.skipped = candidates.filter { $0.alreadyImported && (settings.skipAlreadyImported || !$0.include) }.count
         let destination = settings.destination.standardizedFileURL
@@ -168,39 +195,73 @@ public enum PhotoImport {
             if cancelled() { report.cancelled = true; break }
             progress(index, chosen.count)
             do {
+                if settings.importMode == .add {
+                    // Add: the photo stays where it is.
+                    let record = try store.record(for: candidate.url)
+                    try applyPresets(settings, to: record.id, store: store)
+                    report.imported.append(candidate.url); continue
+                }
                 let camera = settings.folderTemplate.contains("{camera}") || settings.nameTemplate.contains("{camera}") ? Self.camera(candidate.url) : "Camera"
                 let folder = try expand(settings.folderTemplate, candidate: candidate, index: index, camera: camera, folders: true)
                 let stem = try expand(settings.nameTemplate, candidate: candidate, index: index, camera: camera, folders: false)
                 let ext = candidate.url.pathExtension
                 let target = freeURL(folder.isEmpty ? destination : destination.appendingPathComponent(folder, isDirectory: true), stem: stem, ext: ext, taken: taken)
                 taken.insert(target.path.lowercased())
-                try verifiedCopy(candidate.url, to: target)
-                if let sidecar = candidate.sidecar { _ = try? verifiedCopy(sidecar, to: XMPSidecar.url(for: target)) }
+                let move = settings.importMode == .move
+                if move && sameVolume(candidate.url, target.deletingLastPathComponent()) {
+                    // Moving on the same drive is a rename: nothing to copy or verify.
+                    try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+                    try FileManager.default.moveItem(at: candidate.url, to: target)
+                    if let sidecar = candidate.sidecar { try? FileManager.default.moveItem(at: sidecar, to: XMPSidecar.url(for: target)) }
+                } else {
+                    try verifiedCopy(candidate.url, to: target)
+                    if let sidecar = candidate.sidecar { _ = try? verifiedCopy(sidecar, to: XMPSidecar.url(for: target)) }
+                }
                 if let backup = settings.backup {
                     let relative = String(target.path.dropFirst(destination.path.count + 1))
                     let copy = backup.standardizedFileURL.appendingPathComponent(relative)
                     do {
-                        try verifiedCopy(candidate.url, to: copy)
-                        if let sidecar = candidate.sidecar { _ = try? verifiedCopy(sidecar, to: XMPSidecar.url(for: copy)) }
+                        // From the verified copy, which is also where a moved photo now is.
+                        try verifiedCopy(target, to: copy)
+                        let sidecar = XMPSidecar.url(for: target)
+                        if candidate.sidecar != nil, FileManager.default.fileExists(atPath: sidecar.path) { _ = try? verifiedCopy(sidecar, to: XMPSidecar.url(for: copy)) }
                     } catch { report.backupFailed.append("\(candidate.url.lastPathComponent): \(error.localizedDescription)") }
+                }
+                // Moving across drives: the original goes to the Trash only now that the copy (and any backup) is verified.
+                if move, FileManager.default.fileExists(atPath: candidate.url.path) {
+                    do {
+                        try FileManager.default.trashItem(at: candidate.url, resultingItemURL: nil)
+                        if let sidecar = candidate.sidecar { try? FileManager.default.trashItem(at: sidecar, resultingItemURL: nil) }
+                    } catch { report.originalsKept.append("\(candidate.url.lastPathComponent): \(error.localizedDescription)") }
                 }
                 // Add to the library, with metadata and a develop preset when asked.
                 let record = try store.record(for: target)
-                if settings.metadata != nil || settings.developPreset != nil {
-                    try store.update(record.id) { record in
-                        if let metadata = settings.metadata { record.iptc = record.iptc.applying(metadata) }
-                        if let preset = settings.developPreset {
-                            var document = record.active.document
-                            document.commit(applying(preset, to: document.current), title: settings.developPresetName ?? "Import preset")
-                            record.updateDocument(document)
-                        }
-                    }
-                }
+                try applyPresets(settings, to: record.id, store: store)
                 report.imported.append(target)
             } catch { report.failed.append("\(candidate.url.lastPathComponent): \(error.localizedDescription)") }
         }
         progress(chosen.count, chosen.count)
         return report
+    }
+    private static func applyPresets(_ settings: ImportSettings, to id: UUID, store: PhotoRecordStore) throws {
+        guard settings.metadata != nil || settings.developPreset != nil else { return }
+        try store.update(id) { record in
+            if let metadata = settings.metadata { record.iptc = record.iptc.applying(metadata) }
+            if let preset = settings.developPreset {
+                var document = record.active.document
+                document.commit(applying(preset, to: document.current), title: settings.developPresetName ?? "Import preset")
+                record.updateDocument(document)
+            }
+        }
+    }
+    static func sameVolume(_ a: URL, _ b: URL) -> Bool {
+        // The destination folder may not exist yet: compare with its nearest existing parent.
+        var b = b
+        while !FileManager.default.fileExists(atPath: b.path), b.path != "/" { b = b.deletingLastPathComponent() }
+        let key: Set<URLResourceKey> = [.volumeIdentifierKey]
+        guard let va = try? a.resourceValues(forKeys: key).volumeIdentifier as? NSObject,
+              let vb = try? b.resourceValues(forKeys: key).volumeIdentifier as? NSObject else { return false }
+        return va.isEqual(vb)
     }
     /// A preset's look on top of a photo's own geometry, lens corrections and masks (as Load preset does).
     public static func applying(_ preset: PhotoEdits, to current: PhotoEdits) -> PhotoEdits {

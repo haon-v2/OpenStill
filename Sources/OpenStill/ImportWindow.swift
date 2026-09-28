@@ -2,8 +2,8 @@ import AppKit
 import UniformTypeIdentifiers
 import OpenStillCore
 
-/// File → Import Photos… (⇧⌘I): copy photos from a camera card or folder into the library, verified by checksum.
-/// The source is never changed or deleted.
+/// File → Import Photos… (⇧⌘I), like Lightroom's: Copy photos from a camera card or folder into a destination,
+/// Move them there, or Add them to the library where they are. Copies are verified by checksum; Copy and Add never change the source.
 final class ImportWindow: NSWindowController, NSWindowDelegate, NSTableViewDataSource, NSTableViewDelegate {
     var imported: (([URL]) -> Void)?
     /// Opens a folder in the Library (set by the main window).
@@ -32,6 +32,12 @@ final class ImportWindow: NSWindowController, NSWindowDelegate, NSTableViewDataS
     private let ejectCheck = NSButton(checkboxWithTitle: "Eject the card when done", target: nil, action: nil)
     private let progress = NSProgressIndicator()
     private let importButton = NSButton(title: "Import", target: nil, action: nil)
+    private let modeControl = NSSegmentedControl(labels: ImportMode.allCases.map(\.title), trackingMode: .selectOne, target: nil, action: nil)
+    private let modeNote = NSTextField(wrappingLabelWithString: "")
+    private let destinationTitle = NSTextField(labelWithString: "Copy to")
+    private var mode: ImportMode = .copy
+    /// Rows of the settings grid that only apply when photos are copied or moved.
+    private var placementRows: [NSGridRow] = []
     private let defaults = UserDefaults.standard
 
     init() {
@@ -50,6 +56,10 @@ final class ImportWindow: NSWindowController, NSWindowDelegate, NSTableViewDataS
         let all = NSButton(title: "Check all", target: self, action: #selector(checkAll)); all.bezelStyle = .rounded
         let none = NSButton(title: "Uncheck all", target: self, action: #selector(checkNone)); none.bezelStyle = .rounded
         let top = NSStackView(views: [NSTextField(labelWithString: "Import from"), sourcePopup, rescan, NSView(), all, none]); top.spacing = 8
+        modeControl.target = self; modeControl.action = #selector(modeChanged); modeControl.segmentStyle = .rounded; modeControl.setAccessibilityLabel("Copy, Move or Add")
+        for (i, m) in ImportMode.allCases.enumerated() { modeControl.setToolTip(m.explanation, forSegment: i); modeControl.setWidth(80, forSegment: i) }
+        modeNote.font = .systemFont(ofSize: 11); modeNote.textColor = .secondaryLabelColor
+        let modeRow = NSStackView(views: [modeControl, modeNote]); modeRow.spacing = 12; modeRow.alignment = .centerY
         summary.font = .systemFont(ofSize: 11); summary.textColor = .secondaryLabelColor
 
         for (id, title, width) in [("use", "", 24.0), ("name", "File", 220), ("date", "Captured", 150), ("size", "Size", 80), ("status", "Status", 150)] {
@@ -79,11 +89,13 @@ final class ImportWindow: NSWindowController, NSWindowDelegate, NSTableViewDataS
         let close = NSButton(title: "Close", target: self, action: #selector(closeOrCancel)); close.bezelStyle = .rounded; close.keyEquivalent = "\u{1b}"
 
         let form = NSGridView(numberOfColumns: 2, rows: 0); form.rowSpacing = 7; form.columnSpacing = 8; form.column(at: 0).xPlacement = .trailing
-        form.addRow(with: [NSTextField(labelWithString: "Copy to"), NSStackView(views: [destinationButton, destinationLabel])])
-        form.addRow(with: [NSTextField(labelWithString: "Folders"), folders])
-        form.addRow(with: [NSTextField(labelWithString: "File names"), names])
-        form.addRow(with: [NSView(), example]); form.addRow(with: [NSView(), tokens])
-        form.addRow(with: [NSView(), NSStackView(views: [backupCheck, backupLabel])])
+        placementRows = [
+            form.addRow(with: [destinationTitle, NSStackView(views: [destinationButton, destinationLabel])]),
+            form.addRow(with: [NSTextField(labelWithString: "Folders"), folders]),
+            form.addRow(with: [NSTextField(labelWithString: "File names"), names]),
+            form.addRow(with: [NSView(), example]), form.addRow(with: [NSView(), tokens]),
+            form.addRow(with: [NSView(), NSStackView(views: [backupCheck, backupLabel])])
+        ]
         form.addRow(with: [NSView(), skipCheck])
         form.addRow(with: [NSTextField(labelWithString: "Metadata"), metadataPopup])
         form.addRow(with: [NSTextField(labelWithString: "Keywords"), keywords])
@@ -92,18 +104,19 @@ final class ImportWindow: NSWindowController, NSWindowDelegate, NSTableViewDataS
         for view in [folders, names, keywords, metadataPopup, developPopup] { view.widthAnchor.constraint(equalToConstant: 280).isActive = true }
         destinationLabel.widthAnchor.constraint(lessThanOrEqualToConstant: 200).isActive = true; backupLabel.widthAnchor.constraint(lessThanOrEqualToConstant: 170).isActive = true
         example.widthAnchor.constraint(lessThanOrEqualToConstant: 280).isActive = true; tokens.widthAnchor.constraint(equalToConstant: 280).isActive = true
-        let note = NSTextField(wrappingLabelWithString: "Every copy is read back and checked against the original before it counts as imported. Nothing on the card is changed or deleted.")
+        let note = NSTextField(wrappingLabelWithString: "Every copy is read back and checked against the original before it counts as imported. Nothing on a camera card is changed or deleted: from a card you can only copy.")
         note.font = .systemFont(ofSize: 10); note.textColor = .secondaryLabelColor; note.widthAnchor.constraint(equalToConstant: 360).isActive = true
         let side = NSStackView(views: [form, note]); side.orientation = .vertical; side.alignment = .leading; side.spacing = 12
 
         let middle = NSStackView(views: [scroll, side]); middle.spacing = 16; middle.alignment = .top
         let buttons = NSStackView(views: [progress, close, importButton]); buttons.spacing = 8
-        let stack = NSStackView(views: [top, summary, middle, buttons]); stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 10
+        let stack = NSStackView(views: [modeRow, top, summary, middle, buttons]); stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 10
+        stack.setCustomSpacing(16, after: modeRow)
         stack.translatesAutoresizingMaskIntoConstraints = false; root.addSubview(stack)
         NSLayoutConstraint.activate([
             stack.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 18), stack.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -18),
             stack.topAnchor.constraint(equalTo: root.topAnchor, constant: 18), stack.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -14),
-            top.widthAnchor.constraint(equalTo: stack.widthAnchor), middle.widthAnchor.constraint(equalTo: stack.widthAnchor), buttons.widthAnchor.constraint(equalTo: stack.widthAnchor),
+            top.widthAnchor.constraint(equalTo: stack.widthAnchor), modeRow.widthAnchor.constraint(equalTo: stack.widthAnchor), middle.widthAnchor.constraint(equalTo: stack.widthAnchor), buttons.widthAnchor.constraint(equalTo: stack.widthAnchor),
             scroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 320), sourcePopup.widthAnchor.constraint(greaterThanOrEqualToConstant: 260),
             progress.widthAnchor.constraint(greaterThanOrEqualToConstant: 200)
         ])
@@ -119,12 +132,36 @@ final class ImportWindow: NSWindowController, NSWindowDelegate, NSTableViewDataS
         folders.stringValue = defaults.string(forKey: "importFolders") ?? ImportSettings.folderTemplates[0]
         names.stringValue = defaults.string(forKey: "importNames") ?? ImportSettings.nameTemplates[0]
         ejectCheck.state = defaults.bool(forKey: "importEject") ? .on : .off
+        mode = defaults.string(forKey: "importMode").flatMap(ImportMode.init(rawValue:)) ?? .copy
         metadataPopup.removeAllItems(); metadataPopup.addItem(withTitle: "None")
         for p in MetadataPresets.load() { metadataPopup.addItem(withTitle: p.name); metadataPopup.lastItem?.representedObject = p.id.uuidString }
         developPopup.removeAllItems(); developPopup.addItem(withTitle: "None"); developPopup.addItem(withTitle: "Choose preset file…")
         refreshLabels()
     }
+    /// Copy, Move or Add. From a camera card only Copy is offered, as in Lightroom.
+    @objc private func modeChanged() {
+        mode = ImportMode.allCases[max(0, modeControl.selectedSegment)]
+        defaults.set(mode.rawValue, forKey: "importMode"); refreshMode()
+    }
+    private func refreshMode() {
+        let card = sourceIsVolume
+        modeControl.setEnabled(!card, forSegment: 1); modeControl.setEnabled(!card, forSegment: 2)
+        let effective: ImportMode = card ? .copy : mode
+        modeControl.selectedSegment = ImportMode.allCases.firstIndex(of: effective) ?? 0
+        modeNote.stringValue = effective.explanation + (card && mode != .copy ? " (From a camera card, photos are always copied.)" : "")
+        destinationTitle.stringValue = effective == .move ? "Move to" : "Copy to"
+        for row in placementRows { row.isHidden = effective == .add }
+        importButton.title = effective == .add ? "Add" : (effective == .move ? "Move" : "Import")
+    }
+    private var effectiveMode: ImportMode { sourceIsVolume ? .copy : mode }
+    /// Folders panel → Import to This Folder…: copy photos into that folder.
+    func importInto(_ folder: URL) {
+        destination = folder; defaults.set(folder.path, forKey: "importDestination")
+        if mode == .add { mode = .copy; defaults.set(mode.rawValue, forKey: "importMode") }
+        refreshLabels()
+    }
     private func refreshLabels() {
+        refreshMode()
         destinationLabel.stringValue = destination.map { ($0.path as NSString).abbreviatingWithTildeInPath } ?? "Not chosen"
         backupLabel.stringValue = backup.map { ($0.path as NSString).abbreviatingWithTildeInPath } ?? "(choose a folder)"
         templateChanged()
@@ -188,7 +225,7 @@ final class ImportWindow: NSWindowController, NSWindowDelegate, NSTableViewDataS
     private var sourceIsVolume: Bool { source.map { PhotoImport.removableVolumes().contains($0) } ?? false }
     private func scan(_ url: URL) {
         source = url; candidates = []; table.reloadData(); importButton.isEnabled = false
-        ejectCheck.isEnabled = sourceIsVolume
+        ejectCheck.isEnabled = sourceIsVolume; refreshMode()
         summary.stringValue = "Reading \(url.lastPathComponent)…"
         let token = UUID(); generation = token
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
@@ -237,8 +274,9 @@ final class ImportWindow: NSWindowController, NSWindowDelegate, NSTableViewDataS
 
     // MARK: Import
     @objc private func runImport() {
-        guard !running, let destination, let window, let first = candidates.first else { return }
-        var settings = ImportSettings(destination: destination)
+        let mode = effectiveMode
+        guard !running, let window, let first = candidates.first, let destination = mode == .add ? (destination ?? first.url.deletingLastPathComponent()) : destination else { return }
+        var settings = ImportSettings(destination: destination); settings.importMode = mode
         settings.folderTemplate = folderTemplate; settings.nameTemplate = names.stringValue
         settings.backup = backupCheck.state == .on ? backup : nil
         settings.skipAlreadyImported = skipCheck.state == .on
@@ -246,14 +284,15 @@ final class ImportWindow: NSWindowController, NSWindowDelegate, NSTableViewDataS
         metadata.keywords += IPTCMetadata.parseKeywords(keywords.stringValue)
         settings.metadata = metadata.sanitized.isEmpty ? nil : metadata.sanitized
         settings.developPreset = preset?.edits; settings.developPresetName = preset?.name
-        do { _ = try PhotoImport.expand(settings.folderTemplate, candidate: first, index: 0, camera: "Camera", folders: true); _ = try PhotoImport.expand(settings.nameTemplate, candidate: first, index: 0, camera: "Camera", folders: false) }
-        catch { let alert = NSAlert(error: error); alert.beginSheetModal(for: window); return }
+        if mode != .add { do { _ = try PhotoImport.expand(settings.folderTemplate, candidate: first, index: 0, camera: "Camera", folders: true); _ = try PhotoImport.expand(settings.nameTemplate, candidate: first, index: 0, camera: "Camera", folders: false) }
+        catch { let alert = NSAlert(error: error); alert.beginSheetModal(for: window); return } }
         defaults.set(folders.stringValue, forKey: "importFolders"); defaults.set(names.stringValue, forKey: "importNames"); defaults.set(ejectCheck.state == .on, forKey: "importEject")
         running = true; cancelled = false; importButton.isEnabled = false; progress.isHidden = false; progress.doubleValue = 0
         let chosen = candidates, eject = ejectCheck.state == .on && sourceIsVolume ? source : nil
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let report = PhotoImport.run(chosen, settings: settings, progress: { done, total in
-                DispatchQueue.main.async { self?.progress.doubleValue = total == 0 ? 1 : Double(done) / Double(total); self?.summary.stringValue = "Copying and verifying \(min(done + 1, total)) of \(total)…" }
+                let verb = mode == .add ? "Adding" : (mode == .move ? "Moving" : "Copying and verifying")
+                DispatchQueue.main.async { self?.progress.doubleValue = total == 0 ? 1 : Double(done) / Double(total); self?.summary.stringValue = "\(verb) \(min(done + 1, total)) of \(total)…" }
             }, cancelled: { self?.cancelled ?? true })
             DispatchQueue.main.async {
                 guard let self else { return }
@@ -266,7 +305,7 @@ final class ImportWindow: NSWindowController, NSWindowDelegate, NSTableViewDataS
                 if !report.imported.isEmpty { self.imported?(report.imported) }
                 // Say exactly where the copies landed.
                 let landed = LightroomCatalog.folders(of: report.imported.map(\.path), limit: 6)
-                if !landed.isEmpty { text += "\n\nCopied to:\n" + landed.map { ($0.folder as NSString).abbreviatingWithTildeInPath + "  (\($0.count))" }.joined(separator: "\n") }
+                if !landed.isEmpty { text += "\n\n" + (mode == .add ? "Your photos stay in:" : (mode == .move ? "Moved to:" : "Copied to:")) + "\n" + landed.map { ($0.folder as NSString).abbreviatingWithTildeInPath + "  (\($0.count))" }.joined(separator: "\n") }
                 let alert = NSAlert(); alert.messageText = report.imported.isEmpty ? "Nothing imported" : "Import finished"; alert.informativeText = text
                 alert.addButton(withTitle: "OK")
                 if let first = landed.first {

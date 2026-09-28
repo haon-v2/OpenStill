@@ -48,6 +48,7 @@ final class LibrarySidebar: GlassChrome {
             stack.edgeInsets = lightroom ? NSEdgeInsets() : NSEdgeInsets(top: 20, left: 16, bottom: 20, right: 16)
             stack.spacing = lightroom ? 0 : 10
             reloadCollections()
+            if lightroom { reloadFolders() }
         }
     }
     private let stack = LibraryStack()
@@ -76,7 +77,9 @@ final class LibrarySidebar: GlassChrome {
             recent.removeAll { $0 == folder }; recent.insert(folder, at: 0); recent = Array(recent.prefix(8))
             UserDefaults.standard.set(recent.map(\.path), forKey: "OpenStillRecentFolders")
         }
+        let reload = lightroom && folder != nil && folder != self.folder
         self.folder = folder; self.count = count; shownCollection = collection
+        if reload { reloadFolders() }
         collections = EditStorage.records.catalog?.collections() ?? []
         stack.arrangedSubviews.forEach { stack.removeArrangedSubview($0); $0.removeFromSuperview() }
         if lightroom { buildLightroom(collection: collection); return }
@@ -171,12 +174,21 @@ final class LibrarySidebar: GlassChrome {
             s.add(row("Rejected", action: #selector(filterPhotos(_:)), tag: 2))
         }
         section("Folders") { s in
-            if let folder {
-                let r = row(folder.lastPathComponent, count: current == nil ? count : nil, action: #selector(reveal), selected: current == nil, symbol: "folder.fill")
-                r.toolTip = folder.path + " · Click to show in Finder"; s.add(r)
+            if volumes.isEmpty {
+                // Nothing in the catalog yet: the open folder and recent folders.
+                if let folder {
+                    let r = row(folder.lastPathComponent, count: current == nil ? count : nil, action: #selector(reveal), selected: current == nil, symbol: "folder.fill")
+                    r.toolTip = folder.path + " · Click to show in Finder"; s.add(r)
+                }
+                for (index, url) in recent.enumerated() where url != folder {
+                    let r = row(url.lastPathComponent, action: #selector(openRecent(_:)), tag: index, symbol: "folder"); r.toolTip = url.path; s.add(r)
+                }
             }
-            for (index, url) in recent.enumerated() where url != folder {
-                let r = row(url.lastPathComponent, action: #selector(openRecent(_:)), tag: index, symbol: "folder"); r.toolTip = url.path; s.add(r)
+            for volume in volumes {
+                let r = folderRow(volume.name, path: volume.path, count: volume.count, indent: 0, hasChildren: !volume.folders.isEmpty,
+                                  symbol: volume.path == "/" ? "internaldrive" : "externaldrive", dimmed: !volume.online, selected: false, in: s)
+                r.toolTip = volume.online ? volume.path : volume.path + " · Not connected"
+                if expanded(volume.path, default: true) { for node in volume.folders { addFolder(node, indent: 1, online: volume.online, collection: current, in: s) } }
             }
             let subfolders = NSButton(checkboxWithTitle: "Include Subfolders", target: self, action: #selector(toggleSubfolders(_:)))
             subfolders.state = Self.includeSubfolders ? .on : .off; subfolders.font = .systemFont(ofSize: 11); subfolders.controlSize = .small
@@ -196,6 +208,70 @@ final class LibrarySidebar: GlassChrome {
         }
         section("Publish Services") { s in s.add(row("Set Up Publishing…", action: #selector(publishServices), symbol: "square.and.arrow.up")) }
     }
+    // MARK: Folders tree
+
+    /// Show in Finder, Import into this folder, or Synchronize Folder, from a folder's right-click menu.
+    var folderCommand: ((String, URL) -> Void)?
+    private var volumes: [FolderVolume] = []
+    private var folderLoad = UUID()
+    private static let expandedKey = "OpenStillExpandedFolders", collapsedKey = "OpenStillCollapsedFolders"
+    /// Reads the catalog's folders in the background, then redraws the panel.
+    func reloadFolders() {
+        let token = UUID(); folderLoad = token
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            let volumes = FolderTree.volumes(EditStorage.records.catalog?.photoPaths() ?? [])
+            DispatchQueue.main.async {
+                guard let self, self.folderLoad == token else { return }
+                self.volumes = volumes; if self.lightroom { self.reloadCollections() }
+            }
+        }
+    }
+    /// Drives start expanded, folders collapsed; either remembers what you last did.
+    private func expanded(_ path: String, default open: Bool) -> Bool {
+        let d = UserDefaults.standard
+        return open ? !(d.stringArray(forKey: Self.collapsedKey) ?? []).contains(path) : (d.stringArray(forKey: Self.expandedKey) ?? []).contains(path)
+    }
+    private func setExpanded(_ path: String, _ value: Bool, default open: Bool) {
+        let d = UserDefaults.standard, key = open ? Self.collapsedKey : Self.expandedKey
+        var list = Set(d.stringArray(forKey: key) ?? [])
+        if value == open { list.remove(path) } else { list.insert(path) }
+        d.set(Array(list), forKey: key); reloadCollections()
+    }
+    private func addFolder(_ node: FolderNode, indent: Int, online: Bool, collection: PhotoCollection?, in s: LRSection) {
+        let open = expanded(node.path, default: false)
+        let r = folderRow(node.name, path: node.path, count: node.count, indent: indent, hasChildren: !node.children.isEmpty, symbol: open && !node.children.isEmpty ? "folder" : "folder.fill",
+                          dimmed: !online, selected: collection == nil && folder?.standardizedFileURL.path == node.path, in: s)
+        r.toolTip = node.path
+        if open { for child in node.children { addFolder(child, indent: indent + 1, online: online, collection: collection, in: s) } }
+    }
+    @discardableResult private func folderRow(_ title: String, path: String, count: Int, indent: Int, hasChildren: Bool, symbol: String, dimmed: Bool, selected: Bool, in s: LRSection) -> LRListRow {
+        let isVolume = indent == 0
+        let open = expanded(path, default: isVolume)
+        let r = LRListRow(title: title, count: count, symbol: symbol, selected: selected, indent: indent, disclosure: hasChildren ? open : nil, dimmed: dimmed)
+        r.target = self; r.action = #selector(chooseFolder(_:)); r.identifier = .init(path)
+        r.setAccessibilityLabel("\(title), \(count) photos" + (dimmed ? ", not connected" : ""))
+        r.toggled = { [weak self] in self?.setExpanded(path, !open, default: isVolume) }
+        let menu = NSMenu(), url = URL(fileURLWithPath: path, isDirectory: true)
+        let items: [(String, String)] = [("Show in Finder", "finder"), ("Import to This Folder…", "import"), ("Synchronize Folder", "sync")]
+        for (title, id) in items {
+            let item = ActionMenuItem(title) { [weak self] in self?.folderCommand?(id, url) }
+            item.isEnabled = !dimmed; menu.addItem(item)
+        }
+        if hasChildren {
+            menu.addItem(.separator())
+            menu.addItem(ActionMenuItem(open ? "Collapse" : "Expand") { [weak self] in self?.setExpanded(path, !open, default: isVolume) })
+        }
+        menu.autoenablesItems = false
+        r.menu = menu
+        s.add(r)
+        return r
+    }
+    @objc private func chooseFolder(_ sender: NSButton) {
+        guard let path = sender.identifier?.rawValue else { return }
+        guard FileManager.default.fileExists(atPath: path) else { NSSound.beep(); return }
+        open?(URL(fileURLWithPath: path, isDirectory: true))
+    }
+
     /// A flat Lightroom list row: icon, name, and a count on the right.
     private func row(_ title: String, count: Int? = nil, action: Selector, tag: Int = 0, selected: Bool = false, symbol: String? = nil) -> NSButton {
         let b = LRListRow(title: title, count: count, symbol: symbol, selected: selected)
@@ -207,22 +283,41 @@ final class LibrarySidebar: GlassChrome {
 }
 
 /// A row in Lightroom's left panel lists: highlighted when it's the current source.
+/// Folder rows are indented by depth and have a disclosure triangle when they hold subfolders.
 final class LRListRow: NSButton {
     private let label: String, count: Int?, symbol: String?, selected: Bool
-    init(title: String, count: Int?, symbol: String?, selected: Bool) {
+    private let indent: Int, disclosure: Bool?, dimmed: Bool
+    /// Clicking the triangle expands or collapses the row instead of choosing it.
+    var toggled: (() -> Void)?
+    init(title: String, count: Int?, symbol: String?, selected: Bool, indent: Int = 0, disclosure: Bool? = nil, dimmed: Bool = false) {
         label = title; self.count = count; self.symbol = symbol; self.selected = selected
+        self.indent = indent; self.disclosure = disclosure; self.dimmed = dimmed
         super.init(frame: .zero)
         self.title = title; isBordered = false; heightAnchor.constraint(equalToConstant: 22).isActive = true
+        if let disclosure { setAccessibilityExpanded(disclosure) }
     }
     required init?(coder: NSCoder) { fatalError() }
+    private var start: CGFloat { 26 + CGFloat(indent) * 12 }
+    override func mouseDown(with event: NSEvent) {
+        let x = convert(event.locationInWindow, from: nil).x
+        if disclosure != nil, let toggled, x < start, x > start - 18 { toggled(); return }
+        super.mouseDown(with: event)
+    }
     override func draw(_ dirtyRect: NSRect) {
         if selected || isHighlighted { NSColor(calibratedWhite: selected ? 0.34 : 0.28, alpha: 1).setFill(); bounds.fill() }
-        var x: CGFloat = 26
+        var x = start
+        let fraction: CGFloat = dimmed ? 0.35 : 0.7
+        if let disclosure {
+            let t = NSBezierPath(), cx = start - 9, cy = bounds.midY
+            if disclosure { t.move(to: NSPoint(x: cx - 4, y: cy - 2)); t.line(to: NSPoint(x: cx + 4, y: cy - 2)); t.line(to: NSPoint(x: cx, y: cy + 3)) }
+            else { t.move(to: NSPoint(x: cx - 2, y: cy - 4)); t.line(to: NSPoint(x: cx - 2, y: cy + 4)); t.line(to: NSPoint(x: cx + 3, y: cy)) }
+            t.close(); LRColors.dim.setFill(); t.fill()
+        }
         if let symbol, let image = Appearance.symbol(symbol, size: 11) {
-            image.draw(in: NSRect(x: 26, y: (bounds.height - 12) / 2, width: 13, height: 12), from: .zero, operation: .sourceOver, fraction: 0.7, respectFlipped: true, hints: nil); x = 46
+            image.draw(in: NSRect(x: x, y: (bounds.height - 12) / 2, width: 13, height: 12), from: .zero, operation: .sourceOver, fraction: fraction, respectFlipped: true, hints: nil); x += 20
         }
         let style = NSMutableParagraphStyle(); style.lineBreakMode = .byTruncatingMiddle
-        let color = selected ? LRColors.bright : LRColors.text
+        let color = dimmed ? LRColors.dim : (selected ? LRColors.bright : LRColors.text)
         (label as NSString).draw(in: NSRect(x: x, y: (bounds.height - 15) / 2, width: bounds.width - x - 50, height: 15), withAttributes: [.font: NSFont.systemFont(ofSize: 11), .foregroundColor: color, .paragraphStyle: style])
         if let count {
             let text = "\(count)" as NSString, attrs: [NSAttributedString.Key: Any] = [.font: NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .regular), .foregroundColor: LRColors.dim]
