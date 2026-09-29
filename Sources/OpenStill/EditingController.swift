@@ -43,6 +43,7 @@ extension ViewerController {
         }
     }
     func prepareEditor(for source: URL) {
+        flushPendingSave()
         updateHistogram(nil)
         info.setLUTPhoto(nil,edits:PhotoEdits())
         localAI.cancel(); aiPreparing = false; maskSession.end(); maskVisible = false; maskToken = UUID()
@@ -66,7 +67,11 @@ extension ViewerController {
             let converted = currentEdits.editableSunSettings(sourceSize:editSourceSize())
             sun.centerX = converted.centerX; sun.centerY = converted.centerY; edits.sunSettings = sun
         }
-        guard currentSource != nil, renderedPhoto != nil, !localAI.isRunning, !aiPreparing else { return }
+        guard currentSource != nil, renderedPhoto != nil, !localAI.isRunning, !aiPreparing else {
+            // Not applied (no photo, or AI is working): put the panel's controls back where the edit really is.
+            if commit { info.update(currentEdits, document: editDocument, enabled: renderedPhoto != nil) }
+            return
+        }
         if photoRecord?.active.renderer == .legacy && (edits.autoCA.hasEffect || !edits.curves.isIdentity || edits.neutralBalance != NeutralBalance() || edits.optics.hasEffect || edits.hdr.enabled || edits.profile.hasEffect || edits.calibration.hasEffect || !edits.retouch.isEmpty || edits.advanced?.masks.values.contains(where:{$0.components != nil || $0.range != nil}) == true) {
             photoRecord?.upgrade(); editDocument = photoRecord!.active.document
         }
@@ -74,14 +79,26 @@ extension ViewerController {
         if commit {
             let before = editDocument.current
             editDocument.commit(edits, title: title)
-            saveEdits()
+            scheduleSave()
             if autoSync, !title.hasPrefix("Auto Sync") { autoSyncChange(from: before, to: edits, title: title) }
             info.update(edits, document: editDocument, enabled: true)
         }
         renderEdits(interactive:!commit)
     }
-    func saveEdits() {
-        guard let source = currentSource else { return }
+    /// Saves after a short pause, so a run of slider releases writes the record once.
+    func scheduleSave() {
+        pendingSave?.cancel()
+        // The photo is captured now: by the time a flush runs, the selection may already point at the next photo.
+        let source = currentSource
+        let work = DispatchWorkItem { [weak self] in self?.saveEdits(for: source) }
+        pendingSave = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: work)
+    }
+    /// Writes a scheduled save now (before switching photos, leaving Develop or quitting).
+    func flushPendingSave() { if let work = pendingSave, !work.isCancelled { work.perform(); work.cancel() } }
+    func saveEdits(for photo: URL? = nil) {
+        pendingSave?.cancel(); pendingSave = nil
+        guard let source = photo ?? currentSource else { return }
         do {
             if var record = photoRecord {
                 guard editDocument.fingerprint == EditStorage.fingerprint(source) else { throw WorkflowError.changedSource }

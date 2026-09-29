@@ -85,7 +85,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
     var lastSunPreviewAt: TimeInterval = 0
     /// Render scheduling (see `renderEdits`): one render at a time, the newest edits next.
     var renderInFlight = false, renderQueued = false, queuedInteractive = true, renderGeneration = UUID()
-    var detailWork: DispatchWorkItem?
+    var detailWork: DispatchWorkItem?, pendingSave: DispatchWorkItem?
     let renderQueue = DispatchQueue(label: "OpenStill.screenRender", qos: .userInteractive)
     /// Pixel sizes of AI-edited base images, so they are read from disk once.
     var baseSizes: [String: CGSize] = [:]
@@ -497,6 +497,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
     /// View › Tools.
     @objc func chooseToolFromMenu(_ sender: NSMenuItem) { if let raw = sender.representedObject as? String, let t = StudioTool(rawValue: raw) { selectTool(t) } }
     @objc func showLibrary() {
+        flushPendingSave()
         finishMaskEditing(); canvas.clearTool()
         if tool != .adjust { tool = .adjust; info.showToolPanel(nil) }
         isLibrary = true

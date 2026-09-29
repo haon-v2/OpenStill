@@ -1,6 +1,8 @@
 import AppKit
 import OpenStillCore
 
+/// The one slider used for edits: reports each value while dragging (`final` false) and once more when released
+/// (`final` true, which becomes one undo step). A click that leaves the value where it was reports nothing.
 final class ContinuousSlider: NSSlider {
     var changed: ((Double,Bool)->Void)?
     private var tracking = false
@@ -9,7 +11,28 @@ final class ContinuousSlider: NSSlider {
         target = self; action = #selector(change); isContinuous = true; controlSize = .small
     }
     @objc private func change() { changed?(doubleValue,!tracking) }
-    override func mouseDown(with event:NSEvent) { tracking = true;super.mouseDown(with:event);tracking = false;changed?(doubleValue,true) }
+    override func mouseDown(with event:NSEvent) {
+        let start = doubleValue
+        tracking = true; super.mouseDown(with:event); tracking = false
+        if doubleValue != start { changed?(doubleValue,true) }
+    }
+    /// Draws the track as a gradient that shows what the slider does (cool → warm for Temp, green → magenta for Tint).
+    func useGradient(_ colors:[NSColor]) {
+        let (min, max, value, size) = (minValue, maxValue, doubleValue, controlSize)
+        let cell = GradientSliderCell(); cell.gradient = NSGradient(colors:colors)
+        self.cell = cell
+        minValue = min; maxValue = max; doubleValue = value; controlSize = size
+        target = self; action = #selector(change); isContinuous = true
+    }
+}
+
+/// A slider cell whose track is a thin gradient across its whole width.
+private final class GradientSliderCell: NSSliderCell {
+    var gradient: NSGradient?
+    override func drawBar(inside rect:NSRect, flipped:Bool) {
+        let bar = NSRect(x:rect.minX, y:rect.midY-2, width:rect.width, height:4)
+        gradient?.draw(in:NSBezierPath(roundedRect:bar, xRadius:2, yRadius:2), angle:0)
+    }
 }
 private final class SpectrumSliderCell: NSSliderCell {
     var colors: [NSColor] = [.gray,.red]

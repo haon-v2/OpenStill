@@ -39,7 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         createWindow(); return true
     }
-    func applicationWillTerminate(_ notification: Notification) { viewer.localAI.cancel(); viewer.backupIfDue() }
+    func applicationWillTerminate(_ notification: Notification) { viewer.flushPendingSave(); viewer.localAI.cancel(); viewer.backupIfDue() }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
     @MainActor private func buildMenu() {

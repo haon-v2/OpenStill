@@ -528,7 +528,8 @@ public enum PreviewCache {
         let folder = directory(root: root), destination = url(for: request, root: root)
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let prefix = request.photoID.uuidString + "-", suffix = "-\(request.maximumDimension ?? 0).jpg"
-        for old in (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? [] where old.hasPrefix(prefix) && old.hasSuffix(suffix) && old != destination.lastPathComponent {
+        // Older previews of this photo at this size are replaced. The folder is listed once, not on every write.
+        for old in PreviewIndex.replace(in: folder, photo: request.photoID, with: destination.lastPathComponent) where old.hasPrefix(prefix) && old.hasSuffix(suffix) && old != destination.lastPathComponent {
             try? FileManager.default.removeItem(at: folder.appendingPathComponent(old))
         }
         let data = NSMutableData()
@@ -538,4 +539,26 @@ public enum PreviewCache {
         try? (data as Data).write(to: destination, options: .atomic)
     }
     public static func clear(root: URL = EditStorage.root) { try? FileManager.default.removeItem(at: directory(root: root)) }
+}
+
+/// The preview files on disk, grouped by photo, read from the folder once per launch.
+enum PreviewIndex {
+    private static let lock = NSLock()
+    private static var files: [String: [UUID: Set<String>]] = [:]
+    /// Records `name` for `photo` and returns the names that were there before.
+    static func replace(in folder: URL, photo: UUID, with name: String) -> Set<String> {
+        lock.lock(); defer { lock.unlock() }
+        if files[folder.path] == nil {
+            var index: [UUID: Set<String>] = [:]
+            for file in (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? [] {
+                if let id = UUID(uuidString: String(file.prefix(36))) { index[id, default: []].insert(file) }
+            }
+            files[folder.path] = index
+        }
+        let previous = files[folder.path]?[photo] ?? []
+        // The caller removes the older files of the same size (same "-<edge>.jpg" ending); other sizes stay.
+        let size = "-" + (name.split(separator: "-").last.map(String.init) ?? name)
+        files[folder.path]?[photo] = previous.filter { !$0.hasSuffix(size) }.union([name])
+        return previous
+    }
 }

@@ -42,7 +42,7 @@ public enum ModernRenderer {
         guard let image = CIImage(contentsOf: url, options: [.applyOrientationProperty: true]), !image.extent.isEmpty else { throw PhotoReadError.unreadable }
         return image
     }
-    public static func source(_ url: URL, mode: SourceMode, raw: RawSettings = RawSettings(), halfSize:Bool = false, fast:Bool = false) throws -> CIImage {
+    public static func source(_ url: URL, mode: SourceMode, raw: RawSettings = RawSettings(), halfSize:Bool = false, fast:Bool = false, keep:Bool = true) throws -> CIImage {
         let base = "\(url.standardizedFileURL.path)|\(EditStorage.fingerprint(url))|\(mode.rawValue)|\(raw.cacheKey)"
         func key(_ half: Bool, _ quick: Bool) -> NSString { "\(base)|\(half)|\(quick)" as NSString }
         // A larger decode already in memory serves any smaller or quicker request (it is downscaled later anyway),
@@ -64,7 +64,7 @@ public enum ModernRenderer {
             case .original: throw RawDecodeError(message:"Choose RAW or Camera Look for this file")
             }
         } else { image = try readImage(url) }
-        sourceCache.setObject(SourceImageBox(image),forKey:key,cost:Int(image.extent.width*image.extent.height)*8)
+        if keep { sourceCache.setObject(SourceImageBox(image),forKey:key,cost:Int(image.extent.width*image.extent.height)*8) }
         return image
     }
     public static func process(_ source: CIImage, edits: PhotoEdits, maximumDimension: Int? = nil, lutOverride: CubeLUT? = nil, stopBeforeTool:String? = nil) throws -> CIImage {
@@ -76,7 +76,14 @@ public enum ModernRenderer {
         }
         return try PhotoEditor.process(image, sourceSize: image.extent.size, edits: edits, lutOverride: lutOverride, modern: true, stopBeforeTool:stopBeforeTool)
     }
-    public static func render(source url: URL, recipe: RenderRecipe, maximumDimension: Int? = nil, lutOverride:CubeLUT? = nil, stopBeforeTool:String? = nil) throws -> CIImage {
+    /// `keepSource` false renders without adding the decode to the shared cache (grids and strips), so browsing doesn't
+    /// push the photo being edited out of memory.
+    public static func render(source url: URL, recipe: RenderRecipe, maximumDimension: Int? = nil, lutOverride:CubeLUT? = nil, stopBeforeTool:String? = nil, keepSource:Bool = true) throws -> CIImage {
+        // Whole-image measurements are shared by every render of this photo with these edits (see RenderAnalysis).
+        let key = lutOverride == nil && recipe.renderer != .legacy ? RenderAnalysis.key(source: url, mode: recipe.sourceMode, raw: recipe.raw, edits: recipe.edits) : nil
+        return try RenderAnalysis.withKey(key) { try renderUncached(source: url, recipe: recipe, maximumDimension: maximumDimension, lutOverride: lutOverride, stopBeforeTool: stopBeforeTool, keepSource: keepSource) }
+    }
+    private static func renderUncached(source url: URL, recipe: RenderRecipe, maximumDimension: Int?, lutOverride:CubeLUT?, stopBeforeTool:String?, keepSource:Bool) throws -> CIImage {
         let recipe = RenderRecipe(renderer:recipe.renderer, sourceMode:recipe.sourceMode, raw:recipe.raw, edits:recipe.edits)
         if recipe.renderer == .legacy {
             return CIImage(cgImage:try PhotoEditor.render(PhotoDecoder.decode(url), edits: recipe.edits, lutOverride:lutOverride, previewMaxDimension: maximumDimension))
@@ -96,9 +103,16 @@ public enum ModernRenderer {
             }
             return try process(base, edits:edits, maximumDimension:maximumDimension, lutOverride:lutOverride, stopBeforeTool:stopBeforeTool)
         }
-        let input = try source(url, mode:recipe.sourceMode, raw:recipe.raw,halfSize:maximumDimension.map{$0<=2048} ?? false,fast:maximumDimension != nil)
+        let input = try source(url, mode:recipe.sourceMode, raw:recipe.raw,halfSize:maximumDimension.map{$0<=2048} ?? false,fast:maximumDimension != nil,keep:keepSource)
         if recipe.sourceMode == .raw { edits.temperature = 6500; edits.tint = 0; edits.neutralBalance = NeutralBalance() }
         return try process(input, edits:edits, maximumDimension:maximumDimension, lutOverride:lutOverride, stopBeforeTool:stopBeforeTool)
+    }
+    /// A small preview for grids and strips. Unedited RAWs use the camera's embedded JPEG, as Lightroom's embedded
+    /// previews do, which skips the RAW decode entirely; everything else renders without keeping its decode.
+    public static func thumbnail(source url: URL, recipe: RenderRecipe, edge: Int) throws -> CGImage {
+        if recipe.renderer != .legacy, recipe.sourceMode == .raw, recipe.edits.isOriginal, RawDecoder.isRAW(url),
+           let preview = try? RawDecoder.cameraPreview(url) { return try screenImage(preview, maximum: edge) }
+        return try display(render(source: url, recipe: recipe, maximumDimension: edge, keepSource: false))
     }
     /// Renders for the screen at no more than `maximum` pixels on the longest edge.
     public static func screenImage(_ image: CIImage, maximum: Int = screenEdge) throws -> CGImage {

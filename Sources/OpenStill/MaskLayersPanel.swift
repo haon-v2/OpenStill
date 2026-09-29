@@ -16,7 +16,7 @@ final class MaskLayersPanel: NSStackView {
     private let list = NSStackView(), detail = NSStackView(), empty = NSTextField(wrappingLabelWithString: "")
     private let newMask = NSPopUpButton(frame: .zero, pullsDown: true), actions = NSPopUpButton(frame: .zero, pullsDown: true)
     private let name = NSTextField()
-    private var sliders: [(TrackingSlider, NSTextField, WritableKeyPath<LocalSettings, Double>)] = []
+    private var sliders: [(ContinuousSlider, NSTextField, WritableKeyPath<LocalSettings, Double>)] = []
     static let kinds: [(String, String)] = [("Brush", "brush"), ("Linear Gradient", "linear"), ("Radial Gradient", "radial"), ("Select Subject", "ai.subject"),
                                             ("Select Sky", "ai.sky"), ("Select Background", "ai.background"), ("Select People", "ai.people"), ("Object", "object"),
                                             ("Color Range", "colorRange"), ("Luminance Range", "luminanceRange"), ("Depth Range", "ai.depth")]
@@ -42,8 +42,8 @@ final class MaskLayersPanel: NSStackView {
             let label = NSTextField(labelWithString: title); label.font = .systemFont(ofSize: 11); label.widthAnchor.constraint(equalToConstant: 70).isActive = true
             let value = NSTextField(labelWithString: "0"); value.font = .monospacedDigitSystemFont(ofSize: 10, weight: .regular); value.textColor = .secondaryLabelColor
             value.alignment = .right; value.widthAnchor.constraint(equalToConstant: 36).isActive = true
-            let slider = TrackingSlider(range: range); slider.setAccessibilityLabel("Mask " + title)
-            slider.change = { [weak self] v, final in self?.slide(path, title: title, value: v, final: final); value.stringValue = Self.format(v, range: range) }
+            let slider = ContinuousSlider(range: range); slider.setAccessibilityLabel("Mask " + title)
+            slider.changed = { [weak self] v, final in self?.slide(path, title: title, value: v, final: final); value.stringValue = Self.format(v, range: range) }
             // Double-click a slider's label to reset it, as in Lightroom.
             let reset = NSClickGestureRecognizer(target: self, action: #selector(resetSlider(_:))); reset.numberOfClicksRequired = 2; label.addGestureRecognizer(reset); label.identifier = NSUserInterfaceItemIdentifier(title)
             let row = NSStackView(views: [label, slider, value]); row.spacing = 6

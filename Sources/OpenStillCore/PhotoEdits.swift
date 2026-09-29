@@ -233,7 +233,8 @@ public enum PhotoEditor {
         var before = image
         if stopBeforeTool == "Enhance" { return image }
         if e.autoEnhance {
-            for filter in image.autoAdjustmentFilters(options:[.enhance:true,.redEye:false,.crop:false,.level:false]) {
+            let analysed = image
+            for filter in RenderAnalysis.enhanceFilters({ analysed.autoAdjustmentFilters(options:[.enhance:true,.redEye:false,.crop:false,.level:false]) }) {
                 filter.setValue(image,forKey:kCIInputImageKey); if let output = filter.outputImage { image = output.cropped(to:originalExtent) }
             }
         }
@@ -252,7 +253,7 @@ public enum PhotoEditor {
         if e.usesToneRegions { image = try ToneRegions.apply(image, highlights: e.highlightsAmount, shadows: e.shadowsAmount) }
         else if e.highlights != 1 || e.shadows != 0 { image = image.applyingFilter("CIHighlightShadowAdjust",parameters:["inputHighlightAmount":e.highlights,"inputShadowAmount":e.shadows]) }
         if e.contrast != 1 {
-            if e.usesSmartContrast { image = try SmartContrast.apply(image, contrast: e.contrast) }
+            if e.usesSmartContrast { let upstream = image; image = try SmartContrast.apply(image, contrast: e.contrast, pivot: RenderAnalysis.pivot { SmartContrast.pivot(upstream) }) }
             else { image = image.applyingFilter("CIColorControls",parameters:[kCIInputContrastKey:e.contrast]) }
         }
         image = try masked(before,image,"Develop"); before = image

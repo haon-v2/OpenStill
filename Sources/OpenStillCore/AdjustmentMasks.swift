@@ -49,22 +49,25 @@ public struct AdjustmentMask: Codable, Equatable {
         case "object", "depthMap":
             guard let asset else { mask=black; break }
             // Depth maps are data, not pictures: read their values without color management.
-            let decoded = try PhotoDecoder.decode(EditStorage.asset(asset))
+            let decoded = try MaskRasters.asset(asset)
             mask = kind == "depthMap" ? CIImage(cgImage:decoded,options:[.colorSpace:NSNull()]) : CIImage(cgImage:decoded)
             mask = mask.transformed(by:CGAffineTransform(scaleX:size.width/mask.extent.width,y:size.height/mask.extent.height)).cropped(to:bounds)
         default: mask = black
         }
         for stroke in strokes {
             guard let first = stroke.points.first else { continue }
-            let w = max(1,Int(size.width)), h = max(1,Int(size.height))
-            guard let ctx = CGContext(data:nil,width:w,height:h,bitsPerComponent:8,bytesPerRow:0,space:CGColorSpaceCreateDeviceGray(),bitmapInfo:CGImageAlphaInfo.none.rawValue) else { throw EditError.render }
-            ctx.setFillColor(gray:0,alpha:1);ctx.fill(bounds)
             let r = max(1,stroke.radius*min(size.width,size.height))
-            ctx.setStrokeColor(gray:1,alpha:1);ctx.setFillColor(gray:1,alpha:1);ctx.setLineWidth(r*2);ctx.setLineCap(.round);ctx.setLineJoin(.round)
-            ctx.beginPath();ctx.move(to:CGPoint(x:first.x*size.width,y:first.y*size.height))
-            for p in stroke.points.dropFirst() { ctx.addLine(to:CGPoint(x:p.x*size.width,y:p.y*size.height)) };ctx.strokePath()
-            ctx.fillEllipse(in:CGRect(x:first.x*size.width-r,y:first.y*size.height-r,width:r*2,height:r*2))
-            guard let cg = ctx.makeImage() else { throw EditError.render }
+            let cg = try MaskRasters.stroke(stroke, size:size) {
+                let w = max(1,Int(size.width)), h = max(1,Int(size.height))
+                guard let ctx = CGContext(data:nil,width:w,height:h,bitsPerComponent:8,bytesPerRow:0,space:CGColorSpaceCreateDeviceGray(),bitmapInfo:CGImageAlphaInfo.none.rawValue) else { throw EditError.render }
+                ctx.setFillColor(gray:0,alpha:1);ctx.fill(bounds)
+                ctx.setStrokeColor(gray:1,alpha:1);ctx.setFillColor(gray:1,alpha:1);ctx.setLineWidth(r*2);ctx.setLineCap(.round);ctx.setLineJoin(.round)
+                ctx.beginPath();ctx.move(to:CGPoint(x:first.x*size.width,y:first.y*size.height))
+                for p in stroke.points.dropFirst() { ctx.addLine(to:CGPoint(x:p.x*size.width,y:p.y*size.height)) };ctx.strokePath()
+                ctx.fillEllipse(in:CGRect(x:first.x*size.width-r,y:first.y*size.height-r,width:r*2,height:r*2))
+                guard let cg = ctx.makeImage() else { throw EditError.render }
+                return cg
+            }
             var coverage = CIImage(cgImage:cg)
             if let softness = stroke.softness, softness > 0 { coverage = coverage.clampedToExtent().applyingFilter("CIGaussianBlur",parameters:[kCIInputRadiusKey:r*min(1,softness)*0.45]).cropped(to:bounds) }
             let strength = min(1,max(0,stroke.strength ?? 1))
@@ -172,5 +175,27 @@ public struct EditGeometry {
     public func sourcePoint(_ displayed: CGPoint) -> CGPoint {
         let p = CGPoint(x:displayed.x*extent.width,y:displayed.y*extent.height).applying(transform.inverted())
         return CGPoint(x:min(1,max(0,p.x/sourceSize.width)),y:min(1,max(0,p.y/sourceSize.height)))
+    }
+}
+
+/// Mask pixels that don't change between renders: brush strokes drawn at a given size, and AI mask images read from disk.
+/// Kept so moving a slider doesn't redraw every stroke or re-read every mask file on each frame.
+enum MaskRasters {
+    private static let cache: NSCache<NSString, CGImage> = { let c = NSCache<NSString, CGImage>(); c.totalCostLimit = 256 << 20; return c }()
+    static func stroke(_ stroke: MaskStroke, size: CGSize, draw: () throws -> CGImage) throws -> CGImage {
+        guard let data = try? JSONEncoder().encode(stroke) else { return try draw() }
+        var hasher = Hasher(); hasher.combine(data)
+        let key = "stroke|\(Int(size.width))x\(Int(size.height))|\(hasher.finalize())" as NSString
+        if let known = cache.object(forKey: key) { return known }
+        let image = try draw()
+        cache.setObject(image, forKey: key, cost: image.bytesPerRow * image.height)
+        return image
+    }
+    static func asset(_ name: String) throws -> CGImage {
+        let key = "asset|\(name)" as NSString
+        if let known = cache.object(forKey: key) { return known }
+        let image = try PhotoDecoder.decode(EditStorage.asset(name))
+        cache.setObject(image, forKey: key, cost: image.bytesPerRow * image.height)
+        return image
     }
 }
