@@ -181,21 +181,48 @@ public struct EditGeometry {
 /// Mask pixels that don't change between renders: brush strokes drawn at a given size, and AI mask images read from disk.
 /// Kept so moving a slider doesn't redraw every stroke or re-read every mask file on each frame.
 enum MaskRasters {
-    private static let cache: NSCache<NSString, CGImage> = { let c = NSCache<NSString, CGImage>(); c.totalCostLimit = 256 << 20; return c }()
+    /// Least recently used first out, within a byte budget. (NSCache may drop entries whenever it likes, which would
+    /// redraw strokes in the middle of a drag.)
+    private static let cache = ByteLimitedCache<CGImage>(limit: 256 << 20)
     static func stroke(_ stroke: MaskStroke, size: CGSize, draw: () throws -> CGImage) throws -> CGImage {
         guard let data = try? JSONEncoder().encode(stroke) else { return try draw() }
         var hasher = Hasher(); hasher.combine(data)
-        let key = "stroke|\(Int(size.width))x\(Int(size.height))|\(hasher.finalize())" as NSString
-        if let known = cache.object(forKey: key) { return known }
+        let key = "stroke|\(Int(size.width))x\(Int(size.height))|\(hasher.finalize())"
+        if let known = cache[key] { return known }
         let image = try draw()
-        cache.setObject(image, forKey: key, cost: image.bytesPerRow * image.height)
+        cache.insert(image, for: key, bytes: image.bytesPerRow * image.height)
         return image
     }
     static func asset(_ name: String) throws -> CGImage {
-        let key = "asset|\(name)" as NSString
-        if let known = cache.object(forKey: key) { return known }
+        let key = "asset|\(name)"
+        if let known = cache[key] { return known }
         let image = try PhotoDecoder.decode(EditStorage.asset(name))
-        cache.setObject(image, forKey: key, cost: image.bytesPerRow * image.height)
+        cache.insert(image, for: key, bytes: image.bytesPerRow * image.height)
         return image
+    }
+}
+
+/// A thread-safe cache that keeps the most recently used entries within a byte budget.
+final class ByteLimitedCache<Value> {
+    private let lock = NSLock()
+    private var entries: [String: (value: Value, bytes: Int)] = [:]
+    private var order: [String] = []   // least recently used first
+    private var total = 0
+    let limit: Int
+    init(limit: Int) { self.limit = limit }
+    subscript(key: String) -> Value? {
+        lock.lock(); defer { lock.unlock() }
+        guard let entry = entries[key] else { return nil }
+        if let i = order.firstIndex(of: key) { order.remove(at: i); order.append(key) }
+        return entry.value
+    }
+    func insert(_ value: Value, for key: String, bytes: Int) {
+        lock.lock(); defer { lock.unlock() }
+        if let old = entries[key], let i = order.firstIndex(of: key) { total -= old.bytes; order.remove(at: i) }
+        entries[key] = (value, bytes); order.append(key); total += bytes
+        while total > limit, order.count > 1 {
+            let oldest = order.removeFirst()
+            total -= entries.removeValue(forKey: oldest)?.bytes ?? 0
+        }
     }
 }
