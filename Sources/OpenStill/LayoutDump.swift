@@ -76,6 +76,12 @@ enum LayoutDump {
         case "status": viewer.info.status("Rendering preview…", busy: true)
         case "drag": drag(slider: arg, viewer: viewer, window: window)
         case "zoom": viewer.canvas.native = true
+        case "action":
+            // A menu command: the viewer's own, otherwise whatever the key window's responder chain handles.
+            let selector = Selector(arg)
+            if !NSApp.sendAction(selector, to: viewer.responds(to: selector) ? viewer : nil, from: nil) { print("ACTION not handled \(arg)") }
+        case "people": viewer.withLibrary { $0.showPeople() }
+        case "timeline": viewer.withLibrary { $0.showTimeline() }
         case "settings":
             NSApp.sendAction(Selector(("showSettings")), to: nil, from: nil)
             if let settings = NSApp.windows.lazy.compactMap({ $0.windowController as? SettingsWindowController }).first,

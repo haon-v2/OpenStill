@@ -156,7 +156,6 @@ public enum ModernRenderer {
     /// so no single compile holds up a render the person starts meanwhile.
     public static func warmUp() {
         DispatchQueue.global(qos: .utility).async {
-            let started = Date()   // TEMPORARY TIMING
             let image = CIImage(color: CIColor(red: 0.5, green: 0.4, blue: 0.3)).cropped(to: CGRect(x: 0, y: 0, width: 64, height: 64))
             let changes: [(inout PhotoEdits) -> Void] = [
                 { _ in }, { $0.exposure = 0.1 }, { $0.contrast = 1.1; $0.usesSmartContrast = true }, { $0.highlightsAmount = -0.1 }, { $0.shadowsAmount = 0.1 },
@@ -167,7 +166,6 @@ public enum ModernRenderer {
                 var edits = PhotoEdits(); change(&edits)
                 if let out = try? process(image, edits: edits) { _ = try? display(out) }
             }
-            if ProcessInfo.processInfo.environment["OPENSTILL_LAYOUT_DUMP"] != nil { print("TRACE warm-up \(Int(Date().timeIntervalSince(started)*1000)) ms"); fflush(stdout) }   // TEMPORARY TIMING
         }
     }
     public static func display(_ image: CIImage, profile: ExportProfile = .displayP3) throws -> CGImage {

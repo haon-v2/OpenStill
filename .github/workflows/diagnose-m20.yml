@@ -42,8 +42,32 @@ jobs:
           settings2|1|develop;settings:2
           settings3|1|develop;settings:3
           settings4|1|develop;settings:4
-          develop|1|develop
           library|1|library
+          loupe|1|library;view:loupe
+          compare|1|library;selectall;view:compare
+          survey|1|library;selectall;view:survey
+          people|1|library;people
+          timeline|1|library;timeline
+          metadata|1|library;selectall;action:editMetadata
+          rename|1|library;selectall;action:renamePhotos
+          export|1|library;selectall;action:exportPhoto
+          logo|1|library;selectall;action:exportPhoto;action:createLogo
+          import|1|develop;action:importPhotos
+          map|1|develop;action:showMapModule
+          book|1|develop;action:showBookModule
+          slideshow|1|develop;action:showSlideshowModule
+          print|1|develop;action:showPrintModule
+          web|1|develop;action:showWebModule
+          identity|1|develop;action:editIdentityPlate
+          reference|1|develop;action:showReferenceView
+          tether|1|develop;action:tetheredCapture
           presets|1|develop;panel:presets
+          history|1|develop;panel:history
+          info|1|develop;panel:info
+          navigator|1|develop;panel:navigator
+          crop|1|develop;tool:crop
+          masking|1|develop;tool:masking
+          narrow|1|size:900;develop
+          empty|0|
           LIST
           true
