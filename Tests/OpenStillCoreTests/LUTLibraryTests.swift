@@ -67,13 +67,17 @@ import Testing
         let values = rgb(neutral)
         for b in 0..<n { for g in 0..<n { for r in 0..<n {
             let i = ((b*n+g)*n+r)*4
-            #expect(abs(values[i]-Float(r)/Float(n-1)) <= 1/255 && abs(values[i+1]-Float(g)/Float(n-1)) <= 1/255 && abs(values[i+2]-Float(b)/Float(n-1)) <= 1/255)
+            let top = Float(n-1), expected: [Float] = [Float(r)/top, Float(g)/top, Float(b)/top]
+            let error: Float = (0..<3).map { abs(values[i+$0]-expected[$0]) }.max()!
+            #expect(error <= 1/255)
         } } }
         let mono = library.items.filter { $0.entry.id.hasPrefix("openstill-b-w-") }
         #expect(mono.count >= 8)
         for item in mono {
             let v = rgb(try item.load())
-            #expect(stride(from:0,to:v.count,by:4).allSatisfy { v[$0] == v[$0+1] && v[$0+1] == v[$0+2] })
+            var gray = true
+            for i in stride(from:0,to:v.count,by:4) where v[i] != v[i+1] || v[i+1] != v[i+2] { gray = false; break }
+            #expect(gray, "\(item.entry.id)")
         }
     }
     @Test func tamperedPackIsRefused() throws {
