@@ -53,7 +53,7 @@ final class ToolOptionsBar: StudioBar {
         actions.spacing = 8
         title.translatesAutoresizingMaskIntoConstraints = false
         title.setContentCompressionResistancePriority(.required, for: .horizontal)
-        controls.setClippingResistancePriority(.defaultLow, for: .horizontal)
+        actions.setContentCompressionResistancePriority(.required, for: .horizontal)
         for v in [title, controls, actions] as [NSView] { addSubview(v) }
         NSLayoutConstraint.activate([
             title.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Studio.inset), title.centerYAnchor.constraint(equalTo: centerYAnchor),
@@ -67,7 +67,11 @@ final class ToolOptionsBar: StudioBar {
     func show(title text: String, controls items: [NSView], actions buttons: [NSView] = []) {
         title.stringValue = text
         for s in [controls, actions] { s.arrangedSubviews.forEach { $0.removeFromSuperview() } }
-        items.forEach { controls.addArrangedSubview($0) }
+        // When the window is too narrow, the last settings step aside first; the actions (Cancel, Done) always stay.
+        for (i, item) in items.enumerated() {
+            controls.addArrangedSubview(item)
+            controls.setVisibilityPriority(NSStackView.VisibilityPriority(rawValue: Float(900 - i * 10)), for: item)
+        }
         buttons.forEach { actions.addArrangedSubview($0) }
     }
 }

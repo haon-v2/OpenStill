@@ -129,7 +129,7 @@ final class ShootWindow:NSWindowController,NSCollectionViewDataSource,NSCollecti
     private var metadataPopups:[MetadataColumn:NSPopUpButton]=[:]
     private let viewModes=NSSegmentedControl(labels:LibraryViewMode.allCases.map(\.title),trackingMode:.selectOne,target:nil,action:nil)
     private let painterButton=NSButton(checkboxWithTitle:"Painter",target:nil,action:nil),painterKind=NSPopUpButton(),painterValue=NSTextField()
-    private let flowLayout=NSCollectionViewFlowLayout()
+    private let flowLayout=FillingFlowLayout()
     /// Survey shows these photos; they start as the selection when Survey opens.
     private var surveyIDs:[UUID]=[]
     private var activeID:UUID?
@@ -238,8 +238,9 @@ final class ShootWindow:NSWindowController,NSCollectionViewDataSource,NSCollecti
             viewModes.controlSize = .small; viewModes.font = .systemFont(ofSize:11)
             moreMenu?.controlSize = .small; moreMenu?.font = .systemFont(ofSize:11); moreMenu?.isBordered=false
             painterKind.isHidden=true; painterValue.isHidden=true
-            optionsControls=[viewModes,minimum,flag,labelFilter,sort,search]+(moreMenu.map{[$0]} ?? [])
-            optionsActions=[painterButton,painterKind,painterValue]+(sizeSlider.map{[$0]} ?? [])
+            // The views (Grid, Loupe…) and the Painter switch live in the tool rail; the bar keeps the filters.
+            optionsControls=[minimum,flag,labelFilter,sort,search]+(moreMenu.map{[$0]} ?? [])
+            optionsActions=[painterKind,painterValue]+(sizeSlider.map{[$0]} ?? [])
             for child in [metadataRow,scroll,stage]{child.translatesAutoresizingMaskIntoConstraints=false;content.addSubview(child)}
             metadataHeight=metadataRow.heightAnchor.constraint(equalToConstant:0)
             NSLayoutConstraint.activate([metadataRow.topAnchor.constraint(equalTo:content.topAnchor,constant:10),metadataRow.leadingAnchor.constraint(equalTo:content.leadingAnchor,constant:16),metadataRow.trailingAnchor.constraint(lessThanOrEqualTo:content.trailingAnchor,constant:-16),metadataHeight,
@@ -618,7 +619,7 @@ extension ShootWindow {
         return bar
     }
     @objc fileprivate func thumbnailSize(_ sender:NSSlider){
-        ShootCell.cellWidth=CGFloat(sender.doubleValue.rounded());flowLayout.itemSize=NSSize(width:ShootCell.cellWidth,height:ShootCell.cellWidth-5)
+        ShootCell.cellWidth=CGFloat(sender.doubleValue.rounded())
         for item in grid.visibleItems(){(item as? ShootCell)?.sizePreview()}
         flowLayout.invalidateLayout()
     }
@@ -884,4 +885,19 @@ extension ShootWindow {
 final class ReportingLabel: NSTextField {
     var changed: ((String) -> Void)?
     override var stringValue: String { didSet { changed?(stringValue) } }
+}
+
+/// Grid layout that fits as many columns of about `ShootCell.cellWidth` as the width allows, then widens them to fill the row,
+/// so the grid never leaves a wide gap between columns.
+private final class FillingFlowLayout: NSCollectionViewFlowLayout {
+    override func prepare() {
+        if let width = collectionView?.enclosingScrollView?.contentView.bounds.width, width > 0 {
+            let available = width - sectionInset.left - sectionInset.right
+            let columns = max(1, floor((available + minimumInteritemSpacing) / (ShootCell.cellWidth + minimumInteritemSpacing)))
+            let side = floor((available - minimumInteritemSpacing * (columns - 1)) / columns)
+            if abs(itemSize.width - side) > 0.5 { itemSize = NSSize(width: side, height: side - 5) }
+        }
+        super.prepare()
+    }
+    override func shouldInvalidateLayout(forBoundsChange newBounds: NSRect) -> Bool { newBounds.width != collectionView?.bounds.width || super.shouldInvalidateLayout(forBoundsChange: newBounds) }
 }
