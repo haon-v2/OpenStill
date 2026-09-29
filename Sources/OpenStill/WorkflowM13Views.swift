@@ -182,7 +182,7 @@ final class SecondaryDisplayWindow: NSWindowController, NSWindowDelegate {
         let window = NSWindow(contentRect: frame, styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
         window.title = "Secondary Display · OpenStill"; window.isReleasedWhenClosed = false
         super.init(window: window); window.delegate = self
-        let root = NSView(); root.wantsLayer = true; root.layer?.backgroundColor = LRColors.canvas.cgColor; window.contentView = root
+        let root = NSView(); root.wantsLayer = true; root.layer?.backgroundColor = Studio.canvas.cgColor; window.contentView = root
         mode.selectedSegment = 0; mode.target = self; mode.action = #selector(modeChanged); mode.controlSize = .small; mode.setAccessibilityLabel("Secondary display view")
         for v in [stage, mode] as [NSView] { v.translatesAutoresizingMaskIntoConstraints = false; root.addSubview(v) }
         NSLayoutConstraint.activate([

@@ -50,7 +50,7 @@ final class ShareController: NSViewController, NSSharingServiceDelegate, NSShari
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     override func loadView() {
-        let chrome = GlassChrome(frame: NSRect(x: 0, y: 0, width: 440, height: 690)); chrome.cornerRadius = 0; view = chrome
+        let chrome = ChromePanel(frame: NSRect(x: 0, y: 0, width: 440, height: 690)); view = chrome
         let content = chrome.contentView
         let stack = NSStackView()
         stack.orientation = .vertical

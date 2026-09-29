@@ -1,18 +1,6 @@
 import AppKit
 import OpenStillCore
 
-/// The panels' colors, from the Studio palette (see Studio in StudioStyle.swift).
-enum LRColors {
-    static let backdrop = Studio.canvas
-    static let panel = Studio.chrome
-    static let strip = Studio.chrome
-    static let canvas = Studio.canvas
-    static let text = NSColor(calibratedWhite: 0.86, alpha: 1)
-    static let dim = Studio.secondary
-    static let bright = Studio.text
-    static let line = Studio.hairline
-}
-
 /// Panel state shared by the Lightroom layout's views, saved as it changes.
 @MainActor final class LightroomState {
     static let shared = LightroomState()
@@ -138,7 +126,7 @@ private final class LRSectionHeader: NSView {
     override func mouseExited(with event: NSEvent) { hovering = false }
     /// A chevron and the title in 13-point semibold, with a hairline above: the Studio section header.
     override func draw(_ dirtyRect: NSRect) {
-        LRColors.line.setFill(); NSRect(x: 0, y: 0, width: bounds.width, height: 1).fill()
+        Studio.hairline.setFill(); NSRect(x: 0, y: 0, width: bounds.width, height: 1).fill()
         let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 13, weight: .semibold), .foregroundColor: hovering || open ? Studio.text : NSColor(calibratedWhite: 0.78, alpha: 1)]
         let size = (title as NSString).size(withAttributes: attrs), y = bounds.midY
         (title as NSString).draw(at: NSPoint(x: 34, y: y - size.height / 2), withAttributes: attrs)
@@ -164,12 +152,12 @@ final class LRPanelColumn: LRFill {
     let note = NSTextField(wrappingLabelWithString: "")
     private var sections: [LRSection] = []
     init() {
-        super.init(LRColors.panel)
+        super.init(Studio.chrome)
         appearance = NSAppearance(named: .darkAqua)
         for stack in [fixed, scrolling] { stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 0 }
         scroll.drawsBackground = false; scroll.hasVerticalScroller = true; scroll.autohidesScrollers = true; scroll.documentView = scrolling
         footer.spacing = 8; footer.distribution = .fillEqually; footer.edgeInsets = NSEdgeInsets(top: 10, left: 18, bottom: 12, right: 18)
-        note.font = .systemFont(ofSize: 10); note.textColor = LRColors.dim; note.maximumNumberOfLines = 3; note.lineBreakMode = .byTruncatingTail
+        note.font = .systemFont(ofSize: 10); note.textColor = Studio.secondary; note.maximumNumberOfLines = 3; note.lineBreakMode = .byTruncatingTail
         for v in [fixed, scroll, note, footer] as [NSView] { v.translatesAutoresizingMaskIntoConstraints = false; addSubview(v) }
         scrolling.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
@@ -309,7 +297,7 @@ final class LRZoomLinks: NSStackView {
     }
     required init?(coder: NSCoder) { fatalError() }
     private func restyle() {
-        for b in links { b.attributedTitle = NSAttributedString(string: b.title, attributes: [.font: NSFont.systemFont(ofSize: 10, weight: .medium), .foregroundColor: b.tag == selected ? LRColors.bright : LRColors.dim]) }
+        for b in links { b.attributedTitle = NSAttributedString(string: b.title, attributes: [.font: NSFont.systemFont(ofSize: 10, weight: .medium), .foregroundColor: b.tag == selected ? Studio.text : Studio.secondary]) }
     }
     @objc private func picked(_ sender: NSButton) { choose?(sender.tag) }
 }
