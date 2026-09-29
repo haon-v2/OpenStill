@@ -15,6 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.appearance = NSAppearance(named: .darkAqua)   // OpenStill is always dark, like its Studio window
         ModernRenderer.warmUp()
         createWindow()
+        LayoutDump.runIfRequested(window: window)
         Shortcuts.registerKeys()
         viewer.startAutoImport()
         buildMenu()

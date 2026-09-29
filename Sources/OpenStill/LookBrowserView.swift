@@ -432,6 +432,30 @@ final class LookBrowserView: NSStackView, NSCollectionViewDataSource, NSCollecti
     }
 }
 
+// TEMPORARY: driven by LayoutDump on CI.
+extension LookBrowserView {
+    func harness(_ command: String) {
+        let parts = command.split(separator: ":", maxSplits: 1).map(String.init), arg = parts.count > 1 ? parts[1] : ""
+        switch parts[0] {
+        case "mode": modePicker.selectedSegment = Int(arg) ?? 0; modeChanged()
+        case "search": search.stringValue = arg; filterChanged()
+        case "category":
+            if let i = picker.itemArray.firstIndex(where: { ($0.representedObject as? String) == arg }) { picker.selectItem(at: i); filterChanged() } else { print("LOOKS no category \(arg)") }
+        case "pick": if let look = shown.first(where: { $0.title == arg }) { choose(look) } else { print("LOOKS no look \(arg)") }
+        case "variant": if let i = variantPicker.itemArray.firstIndex(where: { $0.title == arg }) { variantPicker.selectItem(at: i); variantChanged() }
+        case "amount": amount.doubleValue = Double(arg) ?? 100; amountValue.stringValue = arg + "%"; if let p = appliedPreset { choosePreset?(p, amount.doubleValue / 100) }
+        case "favorite": if let look = shown.first(where: { $0.title == arg }) { favorites = favorites + [look.id]; refreshVisibleCards() }
+        case "save": try? PresetLibrary.save(PhotoEdits(), name: arg, in: Self.userPresets, replacing: true); reload()
+        case "scroll": collection.scroll(NSPoint(x: 0, y: Double(arg) ?? 0))
+        default: print("LOOKS unknown \(command)")
+        }
+    }
+    func harnessSummary() -> String {
+        let visible = collection.visibleItems().compactMap { ($0 as? LookItem)?.card }
+        return "mode=\(mode) shown=\(shown.count) visible=\(visible.count) withThumbnail=\(visible.filter { $0.preview != nil }.count) failed=\(visible.filter(\.failed).count) category=\(picker.titleOfSelectedItem ?? "") detail=\(detail.stringValue.replacingOccurrences(of: "\n", with: " | "))"
+    }
+}
+
 extension PresetLibrary {
     static let empty = try! PresetLibrary(bundled: nil, user: URL(fileURLWithPath: "/nonexistent-openstill-presets"))
 }
