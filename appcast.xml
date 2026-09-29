@@ -158,5 +158,16 @@
             <sparkle:fullReleaseNotesLink>https://github.com/haon-v2/OpenStill/releases/tag/v0.0.14</sparkle:fullReleaseNotesLink>
             <enclosure url="https://github.com/haon-v2/OpenStill/releases/download/v0.0.14/OpenStill-0.0.14.zip" sparkle:edSignature="elNykUizfqsvJDnaFyVIkFOZvBRKRj6TV5RJML1ebomNaNxBQKG49nQ1i83I5/gsPSHqeeL6J6JhQ3khzNgnCQ==" length="32686936" type="application/octet-stream"/>
         </item>
+        <item>
+            <title>OpenStill 0.0.15</title>
+            <description><![CDATA[<h3>What’s new in 0.0.15</h3><ul><li>Redesigned window: a tool rail, a tool options bar, photo tabs, a status line and floating panels</li><li>Library folders, collections and info are tabs in the right panel</li><li>drag a slider&#x27;s name to scrub it, double-click to reset</li><li>faster editing (unused hidden controls removed)</li></ul>]]></description>
+            <pubDate>Tue, 29 Sep 2026 11:36:04 GMT</pubDate>
+            <sparkle:version>31</sparkle:version>
+            <sparkle:shortVersionString>0.0.15</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <sparkle:fullReleaseNotesLink>https://github.com/haon-v2/OpenStill/releases/tag/v0.0.15</sparkle:fullReleaseNotesLink>
+            <enclosure url="https://github.com/haon-v2/OpenStill/releases/download/v0.0.15/OpenStill-0.0.15.zip" sparkle:edSignature="cc3YpHN+0eSSYOR+Ujvbl9j7bMiXMB1Mhedy/ZMQMc7JfmpKEk+SiThMecH82dCcsdqLWVx0w1xiuFyJ5x9RCw==" length="32712309" type="application/octet-stream"/>
+        </item>
     </channel>
 </rss>
