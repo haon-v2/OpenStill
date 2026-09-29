@@ -202,9 +202,9 @@ class SettingsPage: NSViewController {
         label.setContentCompressionResistancePriority(.required, for: .horizontal)
         var left: NSView = label
         if let detail {
-            let small = settingsNote(detail); small.preferredMaxLayoutWidth = 220
+            let small = settingsNote(detail); small.preferredMaxLayoutWidth = 290
             let column = NSStackView(views: [label, small]); column.orientation = .vertical; column.alignment = .leading; column.spacing = 2
-            small.widthAnchor.constraint(lessThanOrEqualToConstant: 220).isActive = true
+            small.widthAnchor.constraint(lessThanOrEqualToConstant: 290).isActive = true
             left = column
         }
         let right = NSStackView(views: controls); right.spacing = 8
@@ -252,6 +252,7 @@ private final class GeneralSettings: SettingsPage {
             row("Check now", [lastChecked, checkNow]),
             row("All releases", [button("View on GitHub", #selector(openReleases))]),
         ], note: "Only OpenStill's public release list on GitHub is requested. Nothing about you or your photos is sent.")
+        if let privacy = stack.arrangedSubviews.last { stack.setCustomSpacing(8, after: privacy) }
         stack.addArrangedSubview(method); method.widthAnchor.constraint(equalToConstant: Self.width).isActive = true
     }
     override func refresh() {
@@ -282,7 +283,7 @@ private final class EditingSettings: SettingsPage {
     required init?(coder: NSCoder) { fatalError() }
 
     override func build() {
-        cacheSize.addItems(withTitles: Self.cacheSizes.map { ByteCountFormatter.string(fromByteCount: $0, countStyle: .file) })
+        cacheSize.addItems(withTitles: Self.cacheSizes.map { "\($0 >> 30) GB" })
         cacheSize.target = self; cacheSize.action = #selector(sizeChanged); cacheSize.setAccessibilityLabel("Render cache size")
         cacheUsed.font = .monospacedDigitSystemFont(ofSize: 12, weight: .regular); cacheUsed.textColor = Studio.secondary
         group("Render cache", [
@@ -303,7 +304,7 @@ private final class EditingSettings: SettingsPage {
         cacheUsed.stringValue = "Measuring…"
         DispatchQueue.global(qos: .utility).async { [weak self] in
             let used = RenderCache.diskUsage()
-            DispatchQueue.main.async { self?.cacheUsed.stringValue = ByteCountFormatter.string(fromByteCount: used, countStyle: .file) }
+            DispatchQueue.main.async { self?.cacheUsed.stringValue = used == 0 ? "Empty" : ByteCountFormatter.string(fromByteCount: used, countStyle: .binary) }
         }
     }
     @objc private func sizeChanged() { RenderCache.limitBytes = Self.cacheSizes[max(0, cacheSize.indexOfSelectedItem)]; refresh() }
@@ -345,7 +346,7 @@ private final class LibrarySettings: SettingsPage {
             row("Back up", [frequency]),
             row("Keep", [keepLabel, keep]),
             row("Last backup", [lastBackup, backUpNow]),
-        ], note: "Backups are zipped copies of the catalog in \(CatalogBackup.defaultFolder().path).")
+        ], note: "Backups are zipped copies of the catalog in \((CatalogBackup.defaultFolder().path as NSString).abbreviatingWithTildeInPath).")
     }
     override func refresh() {
         guard isViewLoaded else { return }
