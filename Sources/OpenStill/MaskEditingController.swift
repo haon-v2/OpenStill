@@ -77,7 +77,7 @@ extension ViewerController {
         case "clear":
             edits.setMask(nil,for:key); maskVisible = false; maskToken = UUID(); canvas.clearTool()
             changeEdits(edits,title:key+" · Clear mask",commit:true)
-        case "done": finishMaskEditing(); closeLightroomTool(); info.status("Mask saved. Adjust the sliders to edit the selected area.")
+        case "done": finishMaskEditing(); closeTool(); info.status("Mask saved. Adjust the sliders to edit the selected area.")
         case "show":
             guard edits.advanced?.masks[key] != nil else { info.status("Create a mask for \(key) first."); return }
             maskVisible = !wasVisible; refreshMaskOverlay()

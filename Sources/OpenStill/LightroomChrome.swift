@@ -1,17 +1,16 @@
 import AppKit
 import OpenStillCore
 
-/// Lightroom Classic's look: flat dark grays, square panels, no glass.
+/// The panels' colors, from the Studio palette (see Studio in StudioStyle.swift).
 enum LRColors {
-    static let backdrop = NSColor(calibratedWhite: 0.09, alpha: 1)
-    static let panel = NSColor(calibratedWhite: 0.19, alpha: 1)
-    static let header = NSColor(calibratedWhite: 0.215, alpha: 1)
-    static let strip = NSColor(calibratedWhite: 0.14, alpha: 1)
-    static let canvas = NSColor(calibratedWhite: 0.24, alpha: 1)
-    static let text = NSColor(calibratedWhite: 0.80, alpha: 1)
-    static let dim = NSColor(calibratedWhite: 0.52, alpha: 1)
-    static let bright = NSColor(calibratedWhite: 0.94, alpha: 1)
-    static let line = NSColor(calibratedWhite: 0.105, alpha: 1)
+    static let backdrop = Studio.canvas
+    static let panel = Studio.chrome
+    static let strip = Studio.chrome
+    static let canvas = Studio.canvas
+    static let text = NSColor(calibratedWhite: 0.86, alpha: 1)
+    static let dim = Studio.secondary
+    static let bright = Studio.text
+    static let line = Studio.hairline
 }
 
 /// Panel state shared by the Lightroom layout's views, saved as it changes.
@@ -38,8 +37,8 @@ class LRFill: NSView {
 
 // MARK: - Collapsible sections
 
-/// One of Lightroom's panel sections: a header you click to open or close, and its contents.
-/// Left-panel headers read "▼ Navigator"; right-panel headers are right-aligned, "Basic ▼", as in Lightroom.
+/// A collapsible panel section: a header you click to open or close, and its contents.
+/// Option-click a header for solo mode (opening one closes the others); Control-click for Expand / Collapse All.
 final class LRSection: NSView {
     let title: String
     let key: String
@@ -57,13 +56,13 @@ final class LRSection: NSView {
         header = LRSectionHeader(title: title, side: side, accessory: accessory)
         super.init(frame: .zero)
         body.orientation = .vertical; body.alignment = .leading; body.spacing = 8
-        body.edgeInsets = NSEdgeInsets(top: 8, left: 14, bottom: 14, right: 14)
+        body.edgeInsets = NSEdgeInsets(top: 2, left: 18, bottom: 16, right: 18)
         // A stack, so a closed section's hidden contents take no space.
         let column = LRStack(views: [header, body]); column.orientation = .vertical; column.spacing = 0; column.alignment = .leading
         column.translatesAutoresizingMaskIntoConstraints = false; addSubview(column)
         NSLayoutConstraint.activate([
             column.topAnchor.constraint(equalTo: topAnchor), column.leadingAnchor.constraint(equalTo: leadingAnchor), column.trailingAnchor.constraint(equalTo: trailingAnchor), column.bottomAnchor.constraint(equalTo: bottomAnchor),
-            header.widthAnchor.constraint(equalTo: column.widthAnchor), body.widthAnchor.constraint(equalTo: column.widthAnchor), header.heightAnchor.constraint(equalToConstant: 28),
+            header.widthAnchor.constraint(equalTo: column.widthAnchor), body.widthAnchor.constraint(equalTo: column.widthAnchor), header.heightAnchor.constraint(equalToConstant: 36),
         ])
         header.clicked = { [weak self] option in self?.headerClicked(option: option) }
         header.menuProvider = { [weak self] in self?.headerMenu() }
@@ -124,35 +123,31 @@ private final class LRSectionHeader: NSView {
         if let accessory {
             accessory.translatesAutoresizingMaskIntoConstraints = false; addSubview(accessory)
             NSLayoutConstraint.activate([accessory.centerYAnchor.constraint(equalTo: centerYAnchor),
-                                         side == .left ? accessory.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10) : accessory.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10)])
+                                         accessory.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -14)])
         }
     }
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
-    override func draw(_ dirtyRect: NSRect) {
-        LRColors.header.setFill(); bounds.fill()
-        LRColors.line.setFill(); NSRect(x: 0, y: bounds.height - 1, width: bounds.width, height: 1).fill()
-        let font = NSFont.systemFont(ofSize: 12, weight: .medium)
-        let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: LRColors.text]
-        let size = (title as NSString).size(withAttributes: attrs)
-        let triangle = NSBezierPath(), y = bounds.midY
-        if side == .left {
-            (title as NSString).draw(at: NSPoint(x: 26, y: y - size.height / 2), withAttributes: attrs)
-            drawTriangle(triangle, at: NSPoint(x: 13, y: y))
-        } else {
-            (title as NSString).draw(at: NSPoint(x: bounds.width - 26 - size.width, y: y - size.height / 2), withAttributes: attrs)
-            drawTriangle(triangle, at: NSPoint(x: bounds.width - 13, y: y))
-        }
+    private var hovering = false { didSet { needsDisplay = true } }
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        trackingAreas.forEach(removeTrackingArea)
+        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect], owner: self))
     }
-    /// ▼ when open; ◀ (right panel) or ▶ (left panel) when closed. Solo mode draws it dotted, as Lightroom does.
-    private func drawTriangle(_ path: NSBezierPath, at c: NSPoint) {
-        let s: CGFloat = 4
-        if open { path.move(to: NSPoint(x: c.x - s, y: c.y - s / 2)); path.line(to: NSPoint(x: c.x + s, y: c.y - s / 2)); path.line(to: NSPoint(x: c.x, y: c.y + s)) }
-        else if side == .left { path.move(to: NSPoint(x: c.x - s / 2, y: c.y - s)); path.line(to: NSPoint(x: c.x - s / 2, y: c.y + s)); path.line(to: NSPoint(x: c.x + s, y: c.y)) }
-        else { path.move(to: NSPoint(x: c.x + s / 2, y: c.y - s)); path.line(to: NSPoint(x: c.x + s / 2, y: c.y + s)); path.line(to: NSPoint(x: c.x - s, y: c.y)) }
-        path.close()
-        if solo { LRColors.text.setStroke(); path.setLineDash([1.5, 1.5], count: 2, phase: 0); path.lineWidth = 1; path.stroke() }
-        else { LRColors.dim.setFill(); path.fill() }
+    override func mouseEntered(with event: NSEvent) { hovering = true }
+    override func mouseExited(with event: NSEvent) { hovering = false }
+    /// A chevron and the title in 13-point semibold, with a hairline above: the Studio section header.
+    override func draw(_ dirtyRect: NSRect) {
+        LRColors.line.setFill(); NSRect(x: 0, y: 0, width: bounds.width, height: 1).fill()
+        let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 13, weight: .semibold), .foregroundColor: hovering || open ? Studio.text : NSColor(calibratedWhite: 0.78, alpha: 1)]
+        let size = (title as NSString).size(withAttributes: attrs), y = bounds.midY
+        (title as NSString).draw(at: NSPoint(x: 34, y: y - size.height / 2), withAttributes: attrs)
+        let name = open ? "chevron.down" : "chevron.right"
+        if let chevron = NSImage(systemSymbolName: name, accessibilityDescription: nil)?.withSymbolConfiguration(.init(pointSize: 9, weight: .semibold).applying(.init(paletteColors: [solo ? Studio.accent : Studio.secondary]))) {
+            let s = chevron.size
+            chevron.draw(in: NSRect(x: 18 + (10 - s.width) / 2, y: y - s.height / 2, width: s.width, height: s.height), from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+        }
+        _ = side
     }
     override func mouseDown(with event: NSEvent) { clicked?(event.modifierFlags.contains(.option)) }
     override func menu(for event: NSEvent) -> NSMenu? { menuProvider?() }
@@ -173,7 +168,7 @@ final class LRPanelColumn: LRFill {
         appearance = NSAppearance(named: .darkAqua)
         for stack in [fixed, scrolling] { stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 0 }
         scroll.drawsBackground = false; scroll.hasVerticalScroller = true; scroll.autohidesScrollers = true; scroll.documentView = scrolling
-        footer.spacing = 6; footer.distribution = .fillEqually; footer.edgeInsets = NSEdgeInsets(top: 8, left: 10, bottom: 8, right: 10)
+        footer.spacing = 8; footer.distribution = .fillEqually; footer.edgeInsets = NSEdgeInsets(top: 10, left: 18, bottom: 12, right: 18)
         note.font = .systemFont(ofSize: 10); note.textColor = LRColors.dim; note.maximumNumberOfLines = 3; note.lineBreakMode = .byTruncatingTail
         for v in [fixed, scroll, note, footer] as [NSView] { v.translatesAutoresizingMaskIntoConstraints = false; addSubview(v) }
         scrolling.translatesAutoresizingMaskIntoConstraints = false
@@ -212,101 +207,55 @@ final class LRPanelColumn: LRFill {
     }
 }
 
-/// A flat gray Lightroom button.
+/// A capsule button for panels (Previous, Reset, Sync…), drawn like the Studio bar buttons.
 final class LRButton: NSButton {
     private let run: () -> Void
     init(_ title: String, _ run: @escaping () -> Void) {
         self.run = run
         super.init(frame: .zero)
-        self.title = title; bezelStyle = .rounded; controlSize = .small; font = .systemFont(ofSize: 11)
+        self.title = title; isBordered = false; font = Studio.controlFont
         target = self; action = #selector(clicked)
+        heightAnchor.constraint(equalToConstant: 26).isActive = true
     }
     required init?(coder: NSCoder) { fatalError() }
+    override var intrinsicContentSize: NSSize { NSSize(width: ceil((title as NSString).size(withAttributes: [.font: font ?? Studio.controlFont]).width) + 24, height: 26) }
     @objc private func clicked() { run() }
-}
-
-// MARK: - Module picker
-
-/// The top bar: the identity plate on the left and the modules on the right, "Library | Develop | Map | …".
-final class LRModulePicker: LRFill {
-    var choose: ((LightroomModule) -> Void)?
-    var current: LightroomModule = .develop { didSet { restyle() } }
-    private var buttons: [LightroomModule: NSButton] = [:]
-    /// The identity plate: "OpenStill", your own text, or a logo image (Develop › Identity Plate…).
-    static let plateTextKey = "OpenStillIdentityPlateText", plateImageKey = "OpenStillIdentityPlateImage"
-    private let identity = NSTextField(labelWithString: "OpenStill"), logo = NSImageView()
-    func refreshIdentityPlate() {
-        let text = UserDefaults.standard.string(forKey: Self.plateTextKey) ?? ""
-        identity.stringValue = text.isEmpty ? "OpenStill" : text
-        let image = UserDefaults.standard.string(forKey: Self.plateImageKey).flatMap { NSImage(contentsOfFile: $0) }
-        logo.image = image; logo.isHidden = image == nil; identity.isHidden = image != nil
-    }
-    init() {
-        super.init(LRColors.backdrop)
-        identity.font = .systemFont(ofSize: 19, weight: .light); identity.textColor = LRColors.dim
-        logo.imageScaling = .scaleProportionallyDown; logo.translatesAutoresizingMaskIntoConstraints = false; addSubview(logo)
-        NSLayoutConstraint.activate([logo.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 22), logo.centerYAnchor.constraint(equalTo: centerYAnchor),
-                                     logo.heightAnchor.constraint(equalToConstant: 30), logo.widthAnchor.constraint(lessThanOrEqualToConstant: 260)])
-        let modules = NSStackView(); modules.spacing = 0
-        for (index, module) in LightroomModule.allCases.enumerated() {
-            if index > 0 {
-                let bar = NSTextField(labelWithString: "|"); bar.font = .systemFont(ofSize: 15, weight: .ultraLight); bar.textColor = LRColors.dim.withAlphaComponent(0.6)
-                modules.addArrangedSubview(bar)
-            }
-            let button = NSButton(title: module.title, target: self, action: #selector(picked(_:)))
-            button.isBordered = false; button.tag = index; button.setAccessibilityLabel("\(module.title) module")
-            buttons[module] = button; modules.addArrangedSubview(button)
-            modules.setCustomSpacing(12, after: button)
-            if index > 0 { modules.setCustomSpacing(12, after: modules.arrangedSubviews[modules.arrangedSubviews.count - 2]) }
-        }
-        for v in [identity, modules] { v.translatesAutoresizingMaskIntoConstraints = false; addSubview(v) }
-        NSLayoutConstraint.activate([
-            identity.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 22), identity.centerYAnchor.constraint(equalTo: centerYAnchor),
-            modules.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -22), modules.centerYAnchor.constraint(equalTo: centerYAnchor),
-        ])
-        restyle(); refreshIdentityPlate()
-    }
-    required init?(coder: NSCoder) { fatalError() }
-    private func restyle() {
-        for (module, button) in buttons {
-            let active = module == current
-            button.attributedTitle = NSAttributedString(string: module.title, attributes: [
-                .font: NSFont.systemFont(ofSize: 16, weight: active ? .regular : .light),
-                .foregroundColor: active ? LRColors.bright : LRColors.dim])
-            button.setAccessibilityValue(active ? "Selected" : nil)
-        }
-    }
-    @objc private func picked(_ sender: NSButton) { choose?(LightroomModule.allCases[sender.tag]) }
-}
-
-// MARK: - Edge toggles
-
-/// The small triangle at each window edge that shows or hides that panel.
-final class LREdgeToggle: NSView {
-    let edge: PanelEdge
-    var shown = true { didSet { needsDisplay = true; setAccessibilityLabel((shown ? "Hide " : "Show ") + name) } }
-    var toggled: (() -> Void)?
-    private var name: String { ["top": "module picker", "left": "left panel", "right": "right panel", "bottom": "filmstrip"][edge.rawValue] ?? "" }
-    init(_ edge: PanelEdge) {
-        self.edge = edge; super.init(frame: .zero)
-        setAccessibilityElement(true); setAccessibilityRole(.button); setAccessibilityLabel("Hide " + name)
-    }
-    required init?(coder: NSCoder) { fatalError() }
     override func draw(_ dirtyRect: NSRect) {
-        LRColors.backdrop.setFill(); bounds.fill()
-        let c = NSPoint(x: bounds.midX, y: bounds.midY), s: CGFloat = 3.5, p = NSBezierPath()
-        // Points toward the edge while the panel shows (click to hide), away from it while hidden.
-        let outward: Bool = shown
-        switch (edge, outward) {
-        case (.left, true), (.right, false): p.move(to: NSPoint(x: c.x - s, y: c.y)); p.line(to: NSPoint(x: c.x + s, y: c.y + s * 1.4)); p.line(to: NSPoint(x: c.x + s, y: c.y - s * 1.4))
-        case (.right, true), (.left, false): p.move(to: NSPoint(x: c.x + s, y: c.y)); p.line(to: NSPoint(x: c.x - s, y: c.y + s * 1.4)); p.line(to: NSPoint(x: c.x - s, y: c.y - s * 1.4))
-        case (.top, true), (.bottom, false): p.move(to: NSPoint(x: c.x, y: c.y + s)); p.line(to: NSPoint(x: c.x - s * 1.4, y: c.y - s)); p.line(to: NSPoint(x: c.x + s * 1.4, y: c.y - s))
-        default: p.move(to: NSPoint(x: c.x, y: c.y - s)); p.line(to: NSPoint(x: c.x - s * 1.4, y: c.y + s)); p.line(to: NSPoint(x: c.x + s * 1.4, y: c.y + s))
-        }
-        p.close(); LRColors.dim.setFill(); p.fill()
+        let r = bounds.insetBy(dx: 0.5, dy: 0.5), path = NSBezierPath(roundedRect: r, xRadius: r.height / 2, yRadius: r.height / 2)
+        (isHighlighted ? Studio.selectedFill : Studio.restFill).setFill(); path.fill(); Studio.restStroke.setStroke(); path.lineWidth = 1; path.stroke()
+        let attrs: [NSAttributedString.Key: Any] = [.font: font ?? Studio.controlFont, .foregroundColor: isEnabled ? Studio.text : Studio.tertiary]
+        let size = (title as NSString).size(withAttributes: attrs)
+        (title as NSString).draw(at: NSPoint(x: (bounds.width - size.width) / 2, y: (bounds.height - size.height) / 2), withAttributes: attrs)
     }
-    override func mouseDown(with event: NSEvent) { toggled?() }
-    override func accessibilityPerformPress() -> Bool { toggled?(); return true }
+}
+
+// MARK: - Identity plate
+
+/// The identity plate at the toolbar's left: "OpenStill", your own text, or a logo (Develop › Identity Plate…).
+final class IdentityPlate: NSView {
+    static let textKey = "OpenStillIdentityPlateText", imageKey = "OpenStillIdentityPlateImage"
+    private let text = Studio.label("OpenStill", font: .systemFont(ofSize: 13, weight: .semibold), color: Studio.text)
+    private let logo = NSImageView()
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        logo.imageScaling = .scaleProportionallyDown
+        for v in [text, logo] as [NSView] { v.translatesAutoresizingMaskIntoConstraints = false; addSubview(v) }
+        NSLayoutConstraint.activate([
+            heightAnchor.constraint(equalToConstant: 28),
+            text.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 4), text.centerYAnchor.constraint(equalTo: centerYAnchor), text.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
+            logo.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 4), logo.centerYAnchor.constraint(equalTo: centerYAnchor),
+            logo.heightAnchor.constraint(equalToConstant: 20), logo.widthAnchor.constraint(lessThanOrEqualToConstant: 140),
+        ])
+        refresh()
+    }
+    required init?(coder: NSCoder) { fatalError() }
+    func refresh() {
+        let custom = UserDefaults.standard.string(forKey: Self.textKey) ?? ""
+        text.stringValue = custom.isEmpty ? "OpenStill" : custom
+        let image = UserDefaults.standard.string(forKey: Self.imageKey).flatMap { NSImage(contentsOfFile: $0) }
+        logo.image = image; logo.isHidden = image == nil; text.isHidden = image != nil
+        setAccessibilityLabel(image == nil ? text.stringValue : "Identity plate")
+    }
 }
 
 // MARK: - Navigator
@@ -328,7 +277,7 @@ final class LRNavigator: NSView {
         return NSRect(x: area.midX - w * scale / 2, y: area.midY - h * scale / 2, width: w * scale, height: h * scale)
     }
     override func draw(_ dirtyRect: NSRect) {
-        LRColors.strip.setFill(); bounds.fill()
+        Studio.well.setFill(); NSBezierPath(roundedRect: bounds, xRadius: 6, yRadius: 6).fill()
         guard let image = canvas?.image, let context = NSGraphicsContext.current?.cgContext else { return }
         let rect = photoRect
         context.interpolationQuality = .medium; context.draw(image, in: rect)
@@ -364,93 +313,4 @@ final class LRZoomLinks: NSStackView {
         for b in links { b.attributedTitle = NSAttributedString(string: b.title, attributes: [.font: NSFont.systemFont(ofSize: 10, weight: .medium), .foregroundColor: b.tag == selected ? LRColors.bright : LRColors.dim]) }
     }
     @objc private func picked(_ sender: NSButton) { choose?(sender.tag) }
-}
-
-// MARK: - Develop tool strip
-
-/// The row of tools under the Develop histogram: Crop, Remove and Masking. The chosen tool's controls open beneath it.
-final class LRToolStrip: LRFill {
-    var choose: ((String?) -> Void)?
-    private(set) var selected: String? { didSet { for b in buttons { b.state = b.identifier?.rawValue == selected ? .on : .off } } }
-    private var buttons: [NSButton] = []
-    init() {
-        super.init(LRColors.panel)
-        let row = NSStackView(); row.spacing = 22
-        for (id, symbol, label) in [("crop", "crop", "Crop overlay (R)"), ("remove", "bandage", "Remove (Q)"), ("redeye", "eye", "Red Eye Correction"), ("masking", "circle.dashed", "Masking (Shift-W)")] {
-            let b = ToolbarIconButton(); b.identifier = .init(id); b.image = Appearance.symbol(symbol, size: 15, description: label)
-            b.toolTip = label; b.setAccessibilityLabel(label); b.setButtonType(.pushOnPushOff); b.isBordered = false
-            b.target = self; b.action = #selector(picked(_:)); b.widthAnchor.constraint(equalToConstant: 34).isActive = true; b.heightAnchor.constraint(equalToConstant: 28).isActive = true
-            buttons.append(b); row.addArrangedSubview(b)
-        }
-        row.translatesAutoresizingMaskIntoConstraints = false; addSubview(row)
-        NSLayoutConstraint.activate([row.centerXAnchor.constraint(equalTo: centerXAnchor), row.topAnchor.constraint(equalTo: topAnchor, constant: 4), row.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -4)])
-    }
-    required init?(coder: NSCoder) { fatalError() }
-    @objc private func picked(_ sender: NSButton) { select(sender.identifier?.rawValue == selected ? nil : sender.identifier?.rawValue) }
-    func select(_ id: String?) { selected = id; choose?(id) }
-    /// Updates the highlight without running the tool.
-    func show(_ id: String?) { selected = id }
-}
-
-// MARK: - Filmstrip bar and toolbar
-
-/// The bar above the filmstrip: Library grid, back / forward, and the source, "Folder : Trip · 124 photos / 1 selected / IMG_0001.CR3".
-final class LRFilmstripBar: LRFill {
-    var grid: (() -> Void)?
-    var step: ((Int) -> Void)?
-    private let source = NSTextField(labelWithString: "")
-    init() {
-        super.init(LRColors.strip)
-        let row = NSStackView(); row.spacing = 6
-        for (symbol, label, action) in [("square.grid.2x2", "Library grid (G)", #selector(showGrid)), ("chevron.left", "Previous photo", #selector(back)), ("chevron.right", "Next photo", #selector(forward))] {
-            let b = ToolbarIconButton(); b.image = Appearance.symbol(symbol, size: 11, description: label); b.toolTip = label; b.setAccessibilityLabel(label)
-            b.isBordered = false; b.target = self; b.action = action
-            b.widthAnchor.constraint(equalToConstant: 24).isActive = true; b.heightAnchor.constraint(equalToConstant: 20).isActive = true
-            row.addArrangedSubview(b)
-        }
-        source.font = .systemFont(ofSize: 11); source.textColor = LRColors.dim; source.lineBreakMode = .byTruncatingMiddle
-        source.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        row.addArrangedSubview(source); row.setCustomSpacing(14, after: row.arrangedSubviews[2])
-        row.translatesAutoresizingMaskIntoConstraints = false; addSubview(row)
-        NSLayoutConstraint.activate([row.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8), row.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -8), row.centerYAnchor.constraint(equalTo: centerYAnchor)])
-    }
-    required init?(coder: NSCoder) { fatalError() }
-    func show(source kind: String, name: String, count: Int, selected: Int, file: String?) {
-        var text = "\(kind) : \(name)   \(count) photo\(count == 1 ? "" : "s") / \(selected) selected"
-        if let file { text += " / \(file)" }
-        source.stringValue = text; source.toolTip = text
-    }
-    @objc private func showGrid() { grid?() }
-    @objc private func back() { step?(-1) }
-    @objc private func forward() { step?(1) }
-}
-
-/// The toolbar under the photo in Develop (T shows or hides it): loupe, before/after, and the clipping warning.
-final class LRDevelopToolbar: LRFill {
-    var command: ((String) -> Void)?
-    private let split = ToolbarIconButton(), loupe = ToolbarIconButton(), clipping = ToolbarIconButton()
-    private let zoom = NSTextField(labelWithString: "")
-    init() {
-        super.init(LRColors.strip)
-        let row = NSStackView(); row.spacing = 4
-        for (button, id, symbol, label) in [(loupe, "loupe", "rectangle", "Loupe view"), (split, "compareSplit", "rectangle.split.2x1", "Before / after, left and right (Y)"), (clipping, "toggleClipping", "exclamationmark.triangle", "Show clipping (J)")] {
-            button.identifier = .init(id); button.image = Appearance.symbol(symbol, size: 13, description: label); button.toolTip = label
-            button.setAccessibilityLabel(label); button.setButtonType(.pushOnPushOff); button.isBordered = false; button.target = self; button.action = #selector(clicked(_:))
-            button.widthAnchor.constraint(equalToConstant: 30).isActive = true; button.heightAnchor.constraint(equalToConstant: 24).isActive = true
-            row.addArrangedSubview(button)
-        }
-        row.setCustomSpacing(18, after: split)
-        zoom.font = .systemFont(ofSize: 11); zoom.textColor = LRColors.dim
-        for v in [row, zoom] as [NSView] { v.translatesAutoresizingMaskIntoConstraints = false; addSubview(v) }
-        NSLayoutConstraint.activate([row.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10), row.centerYAnchor.constraint(equalTo: centerYAnchor),
-                                     zoom.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12), zoom.centerYAnchor.constraint(equalTo: centerYAnchor)])
-    }
-    required init?(coder: NSCoder) { fatalError() }
-    func show(split on: Bool, clipping clipped: Bool, zoom text: String) {
-        split.state = on ? .on : .off; loupe.state = on ? .off : .on; clipping.state = clipped ? .on : .off; zoom.stringValue = text
-    }
-    @objc private func clicked(_ sender: NSButton) {
-        let id = sender.identifier?.rawValue ?? ""
-        if id == "loupe" { if split.state == .on { command?("compareSplit") } else { sender.state = .on } } else { command?(id) }
-    }
 }

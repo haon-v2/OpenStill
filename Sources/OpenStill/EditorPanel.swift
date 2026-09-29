@@ -12,6 +12,23 @@ private final class EditSlider: NSSlider {
     }
     @objc private func change() { changed?(doubleValue, !tracking) }
     override func mouseDown(with event: NSEvent) { tracking = true; super.mouseDown(with: event); tracking = false; changed?(doubleValue, true) }
+    /// Draws the track as a gradient that shows what the slider does (cool → warm for Temp, green → magenta for Tint).
+    func useGradient(_ colors: [NSColor]) {
+        let (min, max, value, size) = (minValue, maxValue, doubleValue, controlSize)
+        let cell = GradientSliderCell(); cell.colors = colors
+        self.cell = cell
+        minValue = min; maxValue = max; doubleValue = value; controlSize = size
+        target = self; action = #selector(change); isContinuous = true
+    }
+}
+
+/// A slider cell whose track is a thin gradient across its whole width.
+final class GradientSliderCell: NSSliderCell {
+    var colors: [NSColor] = [.gray, .white]
+    override func drawBar(inside rect: NSRect, flipped: Bool) {
+        let bar = NSRect(x: rect.minX, y: rect.midY - 2, width: rect.width, height: 4)
+        NSGradient(colors: colors)?.draw(in: NSBezierPath(roundedRect: bar, xRadius: 2, yRadius: 2), angle: 0)
+    }
 }
 
 final class EditorPanel: GlassChrome {
@@ -37,7 +54,7 @@ final class EditorPanel: GlassChrome {
     private var maskPanels:[String:MaskPanel] = [:]
     private var workspaces:[(NSSegmentedControl,NSView,MaskPanel)] = []
     private let mixer = ColorMixerPanel()
-    private let cropPresets = CropPresetPanel()
+    let cropPresets = CropPresetPanel()
     func cropAspect(for size:CGSize) -> Double? { cropPresets.aspect(for:size) }
     func showCrop(selection:CGSize?,photo:CGSize?) { cropPresets.showCrop(selection:selection,photo:photo) }
     private let glow = GlowPanel()
@@ -73,15 +90,16 @@ final class EditorPanel: GlassChrome {
     private var busy = false
     private var toolBodies: [NSView] = []
     private var headers: [NSButton] = []
-    // Lightroom Classic arrangement (see the extension at the end of this file).
-    /// Presets, Versions and History: the left panel while developing in the Lightroom layout.
-    let leftDevelopColumn = LRPanelColumn()
+    // The Studio arrangement (see the extension at the end of this file).
+    /// Presets & LUTs, and History · Snapshots · Versions: shown in their own floating panels.
+    let presetsColumn = LRPanelColumn(), historyColumn = LRPanelColumn()
+    /// Status messages go to the window's status line.
+    var statusChanged: ((String, Bool) -> Void)?
     private var lrColumns: [LightroomModule: LRPanelColumn] = [:]
     fileprivate var lrModule: LightroomModule?
     fileprivate var borrowed: [Borrowed] = []
     fileprivate var lrSlots: [LightroomModule: [(NSView, NSView, CGFloat?)]] = [:]
     fileprivate let lrCamera = NSTextField(labelWithString: "")
-    fileprivate let lrStrip = LRToolStrip()
     fileprivate let lrDrawer = NSStackView()
     fileprivate let treatment = NSSegmentedControl(labels: ["Color", "Black & White"], trackingMode: .selectOne, target: nil, action: nil)
     fileprivate let lrKeywords = NSTextField(wrappingLabelWithString: "")
@@ -91,8 +109,6 @@ final class EditorPanel: GlassChrome {
     fileprivate var maskBorrow: Borrowed?
     fileprivate let maskSlot = NSView()
     fileprivate let presetSlot = NSView(), historySlot = NSView(), versionSlot = NSView(), snapshotSlot = NSView()
-    /// The Lightroom tool strip changed tool (crop, remove, masking or none).
-    var lightroomTool: ((String?) -> Void)?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -474,18 +490,47 @@ final class EditorPanel: GlassChrome {
         if isRaw != rawSource { rawSource = isRaw; profilePanel.update(states, raw:isRaw, enabled:hasPhoto && !busy) }
     }
     func setLUTPhoto(_ image:CGImage?,edits:PhotoEdits, source:CIImage? = nil, url:URL? = nil, recipe:RenderRecipe? = nil) { lutBrowser.setPhoto(image,edits:edits, source:source, url:url, recipe:recipe) }
+    /// A slider row: the name (drag it sideways to scrub, double-click to reset), the value, and the slider beneath.
     private func slider(_ title: String, path: WritableKeyPath<PhotoEdits, Double>, range: ClosedRange<Double>, in stack: NSStackView) {
-        let label = NSTextField(labelWithString: title); label.font = .systemFont(ofSize: 11)
-        let value = NSTextField(labelWithString: ""); value.font = .monospacedDigitSystemFont(ofSize: 10, weight: .regular); value.textColor = .secondaryLabelColor
+        let label = ScrubLabel(title); label.font = .systemFont(ofSize: 12)
+        let value = NSTextField(labelWithString: ""); value.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular); value.textColor = Studio.secondary
+        value.alignment = .right
         let heading = NSStackView(views: [label, NSView(), value]); fullWidth(heading, in: stack)
         let slider = EditSlider(range: range, value: states[keyPath: path]); slider.controlSize = .small; slider.setAccessibilityLabel(title)
+        if let colors = Self.gradients[title] { slider.useGradient(colors) }
+        let reset = PhotoEdits()[keyPath: path]
+        let set: (Double, Bool) -> Void = { [weak self, weak slider, weak value] number, final in
+            guard let self else { return }
+            let clamped = min(range.upperBound, max(range.lowerBound, number))
+            self.states[keyPath: path] = clamped; slider?.doubleValue = clamped
+            value?.stringValue = Self.number(clamped)
+            self.editChanged?(self.states, title, final)
+        }
         slider.changed = { [weak self, weak value] number, final in
             guard let self else { return }; self.states[keyPath: path] = number
             value?.stringValue = Self.number(number)
             self.editChanged?(self.states, title, final)
         }
+        label.scrubbed = { [weak self, weak slider] dx, final in
+            guard self != nil, let slider, slider.isEnabled else { return }
+            set(slider.doubleValue + Double(dx) * (range.upperBound - range.lowerBound) / 300, final)
+        }
+        label.reset = { [weak slider] in guard let slider, slider.isEnabled else { return }; set(reset, true) }
+        label.toolTip = "\(title) · drag sideways to change · double-click to reset"
         sliders.append((slider, value, path)); fullWidth(slider, in: stack)
     }
+    /// Sliders whose track shows what they do.
+    private static let gradients: [String: [NSColor]] = [
+        "Temp": [NSColor(srgbRed: 0.22, green: 0.46, blue: 0.95, alpha: 1), NSColor(srgbRed: 0.98, green: 0.82, blue: 0.18, alpha: 1)],
+        "Tint": [NSColor(srgbRed: 0.28, green: 0.70, blue: 0.34, alpha: 1), NSColor(srgbRed: 0.70, green: 0.40, blue: 0.64, alpha: 1)],
+        "Vibrance": [NSColor(white: 0.55, alpha: 1), NSColor(srgbRed: 0.86, green: 0.38, blue: 0.20, alpha: 1)],
+        "Saturation": [NSColor(white: 0.55, alpha: 1), NSColor(srgbRed: 0.86, green: 0.18, blue: 0.20, alpha: 1)],
+        "Exposure": [NSColor(white: 0.12, alpha: 1), NSColor(white: 0.95, alpha: 1)],
+        "Highlights": [NSColor(white: 0.35, alpha: 1), NSColor(white: 0.95, alpha: 1)],
+        "Shadows": [NSColor(white: 0.08, alpha: 1), NSColor(white: 0.6, alpha: 1)],
+        "Whites": [NSColor(white: 0.45, alpha: 1), NSColor(white: 1, alpha: 1)],
+        "Blacks": [NSColor(white: 0, alpha: 1), NSColor(white: 0.5, alpha: 1)],
+    ]
     private func toggle(_ title: String, path: WritableKeyPath<PhotoEdits, Bool>, in stack: NSStackView) {
         let button = NSButton(checkboxWithTitle: title, target: self, action: #selector(toggleEdit(_:)))
         button.tag = toggles.count; button.font = .systemFont(ofSize: 11); toggles.append((button, path)); fullWidth(button, in: stack)
@@ -601,7 +646,7 @@ final class EditorPanel: GlassChrome {
     @objc private func historyClicked(_ sender: NSButton) { chooseHistory?(sender.tag) }
     func status(_ text: String, busy: Bool = false) {
         message.stringValue = text; message.toolTip = text; self.busy = busy
-        for column in lrColumns.values { column.note.stringValue = text }; leftDevelopColumn.note.stringValue = ""
+        statusChanged?(text, busy)
         lutBrowser.setEnabled(hasPhoto && !busy)
         for panel in maskPanels.values { panel.setEnabled(hasPhoto && !busy) }
         mixer.setEnabled(hasPhoto && !busy)
@@ -637,7 +682,7 @@ extension EditorPanel {
         let target: LightroomModule? = module.map { $0 == .develop ? .develop : .library }
         guard target != lrModule else { return }
         command?("finishMask")
-        lrStrip.show(nil); showDrawer(nil)
+        showDrawer(nil)
         returnBorrowed()
         for column in lrColumns.values { column.isHidden = true }
         lrModule = target
@@ -649,12 +694,13 @@ extension EditorPanel {
         for (slot, view, height) in lrSlots[target] ?? [] { borrow(view, into: slot, height: height) }
         lutBrowser.setActive(target == .develop)
     }
-    /// The Lightroom tool strip: Crop (R), Remove (Q) or Masking (Shift-W), or nil to close the tool.
-    func showLightroomTool(_ id: String?) {
+    /// The Studio tool that's open: Masking shows its masks at the top of the panel; the other tools live in the options bar.
+    /// The mask chosen in the Masking list, if any.
+    var selectedMaskLayer: UUID? { maskLayers.selected }
+    func showToolPanel(_ id: String?) {
         guard lrModule == .develop else { return }
-        lrStrip.show(id); showDrawer(id)
+        showDrawer(id == "masking" ? "masking" : nil)
     }
-    var lightroomToolOpen: String? { lrStrip.selected }
     /// Keywords of the photo selected in the library, for the Keywording panel.
     func showKeywords(_ keywords: [String]?) {
         lrKeywords.stringValue = keywords.map { $0.isEmpty ? "No keywords" : $0.joined(separator: ", ") } ?? "Select a photo to see its keywords."
@@ -662,6 +708,7 @@ extension EditorPanel {
 
     private func buildLightroom(_ module: LightroomModule) -> LRPanelColumn {
         let column = LRPanelColumn()
+        column.note.isHidden = true
         column.translatesAutoresizingMaskIntoConstraints = false; addSubview(column)
         NSLayoutConstraint.activate([column.leadingAnchor.constraint(equalTo: leadingAnchor), column.trailingAnchor.constraint(equalTo: trailingAnchor), column.topAnchor.constraint(equalTo: topAnchor), column.bottomAnchor.constraint(equalTo: bottomAnchor)])
         lrColumns[module] = column
@@ -696,24 +743,16 @@ extension EditorPanel {
         }
         // Develop: the histogram and tool strip stay at the top; the adjustment panels scroll beneath, in Lightroom's order.
         section("Histogram", open: true, pinned: true) { s in slot(histogram, in: s); s.add(lrCamera) }
-        column.pin(lrStrip)
-        lrStrip.choose = { [weak self] id in self?.command?("finishMask"); self?.showDrawer(id); self?.lightroomTool?(id) }
         lrDrawer.orientation = .vertical; lrDrawer.alignment = .leading; lrDrawer.spacing = 8
         lrDrawer.edgeInsets = NSEdgeInsets(top: 6, left: 14, bottom: 12, right: 14)
         column.top(lrDrawer)
-        let crop = LRStack(), remove = LRStack(), masking = LRStack(), redeye = LRStack()
-        for box in [crop, remove, redeye, masking] { box.orientation = .vertical; box.alignment = .leading; box.spacing = 8; fullWidth(box, in: lrDrawer); box.isHidden = true }
-        drawerViews = ["crop": crop, "remove": remove, "redeye": redeye, "masking": masking]
-        addEyeControls(to: redeye)
-        let cropHolder = NSView(); fullWidth(cropHolder, in: crop); slots.append((cropHolder, cropPresets, nil))
-        slider("Angle", path: \.straighten, range: -20...20, in: crop)
-        for (title, id) in [("Draw crop", "crop"), ("Apply crop", "applyCrop"), ("Auto straighten", "autoStraighten"), ("AI align horizon", "horizon"), ("Rotate clockwise", "rotate"), ("Flip horizontally", "flip"), ("Reset", "resetCrop")] { action(title, id, to: crop) }
-        let removeHolder = NSView(); fullWidth(removeHolder, in: remove); slots.append((removeHolder, retouch, nil))
-        help("Remove with AI: select the area with Masking, then:", to: remove); action("Remove selected area", "ai:erase", to: remove)
-        addSpotControls(to: remove)
+        // Masking's masks sit at the top of the panel while the tool is open; Crop, Remove and Red Eye live in the options bar.
+        let masking = LRStack()
+        masking.orientation = .vertical; masking.alignment = .leading; masking.spacing = 8; fullWidth(masking, in: lrDrawer); masking.isHidden = true
+        drawerViews = ["masking": masking]
         let layersHolder = NSView(); fullWidth(layersHolder, in: masking); slots.append((layersHolder, maskLayers, nil))
         let divider = NSBox(); divider.boxType = .separator; fullWidth(divider, in: masking)
-        let target = NSTextField(labelWithString: "Or limit a whole tool:"); target.font = .systemFont(ofSize: 11); target.textColor = LRColors.dim
+        let target = NSTextField(labelWithString: "Or limit a whole tool:"); target.font = .systemFont(ofSize: 11); target.textColor = Studio.secondary
         maskTarget.removeAllItems(); maskTarget.addItems(withTitles: maskOrder); maskTarget.controlSize = .small; maskTarget.font = .systemFont(ofSize: 11)
         maskTarget.target = self; maskTarget.action = #selector(maskTargetChanged); maskTarget.setAccessibilityLabel("Adjustment the mask limits")
         if let develop = maskOrder.firstIndex(of: "Develop") { maskTarget.selectItem(at: develop) }
@@ -780,7 +819,7 @@ extension EditorPanel {
         // Geometry: everything that changes the frame — crop and straighten, the lens profile and perspective.
         section("Geometry") { s in
             label("Crop & Straighten", in: s)
-            s.add(LRButton("Crop & Straighten… (R)") { [weak self] in self?.lrStrip.select("crop") })
+            s.add(LRButton("Crop & Straighten… (R)") { [weak self] in self?.command?("studio:tool:crop") })
             slider("Angle", path: \.straighten, range: -20...20, in: s.body)
             label("Lens Corrections", in: s); slot(lens, in: s)
             label("Transform", in: s); slot(transformPanel, in: s)
@@ -842,22 +881,23 @@ extension EditorPanel {
         status(message.stringValue, busy: busy)
         return column
     }
-    /// Develop's left panel: Presets, Versions (OpenStill's named alternatives) and History, with Copy… / Paste.
+    /// The floating panels' contents: Presets & LUTs; and History, Snapshots and Versions with Copy… / Paste.
     private func buildLeftDevelop() {
+        for column in [presetsColumn, historyColumn] { column.note.isHidden = true }
         let presets = LRSection("Presets", module: .develop, side: .left, open: true)
-        presets.add(presetSlot); leftDevelopColumn.add(presets)
-        let snapshots = LRSection("Snapshots", module: .develop, side: .left, open: true)
-        snapshots.add(snapshotSlot); leftDevelopColumn.add(snapshots)
-        let versionsSection = LRSection("Versions", module: .develop, side: .left, open: false)
-        versionsSection.add(versionSlot); leftDevelopColumn.add(versionsSection)
+        presets.add(presetSlot); presetsColumn.add(presets)
         let history = LRSection("History", module: .develop, side: .left, open: true)
-        history.add(historySlot); leftDevelopColumn.add(history)
-        leftDevelopColumn.setButtons([("Copy…", { [weak self] in self?.command?("lr:copy") }), ("Paste", { [weak self] in self?.command?("lr:paste") })])
+        history.add(historySlot); historyColumn.add(history)
+        let snapshots = LRSection("Snapshots", module: .develop, side: .left, open: true)
+        snapshots.add(snapshotSlot); historyColumn.add(snapshots)
+        let versionsSection = LRSection("Versions", module: .develop, side: .left, open: false)
+        versionsSection.add(versionSlot); historyColumn.add(versionsSection)
+        historyColumn.setButtons([("Copy Settings…", { [weak self] in self?.command?("lr:copy") }), ("Paste Settings", { [weak self] in self?.command?("lr:paste") })])
         if let presetsDoc = presetScroll.documentView, let historyDoc = historyScroll.documentView {
             lrSlots[.develop, default: []] += [(presetSlot, presetsDoc, nil), (snapshotSlot, snapshotStack, nil), (versionSlot, versions, nil), (historySlot, historyDoc, nil)]
         }
     }
-    private func labelView(_ text: String) -> NSTextField { let l = NSTextField(labelWithString: text); l.font = .systemFont(ofSize: 11); l.textColor = LRColors.dim; return l }
+    private func labelView(_ text: String) -> NSTextField { let l = NSTextField(labelWithString: text); l.font = .systemFont(ofSize: 11); l.textColor = Studio.secondary; return l }
     @objc private func treatmentChanged() {
         states.monochrome = treatment.selectedSegment == 1 ? 1 : 0
         editChanged?(states, "Treatment: " + (treatment.selectedSegment == 1 ? "Black & White" : "Color"), true)

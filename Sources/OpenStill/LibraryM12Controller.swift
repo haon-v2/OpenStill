@@ -49,7 +49,7 @@ extension ViewerController {
     }
     /// Quick Develop, Keywording and the Keyword List follow the grid selection.
     func updateLibraryPanels() {
-        guard layoutMode == .lightroom, isLibrary, let browser = libraryBrowser else { return }
+        guard isLibrary, let browser = libraryBrowser else { return }
         let selected = browser.selectedItems
         info.quickDevelopPanel.setEnabled(!selected.isEmpty)
         let catalog = EditStorage.records.catalog

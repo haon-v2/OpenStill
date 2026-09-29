@@ -160,6 +160,7 @@ extension ViewerController {
     }
     func editingCommand(_ name: String) {
         if name.hasPrefix("lr:") { lightroomCommand(name); return }
+        if name.hasPrefix("studio:tool:") { if let t = StudioTool(rawValue: String(name.dropFirst(12))) { selectTool(t) }; return }
         if name.hasPrefix("lib:") { libraryCommand(name); return }
         if name.hasPrefix("maskLayer:") { maskLayerCommand(name); return }
         if name.hasPrefix("recovery:"),let value=Int(name.dropFirst(9)){var edits=currentEdits;edits.ensureAdvanced();edits.advanced?.rawRecovery=min(9,max(0,value));changeEdits(edits,title:"RAW highlight recovery",commit:true);return}

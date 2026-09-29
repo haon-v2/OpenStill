@@ -237,6 +237,13 @@ final class PhotoCanvas: NSView {
                               y: ((bounds.midY - size.height / 2 + offset.y) * backing).rounded() / backing,
                               width: size.width, height: size.height)
             context.interpolationQuality = native && logicalPixels == nil ? .none : .high
+            // A soft shadow under the photo, so it sits on the backdrop like a print.
+            if !rect.contains(bounds) {
+                context.saveGState()
+                context.setShadow(offset: CGSize(width: 0, height: -3), blur: 14, color: NSColor.black.withAlphaComponent(0.35).cgColor)
+                context.setFillColor(NSColor.black.cgColor); context.fill(rect)
+                context.restoreGState()
+            }
             if let hdrImage { context.clear(rect); hdrBackdrop.show(hdrImage, in: rect) }
             else { context.draw(image, in: rect); hdrBackdrop.show(nil, in: rect) }
             if let beforeImage {

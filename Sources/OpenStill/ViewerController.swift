@@ -8,35 +8,37 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
     let canvas = PhotoCanvas()
     let info = EditorPanel()
     let collection = NavigationCollectionView()
-    private let filmstrip = NSScrollView()
-    private let center = NSView()
-    private let libraryHost = NSView()
-    private let librarySidebar = LibrarySidebar()
-    private let leftRail = WorkspaceRail(items: [("folders", "Local folders", "folder"), ("library", "Photo library", "square.grid.2x2"), ("photo", "Edit photograph", "photo"), ("open", "Open photos", "plus")])
-    private let rightRail = WorkspaceRail(items: [("edit", "Edit", "slider.horizontal.3"), ("crop", "Crop and rotate", "crop"), ("retouch", "Retouch", "bandage"), ("mask", "Mask current tool", "circle.dashed"), ("presets", "Presets and LUTs", "square.stack"), ("history", "Edit history", "clock.arrow.circlepath"), ("info", "Camera and lens info", "info.circle")])
-    private let workspaceMode = NSSegmentedControl(labels: ["Library", "Edit"], trackingMode: .selectOne, target: nil, action: nil)
-    private let shelf = Appearance.glass()
-    private let workspaceContent = LRFill(.clear)
-    private let footer = NSStackView()
-    var layoutMode = WorkspaceLayout.current
-    private var luminarConstraints: [NSLayoutConstraint] = []
-    private var sidebarWidth: NSLayoutConstraint!
-    private var infoWidth: NSLayoutConstraint!
-    private var shelfHeight: NSLayoutConstraint!
-    // Lightroom Classic layout: module picker, Navigator, filmstrip bar, toolbar and the edge triangles.
-    let modulePicker = LRModulePicker()
-    private let navigator = LRNavigator()
-    private let zoomLinks = LRZoomLinks()
-    private lazy var navigatorSection = LRSection("Navigator", module: .library, side: .left, open: true, accessory: zoomLinks)
-    private let navigatorBox = LRFill(LRColors.panel)
-    private let libraryButtons = LRPanelColumn()
-    private let filmstripBar = LRFilmstripBar()
-    private let developToolbar = LRDevelopToolbar()
-    private let edges = Dictionary(uniqueKeysWithValues: PanelEdge.allCases.map { ($0, LREdgeToggle($0)) })
-    private var lightroomConstraints: [NSLayoutConstraint] = []
-    private var lights = LightsOut.normal
-    private var libraryInspectorToken = UUID()
-    private var lrPanels: LightroomPanels { LightroomState.shared.panels }
+    let filmstrip = NSScrollView()
+    let center = NSView()
+    let libraryHost = NSView()
+    let librarySidebar = LibrarySidebar()
+    let shelf = LRFill(Studio.chrome)
+    let workspaceContent = LRFill(Studio.chrome)
+    // The Studio window: tool rail, tool options bar, status line, one resizable panel, photo tabs in the toolbar.
+    let rail = ToolRail()
+    let optionsBar = ToolOptionsBar()
+    let statusBar = StudioStatusBar()
+    let rightPanel = LRFill(Studio.chrome)
+    let resizeEdge = PanelResizeEdge()
+    let libraryTabsBar = StudioBar(edge: .bottom)
+    let libraryTabs = StudioSegments(["Folders", "Collections", "Info"])
+    let modeSwitch = StudioSegments(["Library", "Develop"], selected: 1)
+    let tabStrip = PhotoTabStrip()
+    let identityPlate = IdentityPlate()
+    var studio = StudioLayout.load()
+    var tool = StudioTool.adjust
+    var photoTabs = OpenPhotoTabs()
+    var studioConstraints: [NSLayoutConstraint] = []
+    var panelWidth: NSLayoutConstraint?
+    var lights = LightsOut.normal
+    var libraryInspectorToken = UUID()
+    var studioPanels: [String: StudioPanel] = [:]
+    /// The floating Info panel's contents and the Navigator, when shown.
+    let floatingInfo = InfoPanel()
+    weak var navigatorView: LRNavigator?
+    /// The options bar is rebuilt only when what it shows changes, so a slider in it is never replaced mid-drag.
+    var optionsSignature = ""
+    var optionsRefresh: [() -> Void] = []
     var libraryBrowser: ShootWindow?
     // Library tools: Auto Import, the Reference view and their windows.
     let autoImportMonitor = AutoImportMonitor()
@@ -49,34 +51,22 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
     var libraryURLs: [URL] = []
     var folderURL: URL?
     /// The collection the library shows, when opened from the sidebar's Collections.
-    private var openCollection: PhotoCollection?
+    var openCollection: PhotoCollection?
     private var smartCollectionWindow: SmartCollectionWindow?
     var isLibrary = false
-    private var foldersVisible = false
-    private var centerToFolders: NSLayoutConstraint!
-    private var centerToRail: NSLayoutConstraint!
-    private var centerToShelf: NSLayoutConstraint!
-    private var centerToFooter: NSLayoutConstraint!
-
-    private let status = NSTextField(labelWithString: "A little space for your photographs.")
-    private let hint = NSTextField(labelWithString: "")
-    private let zoom = NSSegmentedControl(labels: ["Fit", "100%"], trackingMode: .selectOne, target: nil, action: nil)
     private var toolbarItems: [String: NSToolbarItem] = [:]
     private var shareWindow: NSWindow?
     var exportPanel: ExportPanel?
     var shootWindow: ShootWindow?
     var shootCatalog:[URL]=[]
-    private let welcome = NSStackView()
+    let welcome = NSStackView()
     private let spinner = NSProgressIndicator()
-    private var canvasToInspector: NSLayoutConstraint!
-    private var canvasToEdge: NSLayoutConstraint!
     var urls: [URL] = []
     var selected = 0
     private var generation = UUID()
     private var catalogGeneration = UUID()
-    private var metadata: PhotoMetadata?
+    var metadata: PhotoMetadata?
     var renderedPhoto: DecodedPhoto?
-    private var infoVisible = true
     private var trashInProgress = false
     var editDocument = EditDocument(fingerprint: "")
     var currentEdits = PhotoEdits()
@@ -118,19 +108,6 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         view = Appearance.workspace()
         setupLayout()
         configureEditing()
-        workspaceMode.target = self; workspaceMode.action = #selector(workspaceChanged(_:)); workspaceMode.selectedSegment = 1
-        workspaceMode.selectedSegmentBezelColor = Appearance.accent; workspaceMode.setAccessibilityLabel("Workspace")
-        leftRail.choose = { [weak self] id in
-            guard let self else { return }
-            switch id {
-            case "folders": self.foldersVisible.toggle(); self.updateWorkspaceLayout()
-            case "library": self.showLibrary()
-            case "photo": self.showEditor()
-            default: self.openPanel()
-            }
-        }
-        rightRail.choose = { [weak self] id in self?.showEditingSection(id) }
-        info.sectionChanged = { [weak self] index in self?.rightRail.select(["edit", "presets", "history", "info"][index]) }
         librarySidebar.browse = { [weak self] in self?.openPanel() }
         librarySidebar.open = { [weak self] url in self?.open([url]) }
         librarySidebar.folderCommand = { [weak self] id, url in self?.folderCommand(id, url) }
@@ -143,7 +120,6 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
             window.created = { [weak self] collection in self?.librarySidebar.reloadCollections(); self?.open(collection: collection) }
             window.showWindow(nil); window.window?.makeKeyAndOrderFront(nil)
         }
-        leftRail.select("photo"); rightRail.select("edit")
 
         canvas.navigate = { [weak self] step in self?.advance(step) }
         canvas.toggleZoom = { [weak self] in self?.toggleZoom() }
@@ -165,50 +141,37 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
             self.select(index, preservingSelection: self.collection.selectionIndexPaths.contains(IndexPath(item: index, section: 0)))
             return self.makePhotoMenu()
         }
-        applyLayout(layoutMode)
+        setupStudio()
         updateControls()
     }
 
     private func setupLayout() {
         let content = workspaceContent
-        let surface: NSView
-        if #available(macOS 26.0, *) {
-            let container = NSGlassEffectContainerView()
-            container.spacing = 0
-            container.contentView = content
-            surface = container
-        } else { surface = content }
-        surface.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(surface)
+        content.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(content)
         NSLayoutConstraint.activate([
-            surface.leadingAnchor.constraint(equalTo: view.leadingAnchor), surface.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            surface.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor), surface.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+            content.leadingAnchor.constraint(equalTo: view.leadingAnchor), content.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            content.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor), content.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
-        let lightroomViews: [NSView] = [modulePicker, navigatorBox, libraryButtons, info.leftDevelopColumn, filmstripBar, developToolbar] + PanelEdge.allCases.compactMap { edges[$0] }
-        for child in [leftRail, librarySidebar, center, info, rightRail, shelf] + lightroomViews {
+        for child in [rail, optionsBar, center, resizeEdge, rightPanel, shelf, statusBar] as [NSView] {
             child.translatesAutoresizingMaskIntoConstraints = false; content.addSubview(child)
         }
-        lightroomViews.forEach { $0.isHidden = true }
+        for child in [libraryTabsBar, info, librarySidebar] as [NSView] {
+            child.translatesAutoresizingMaskIntoConstraints = false; rightPanel.addSubview(child)
+        }
         for child in [canvas.hdrBackdrop, canvas, libraryHost] {
             child.translatesAutoresizingMaskIntoConstraints = false; center.addSubview(child)
             NSLayoutConstraint.activate([child.leadingAnchor.constraint(equalTo:center.leadingAnchor),child.trailingAnchor.constraint(equalTo:center.trailingAnchor),child.topAnchor.constraint(equalTo:center.topAnchor),child.bottomAnchor.constraint(equalTo:center.bottomAnchor)])
         }
         canvas.appearance = NSAppearance(named: .darkAqua)
-        for child in [canvas.hdrBackdrop, canvas, libraryHost] { child.wantsLayer = true; child.layer?.cornerRadius = 16; child.layer?.masksToBounds = true }
-        libraryHost.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+        libraryHost.wantsLayer = true; libraryHost.layer?.backgroundColor = Studio.canvas.cgColor
         libraryHost.isHidden = true; librarySidebar.isHidden = true
-        zoom.selectedSegment = 0
-        zoom.target = self
-        zoom.action = #selector(zoomChanged)
-        zoom.toolTip = "Fit (⌘0) or original pixels (⌘1)"
-        zoom.setAccessibilityLabel("Photo zoom")
-        zoom.selectedSegmentBezelColor = Appearance.accent
         let flow = NSCollectionViewFlowLayout()
         flow.scrollDirection = .horizontal
         flow.itemSize = NSSize(width: 102, height: 91)
         flow.minimumInteritemSpacing = 12
         flow.minimumLineSpacing = 12
-        flow.sectionInset = NSEdgeInsets(top: 9, left: 12, bottom: 9, right: 12)
+        flow.sectionInset = NSEdgeInsets(top: 0, left: 12, bottom: 0, right: 12)
         collection.collectionViewLayout = flow
         collection.isSelectable = true
         collection.allowsMultipleSelection = true
@@ -223,48 +186,12 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         filmstrip.autohidesScrollers = true
         filmstrip.drawsBackground = false
         filmstrip.translatesAutoresizingMaskIntoConstraints = false
-        shelf.contentView.addSubview(filmstrip)
-        for view in [status, NSView(), hint] { footer.addArrangedSubview(view) }
-        footer.translatesAutoresizingMaskIntoConstraints = false
-        footer.spacing = 8
-        for label in [status, hint] {
-            label.font = .systemFont(ofSize: 11)
-            label.textColor = .secondaryLabelColor
-            label.lineBreakMode = .byTruncatingTail
-        }
-        status.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        content.addSubview(footer)
-        canvasToInspector = center.trailingAnchor.constraint(equalTo: info.leadingAnchor, constant: -10)
-        canvasToEdge = center.trailingAnchor.constraint(equalTo: rightRail.leadingAnchor, constant: -10)
-        centerToFolders = center.leadingAnchor.constraint(equalTo: librarySidebar.trailingAnchor, constant: 10)
-        centerToRail = center.leadingAnchor.constraint(equalTo: leftRail.trailingAnchor, constant: 10)
-        centerToShelf = center.bottomAnchor.constraint(equalTo: shelf.topAnchor, constant: -10)
-        centerToFooter = center.bottomAnchor.constraint(equalTo: footer.topAnchor, constant: -10)
-        sidebarWidth = librarySidebar.widthAnchor.constraint(equalToConstant: 216)
-        infoWidth = info.widthAnchor.constraint(equalToConstant: 320)
-        shelfHeight = shelf.heightAnchor.constraint(equalToConstant: 112)
-        // EZ Layout: rails at both edges, glass panels, the filmstrip under the photo only.
-        luminarConstraints = [
-            center.topAnchor.constraint(equalTo: content.topAnchor, constant: 10),
-            librarySidebar.topAnchor.constraint(equalTo: center.topAnchor), info.topAnchor.constraint(equalTo: center.topAnchor),
-            librarySidebar.leadingAnchor.constraint(equalTo: leftRail.trailingAnchor, constant: 10), librarySidebar.bottomAnchor.constraint(equalTo: shelf.bottomAnchor),
-            info.trailingAnchor.constraint(equalTo: rightRail.leadingAnchor, constant: -10), info.bottomAnchor.constraint(equalTo: shelf.bottomAnchor),
-            shelf.leadingAnchor.constraint(equalTo: center.leadingAnchor), shelf.trailingAnchor.constraint(equalTo: center.trailingAnchor),
-            shelf.bottomAnchor.constraint(equalTo: footer.topAnchor, constant: -10),
-            leftRail.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 10), leftRail.widthAnchor.constraint(equalToConstant: 48),
-            leftRail.topAnchor.constraint(equalTo: center.topAnchor), leftRail.bottomAnchor.constraint(equalTo: shelf.bottomAnchor),
-            rightRail.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -10), rightRail.widthAnchor.constraint(equalToConstant: 48),
-            rightRail.topAnchor.constraint(equalTo: center.topAnchor), rightRail.bottomAnchor.constraint(equalTo: shelf.bottomAnchor),
-            footer.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 20), footer.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -20),
-            footer.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -8), footer.heightAnchor.constraint(equalToConstant: 18),
-        ]
+        shelf.addSubview(filmstrip)
         NSLayoutConstraint.activate([
-            sidebarWidth, infoWidth, shelfHeight,
-            filmstrip.leadingAnchor.constraint(equalTo: shelf.contentView.leadingAnchor, constant: 4), filmstrip.trailingAnchor.constraint(equalTo: shelf.contentView.trailingAnchor, constant: -4),
-            filmstrip.topAnchor.constraint(equalTo: shelf.contentView.topAnchor), filmstrip.bottomAnchor.constraint(equalTo: shelf.contentView.bottomAnchor),
+            filmstrip.leadingAnchor.constraint(equalTo: shelf.leadingAnchor, constant: 4), filmstrip.trailingAnchor.constraint(equalTo: shelf.trailingAnchor, constant: -4),
+            filmstrip.topAnchor.constraint(equalTo: shelf.topAnchor, constant: 1), filmstrip.bottomAnchor.constraint(equalTo: shelf.bottomAnchor),
         ])
         setupWelcome()
-        setupLightroomChrome()
         spinner.style = .spinning
         spinner.controlSize = .small
         spinner.isDisplayedWhenStopped = false
@@ -274,113 +201,110 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
             spinner.centerXAnchor.constraint(equalTo: canvas.centerXAnchor),
             spinner.centerYAnchor.constraint(equalTo: canvas.centerYAnchor, constant: 48)
         ])
-        NotificationCenter.default.addObserver(forName: .workspaceLayoutChanged, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.applyLayout(WorkspaceLayout.current) }
-        }
     }
 
-    // MARK: Layout (Lightroom Classic's, the only one)
-    func applyLayout(_ layout: WorkspaceLayout) {
-        layoutMode = layout
-        // Flat dark-gray panels with square corners.
-        view.window?.appearance = NSAppearance(named: .darkAqua)
-        view.window?.toolbar?.isVisible = false
-        workspaceContent.color = LRColors.backdrop
-        shelf.flatColor = LRColors.strip
-        librarySidebar.lightroom = true
-        for chrome in [librarySidebar, info, shelf] as [GlassChrome] { chrome.cornerRadius = 0 }
-        for child in [canvas.hdrBackdrop, canvas, libraryHost] { child.layer?.cornerRadius = 0 }
-        canvas.backdrop = LRColors.canvas
-        libraryHost.layer?.backgroundColor = LRColors.canvas.cgColor
-        workspaceMode.setLabel(layout.modeNames.library, forSegment: 0); workspaceMode.setLabel(layout.modeNames.edit, forSegment: 1)
-        workspaceMode.sizeToFit()
-        info.setLightroom(isLibrary ? .library : .develop)
-        updateWorkspaceLayout()
-    }
-
+    /// The empty canvas: a quiet invitation to open or import, and the folders used last.
     private func setupWelcome() {
         welcome.orientation = .vertical
         welcome.alignment = .centerX
-        welcome.spacing = 16
+        welcome.spacing = 14
         welcome.translatesAutoresizingMaskIntoConstraints = false
         let icon = NSImageView(image: NSImage(systemSymbolName: "photo.on.rectangle.angled", accessibilityDescription: nil)!)
-        icon.contentTintColor = NSColor(calibratedWhite: 0.55, alpha: 1)
-        icon.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 46, weight: .ultraLight)
-        let title = NSTextField(labelWithString: "Your photos. A clearer view.")
-        title.font = .systemFont(ofSize: 21, weight: .medium)
-        let subtitle = NSTextField(labelWithString: "Drop a photo or folder here to begin.")
-        subtitle.font = .systemFont(ofSize: 13)
-        subtitle.textColor = .secondaryLabelColor
-        let button = NSButton(title: "Open photos…", target: self, action: #selector(openPanel))
-        button.bezelStyle = .rounded
-        button.controlSize = .large
-        Appearance.primary(button)
-        let help = NSTextField(labelWithString: "← → to browse · Pinch or scroll to zoom")
-        help.font = .systemFont(ofSize: 11)
-        help.textColor = .tertiaryLabelColor
-        for item in [icon, title, subtitle, button, help] { welcome.addArrangedSubview(item) }
+        icon.contentTintColor = Studio.tertiary
+        icon.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 40, weight: .ultraLight)
+        let title = Studio.label("Your photographs, developed on this Mac.", font: .systemFont(ofSize: 20, weight: .semibold), color: Studio.text)
+        let subtitle = Studio.label("Open a folder to browse it, or drop photos anywhere in this window.", font: .systemFont(ofSize: 13))
+        let open = Studio.button("Open Folder…", primary: true) { [weak self] in self?.openPanel() }
+        let importButton = Studio.button("Import Photos…") { [weak self] in self?.importPhotos() }
+        let buttons = NSStackView(views: [importButton, open]); buttons.spacing = 10
+        for item in [icon, title, subtitle, buttons] as [NSView] { welcome.addArrangedSubview(item) }
+        welcome.setCustomSpacing(8, after: title)
         welcome.setCustomSpacing(24, after: subtitle)
-        welcome.setCustomSpacing(28, after: button)
+        let recent = (UserDefaults.standard.stringArray(forKey: "OpenStillRecentFolders") ?? []).prefix(4).map { URL(fileURLWithPath: $0) }
+            .filter { FileManager.default.fileExists(atPath: $0.path) }
+        if !recent.isEmpty {
+            let label = Studio.label("Recent", font: .systemFont(ofSize: 11, weight: .semibold), color: Studio.tertiary)
+            let row = NSStackView(); row.spacing = 8
+            for url in recent { row.addArrangedSubview(Studio.button(url.lastPathComponent) { [weak self] in self?.open([url]); self?.showLibrary() }) }
+            welcome.addArrangedSubview(label); welcome.addArrangedSubview(row)
+            welcome.setCustomSpacing(30, after: buttons); welcome.setCustomSpacing(8, after: label)
+        }
+        let foot = Studio.label("Edits are kept on this Mac. Originals are never changed.", font: .systemFont(ofSize: 11), color: Studio.tertiary)
+        welcome.addArrangedSubview(foot); welcome.setCustomSpacing(34, after: welcome.arrangedSubviews[welcome.arrangedSubviews.count - 2])
         canvas.addSubview(welcome)
         NSLayoutConstraint.activate([
             welcome.centerXAnchor.constraint(equalTo: canvas.centerXAnchor),
-            welcome.centerYAnchor.constraint(equalTo: canvas.centerYAnchor)
+            welcome.centerYAnchor.constraint(equalTo: canvas.centerYAnchor, constant: -12),
+            welcome.widthAnchor.constraint(lessThanOrEqualTo: canvas.widthAnchor, constant: -48)
         ])
     }
 
+    // MARK: Toolbar: identity plate, Library | Develop, photo tabs, zoom, Presets, History, Share, Export
     func installToolbar(on window: NSWindow) {
-        let toolbar = NSToolbar(identifier: "OpenStill.MainToolbar")
+        let toolbar = NSToolbar(identifier: "OpenStill.StudioToolbar")
         toolbar.delegate = self
         toolbar.displayMode = .iconOnly
         toolbar.allowsUserCustomization = false
         window.toolbar = toolbar
-        window.toolbarStyle = .unified
-        window.titleVisibility = .visible
-        // Lightroom Classic has no toolbar; its module picker takes that place.
-        toolbar.isVisible = layoutMode != .lightroom
-        window.appearance = layoutMode == .lightroom ? NSAppearance(named: .darkAqua) : nil
+        window.toolbarStyle = .unifiedCompact
+        window.titleVisibility = .hidden
+        window.appearance = NSAppearance(named: .darkAqua)
+        window.backgroundColor = Studio.chrome; window.isOpaque = true
+        NotificationCenter.default.addObserver(forName: NSWindow.didResizeNotification, object: window, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.fitTabStrip() }
+        }
+        fitTabStrip()
         updateControls()
     }
+    /// The tabs get the toolbar's free width; past that they scroll.
+    func fitTabStrip() { tabStrip.setAvailableWidth((view.window?.frame.width ?? 1240) - 700) }
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        let leading = ["open", "previous", "next"].map { NSToolbarItem.Identifier($0) }
-        let trailing = ["workspace", "zoom", "share", "export", "inspector"].map { NSToolbarItem.Identifier($0) }
-        return leading + [.flexibleSpace] + trailing
+        ["plate", "mode", "tabs"].map { NSToolbarItem.Identifier($0) } + [.flexibleSpace]
+            + ["fit", "actual", "zoomGroup", "presets", "history", "share", "export"].map { NSToolbarItem.Identifier($0) }
     }
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] { toolbarDefaultItemIdentifiers(toolbar) }
     func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier id: NSToolbarItem.Identifier, willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
         let item = NSToolbarItem(itemIdentifier: id)
-        let definitions: [String: (String, String, Selector)] = [
-            "open": ("Open photos", "folder", #selector(openPanel)),
-            "previous": ("Previous photo", "chevron.left", #selector(previousPhoto)),
-            "next": ("Next photo", "chevron.right", #selector(nextPhoto)),
-            "shoot": ("Shoot grid", "square.grid.2x2", #selector(showShoot)),
+        let symbols: [String: (String, String, Selector)] = [
+            "presets": ("Presets & LUTs (⇧P)", "square.stack", #selector(togglePresetsPanel)),
+            "history": ("History, Snapshots & Versions (H)", "clock.arrow.circlepath", #selector(toggleHistoryPanel)),
             "share": ("Share photos", "square.and.arrow.up", #selector(sharePhoto)),
-            "export": ("Export", "square.and.arrow.up.on.square", #selector(exportPhoto)),
-            "inspector": ("Show or hide inspector", "sidebar.right", #selector(toggleInspector))
         ]
-        if id.rawValue == "workspace" {
-            item.label = "Workspace"; item.view = workspaceMode
-        } else if id.rawValue == "zoom" {
-            item.label = "Zoom"; item.view = zoom
-        } else if let (label, symbol, action) = definitions[id.rawValue] {
+        switch id.rawValue {
+        case "plate": item.view = identityPlate; item.label = "OpenStill"
+        case "mode":
+            item.view = modeSwitch; item.label = "Library or Develop"
+            modeSwitch.changed = { [weak self] index in index == 0 ? self?.showLibrary() : self?.showEditor() }
+            modeSwitch.setAccessibilityLabel("Library or Develop (G / D)")
+        case "tabs": item.view = tabStrip; item.label = "Open photos"
+        case "fit", "actual":
+            let fit = id.rawValue == "fit"
+            let button = Studio.button(fit ? "Fit" : "100%") { [weak self] in fit ? self?.fitPhoto() : self?.nativePhoto() }
+            button.toolTip = fit ? "Fit the photo in the window (⌘0)" : "Actual pixels (⌘1)"
+            item.view = button; item.label = fit ? "Fit" : "100%"
+        case "zoomGroup":
+            let out = StudioIconButton(symbol: "minus.magnifyingglass", label: "Zoom out (⌘−)", side: 28) { [weak self] in self?.zoomOut() }
+            let zin = StudioIconButton(symbol: "plus.magnifyingglass", label: "Zoom in (⌘+)", side: 28) { [weak self] in self?.zoomIn() }
+            for b in [out, zin] { b.symbolSize = 14 }
+            let group = NSStackView(views: [out, zin]); group.spacing = 2
+            item.view = group; item.label = "Zoom"
+        case "export":
+            let button = Studio.button("Export", primary: true) { [weak self] in self?.exportPhoto() }
+            button.toolTip = "Export the selected photos (⇧⌘E)"
+            item.view = button; item.label = "Export"
+        default:
+            guard let (label, symbol, action) = symbols[id.rawValue] else { return nil }
             item.label = label; item.toolTip = label
-            item.image = Appearance.symbol(symbol, size: 16, description: label)
+            item.image = Appearance.symbol(symbol, size: 15, description: label)
             item.target = self; item.action = action; item.isBordered = true
-            if #available(macOS 26.0, *) {
-                item.isNavigational = ["previous", "next"].contains(id.rawValue)
-                if id.rawValue == "export" { item.style = .prominent; item.backgroundTintColor = Appearance.accent }
-            }
-        } else { return nil }
+        }
         toolbarItems[id.rawValue] = item
         return item
     }
     func validateToolbarItem(_ item: NSToolbarItem) -> Bool {
         switch item.itemIdentifier.rawValue {
-        case "previous": return !isLibrary && !urls.isEmpty && selected > 0
-        case "next": return !isLibrary && !urls.isEmpty && selected < urls.count - 1
         case "share": return !selectedURLs.isEmpty && view.window?.attachedSheet == nil
-        case "export": return isLibrary ? !(libraryBrowser?.selectedItems.isEmpty ?? true) : renderedPhoto != nil && !localAI.isRunning && !aiPreparing
-        case "shoot": return !urls.isEmpty
+        case "presets", "history": return !isLibrary
         default: return true
         }
     }
@@ -527,31 +451,17 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
     }
 
     func updateControls() {
-        defer { updateLightroomBars() }
         let hasPhotos = !urls.isEmpty
         let selectionCount = selectedURLs.count
         toolbarItems["share"]?.toolTip = "Share \(selectionCount) selected photo\(selectionCount == 1 ? "" : "s") (⇧⌘S)"
-        // The Lightroom library's Metadata panel follows the grid selection instead.
-        if !(layoutMode == .lightroom && isLibrary) { info.show(metadata, rendering: renderedPhoto?.description) }
-        view.window?.title = isLibrary ? (openCollection?.name ?? folderURL?.lastPathComponent ?? "Local Library") : (hasPhotos ? urls[selected].lastPathComponent : "OpenStill")
-        var subtitle = hasPhotos ? "\(selected + 1) of \(urls.count)" : "Photo editor"
-        if hasPhotos, selectionCount != 1 { subtitle += " · \(selectionCount) selected" }
-        view.window?.subtitle = isLibrary ? "Local library · \(shootCatalog.count) photos" : subtitle
+        // The library's Info tab follows the grid selection instead.
+        if !isLibrary { info.show(metadata, rendering: renderedPhoto?.description) }
+        view.window?.title = isLibrary ? (openCollection?.name ?? folderURL?.lastPathComponent ?? "Library") : (hasPhotos ? urls[selected].lastPathComponent : "OpenStill")
         view.window?.toolbar?.validateVisibleItems()
-        zoom.isEnabled = !isLibrary && canvas.image != nil
-        zoom.selectedSegment = canvas.isFit ? 0 : (canvas.native ? 1 : -1)
-        status.stringValue = metadata.map { "\($0.dimensions.contains("×") ? "\($0.dimensions) px  ·  " : "")\($0.format)  ·  \($0.fileSize)" } ?? (hasPhotos ? "Reading photo…" : "A little space for your photographs.")
-        if let photo = renderedPhoto, photo.rendering != .original {
-            status.stringValue = photo.description
-            status.toolTip = "100% shows one pixel of this displayed image per physical screen pixel. Embedded previews may be smaller than the RAW sensor image."
-        } else { status.toolTip = nil }
-        if isLibrary {
-            status.stringValue = "\(libraryBrowser?.visibleURLs.count ?? 0) photos · \(selectionCount) selected"
-            status.toolTip = nil
-            hint.stringValue = "Double-click to edit · 0–5 to rate · P to pick"
-            return
-        }
-        hint.stringValue = hasPhotos ? "\(canvas.isFit ? "Fit" : "\(canvas.zoomPercent)%") · ⌘-click or Shift-click to select photos" : ""
+        let canExport = isLibrary ? !(libraryBrowser?.selectedItems.isEmpty ?? true) : renderedPhoto != nil && !localAI.isRunning && !aiPreparing
+        (toolbarItems["export"]?.view as? NSButton)?.isEnabled = canExport
+        for id in ["fit", "actual"] { (toolbarItems[id]?.view as? NSButton)?.isEnabled = !isLibrary && canvas.image != nil }
+        updateStudioBars()
     }
     var libraryExportItems: [ShootItem]? { isLibrary ? (libraryBrowser?.selectedItems ?? []) : nil }
     var selectedURLs: [URL] {
@@ -569,67 +479,34 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
     @objc func nextPhoto() { advance(1) }
     @objc func fitPhoto() { canvas.native = false; updateControls() }
     @objc func nativePhoto() { canvas.native = true; updateControls() }
-    @objc private func zoomChanged() { canvas.native = zoom.selectedSegment == 1; updateControls(); view.window?.makeFirstResponder(canvas) }
     private func toggleZoom() { canvas.native = canvas.isFit; updateControls() }
     @objc func zoomIn() { canvas.scale(by: 1.25) }
     @objc func zoomOut() { canvas.scale(by: 0.8) }
+    /// ⌘I: shows the photo's camera and lens details (the Library's Info tab, or the Info panel beside the photo).
     @objc func toggleInfo() {
-        if isLibrary { showEditor() }
-        if !info.isHidden && info.selectedTab == 3 { infoVisible = false }
-        else { infoVisible = true; info.showTab(3) }
-        updateInspectorVisibility()
+        if isLibrary { studio.libraryTab = 2; studio.save(); layoutStudio(); return }
+        toggleFloatingPanel("info")
     }
-    @objc private func toggleInspector() {
-        if isLibrary { showEditor(); infoVisible=true } else { infoVisible.toggle() }
-        updateInspectorVisibility()
-    }
-    private func updateInspectorVisibility() {
-        if !infoVisible { finishMaskEditing() }
-        updateWorkspaceLayout()
-        toolbarItems["inspector"]?.toolTip = infoVisible ? "Hide inspector" : "Show inspector"
-    }
-    @objc private func workspaceChanged(_ sender:NSSegmentedControl) { sender.selectedSegment == 0 ? showLibrary() : showEditor() }
+    /// View › Tools.
+    @objc func chooseToolFromMenu(_ sender: NSMenuItem) { if let raw = sender.representedObject as? String, let t = StudioTool(rawValue: raw) { selectTool(t) } }
     @objc func showLibrary() {
         finishMaskEditing(); canvas.clearTool()
-        isLibrary = true; foldersVisible = true
-        if layoutMode == .lightroom { info.setLightroom(.library) }
-        refreshLibrary(); updateWorkspaceLayout(); updateControls(); updateLibraryInspector()
+        if tool != .adjust { tool = .adjust; info.showToolPanel(nil) }
+        isLibrary = true
+        info.setLightroom(.library)
+        refreshLibrary(); layoutStudio(); updateControls(); updateLibraryInspector()
         withLibrary { $0.focus() }
     }
     @objc func showEditor() {
         let selectedItem = isLibrary ? libraryBrowser?.selectedItems.first : nil
         let wasLibrary = isLibrary
-        isLibrary = false; foldersVisible = false
-        if layoutMode == .lightroom {
-            info.setLightroom(.develop)
-            // The library showed the selected photo's metadata and histogram; show this photo's again.
-            if wasLibrary { info.show(metadata, rendering: renderedPhoto?.description); if renderedPhoto != nil { renderEdits() } }
-        }
-        updateWorkspaceLayout(); updateControls()
+        isLibrary = false
+        info.setLightroom(.develop)
+        // The library showed the selected photo's metadata and histogram; show this photo's again.
+        if wasLibrary { info.show(metadata, rendering: renderedPhoto?.description); if renderedPhoto != nil { renderEdits() } }
+        layoutStudio(); updateControls()
         if let selectedItem, let browser=libraryBrowser {showShootSelection(filtered:browser.visibleURLs,url:selectedItem.url)}
-        rightRail.select(["edit","presets","history","info"][info.selectedTab])
         view.window?.makeFirstResponder(canvas)
-    }
-    private func showEditingSection(_ id:String) {
-        showEditor(); infoVisible = true; updateWorkspaceLayout()
-        switch id {
-        case "crop": info.openTool("Crop & rotate")
-        case "retouch": info.openTool("Retouch")
-        case "mask": info.openCurrentMask()
-        case "presets": info.showTab(1)
-        case "history": info.showTab(2)
-        case "info": info.showTab(3)
-        default: info.showTab(0)
-        }
-        rightRail.select(id)
-    }
-    private func updateWorkspaceLayout() {
-        // Deactivate every alternative first, preventing transient constraint conflicts.
-        NSLayoutConstraint.deactivate([canvasToInspector, canvasToEdge, centerToFolders, centerToRail, centerToShelf, centerToFooter] + luminarConstraints + lightroomConstraints)
-        lightroomConstraints = []
-        canvas.isHidden = isLibrary; canvas.hdrBackdrop.isHidden = isLibrary; libraryHost.isHidden = !isLibrary
-        workspaceMode.selectedSegment = isLibrary ? 0 : 1
-        layoutLightroom()
     }
     /// A merged photo (HDR, panorama, focus stack) joins the open folder's photos.
     func addMergedPhoto(_ url: URL) {
@@ -650,6 +527,8 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
             guard let self else { return };self.showEditor()
         }
         browser.selectionChanged = { [weak self] in self?.updateControls(); self?.updateLibraryInspector() }
+        browser.messageChanged = { [weak self] text in if !text.isEmpty { self?.statusBar.show(text, busy: false) } }
+        optionsSignature = ""
         browser.merged = { [weak self] url in self?.addMergedPhoto(url) }
         browser.renamed = { [weak self] moves in self?.followRenames(moves) }
         browser.keywordsChanged = { [weak self] in self?.updateLibraryPanels() }
@@ -708,8 +587,8 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         window.showWindow(nil); window.window?.makeKeyAndOrderFront(nil)
     }
     private func escapeView() {
-        if canvas.tool != .browse || (layoutMode == .lightroom && info.lightroomToolOpen != nil) {
-            finishMaskEditing(); canvas.clearTool(); closeLightroomTool()
+        if canvas.tool != .browse || tool != .adjust {
+            finishMaskEditing(); canvas.clearTool(); closeTool()
             info.status("Tool cancelled. Edits are saved on this Mac."); return
         }
         if view.window?.styleMask.contains(.fullScreen) == true { toggleFullscreen() }
@@ -799,7 +678,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
             collection.selectionIndexPaths = []
             updateControls()
         }
-        status.stringValue = "Moved \(url.lastPathComponent) to Trash"
+        statusBar.show("Moved \(url.lastPathComponent) to Trash", busy: false)
     }
     @objc func sharePhoto() {
         let sources = selectedURLs
@@ -828,7 +707,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
     func collectionView(_ collectionView: NSCollectionView, didSelectItemsAt indexPaths: Set<IndexPath>) {
         guard let index = indexPaths.map(\.item).sorted().last else { return }
         // In the Lightroom library the filmstrip selects in the grid, as Lightroom's does.
-        if isLibrary, layoutMode == .lightroom, urls.indices.contains(index) { libraryBrowser?.select(url: urls[index]); return }
+        if isLibrary, urls.indices.contains(index) { libraryBrowser?.select(url: urls[index]); return }
         select(index, preservingSelection: true)
     }
     func collectionView(_ collectionView: NSCollectionView, didDeselectItemsAt indexPaths: Set<IndexPath>) {
@@ -839,216 +718,4 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
             else { self.updateControls() }
         }
     }
-}
-
-// MARK: - Lightroom Classic layout
-
-extension ViewerController {
-    fileprivate var lightroomChrome: [NSView] { [modulePicker, navigatorBox, librarySidebar, libraryButtons, info.leftDevelopColumn, info, shelf, filmstripBar, developToolbar] + PanelEdge.allCases.compactMap { edges[$0] } }
-
-    func setupLightroomChrome() {
-        navigator.canvas = canvas
-        navigatorSection.add(navigator)
-        navigatorSection.toggled = { [weak self] in self?.updateWorkspaceLayout() }
-        navigatorSection.translatesAutoresizingMaskIntoConstraints = false; navigatorBox.addSubview(navigatorSection)
-        NSLayoutConstraint.activate([navigatorSection.topAnchor.constraint(equalTo: navigatorBox.topAnchor), navigatorSection.leadingAnchor.constraint(equalTo: navigatorBox.leadingAnchor),
-                                     navigatorSection.trailingAnchor.constraint(equalTo: navigatorBox.trailingAnchor), navigatorSection.bottomAnchor.constraint(equalTo: navigatorBox.bottomAnchor)])
-        zoomLinks.choose = { [weak self] index in
-            guard let self else { return }
-            switch index { case 0: self.fitPhoto(); case 1: self.nativePhoto(); default: self.canvas.native = true; self.canvas.scale(by: 2); self.updateControls() }
-        }
-        libraryButtons.setButtons([("Import…", { [weak self] in self?.importPhotos() }), ("Export…", { [weak self] in self?.exportPhoto() })])
-        libraryButtons.note.isHidden = true
-        modulePicker.choose = { [weak self] module in self?.chooseModule(module) }
-        for (edge, toggle) in edges { toggle.toggled = { [weak self] in self?.togglePanel(edge) } }
-        filmstripBar.grid = { [weak self] in self?.showLibrary() }
-        filmstripBar.step = { [weak self] step in guard let self else { return }; if self.isLibrary { self.showEditor() }; self.advance(step) }
-        developToolbar.command = { [weak self] name in self?.editingCommand(name); self?.updateLightroomBars() }
-        info.lightroomTool = { [weak self] id in self?.lightroomToolChanged(id) }
-        librarySidebar.publish = { [weak self] in self?.withLibrary { $0.openPublish() } }
-        canvas.viewportChanged = { [weak self] in self?.navigator.needsDisplay = true }
-        Shortcuts.workspace = { [weak self] id in self?.handleWorkspaceKey(id) ?? false }
-        // Workspace keys (G, D, R, Q, L, T, Tab…) work wherever focus is in this window, except while typing in a text field.
-        // Before, only the photo, filmstrip and grid handled them, so after G hid the focused photo, D and G went nowhere.
-        if workspaceKeyMonitor == nil {
-            workspaceKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-                guard let self, let window = self.view.window, event.window === window, window.attachedSheet == nil,
-                      !(window.firstResponder is NSText) else { return event }
-                return Shortcuts.performWorkspace(event) ? nil : event
-            }
-        }
-    }
-
-    /// Lightroom Classic's arrangement, with the panels the person has shown or hidden.
-    fileprivate func layoutLightroom() {
-        let panels = lrPanels, g: CGFloat = 10, content = workspaceContent
-        let top = panels.isVisible(.top), left = panels.isVisible(.left), right = panels.isVisible(.right), bottom = panels.isVisible(.bottom)
-        let toolbar = !isLibrary && !panels.toolbarHidden
-        footer.isHidden = true; leftRail.isHidden = true; rightRail.isHidden = true
-        for (edge, toggle) in edges { toggle.isHidden = false; toggle.shown = panels.isVisible(edge) }
-        modulePicker.isHidden = !top; modulePicker.current = isLibrary ? .library : .develop
-        navigatorBox.isHidden = !left
-        librarySidebar.isHidden = !(left && isLibrary); libraryButtons.isHidden = !(left && isLibrary)
-        info.leftDevelopColumn.isHidden = !(left && !isLibrary)
-        info.isHidden = !right
-        shelf.isHidden = !bottom; filmstripBar.isHidden = !bottom
-        developToolbar.isHidden = !toolbar
-        sidebarWidth.constant = 250; infoWidth.constant = 300; shelfHeight.constant = bottom ? 92 : 0
-        guard let topEdge = edges[.top], let bottomEdge = edges[.bottom], let leftEdge = edges[.left], let rightEdge = edges[.right] else { return }
-        let develop = info.leftDevelopColumn
-        lightroomConstraints = [
-            topEdge.topAnchor.constraint(equalTo: content.topAnchor), topEdge.leadingAnchor.constraint(equalTo: content.leadingAnchor), topEdge.trailingAnchor.constraint(equalTo: content.trailingAnchor), topEdge.heightAnchor.constraint(equalToConstant: g),
-            modulePicker.topAnchor.constraint(equalTo: topEdge.bottomAnchor), modulePicker.leadingAnchor.constraint(equalTo: content.leadingAnchor), modulePicker.trailingAnchor.constraint(equalTo: content.trailingAnchor),
-            modulePicker.heightAnchor.constraint(equalToConstant: top ? 44 : 0),
-            bottomEdge.bottomAnchor.constraint(equalTo: content.bottomAnchor), bottomEdge.leadingAnchor.constraint(equalTo: content.leadingAnchor), bottomEdge.trailingAnchor.constraint(equalTo: content.trailingAnchor), bottomEdge.heightAnchor.constraint(equalToConstant: g),
-            shelf.bottomAnchor.constraint(equalTo: bottomEdge.topAnchor), shelf.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: g), shelf.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -g),
-            filmstripBar.bottomAnchor.constraint(equalTo: shelf.topAnchor), filmstripBar.leadingAnchor.constraint(equalTo: shelf.leadingAnchor), filmstripBar.trailingAnchor.constraint(equalTo: shelf.trailingAnchor),
-            filmstripBar.heightAnchor.constraint(equalToConstant: bottom ? 24 : 0),
-            leftEdge.leadingAnchor.constraint(equalTo: content.leadingAnchor), leftEdge.widthAnchor.constraint(equalToConstant: g), leftEdge.topAnchor.constraint(equalTo: modulePicker.bottomAnchor), leftEdge.bottomAnchor.constraint(equalTo: filmstripBar.topAnchor),
-            rightEdge.trailingAnchor.constraint(equalTo: content.trailingAnchor), rightEdge.widthAnchor.constraint(equalToConstant: g), rightEdge.topAnchor.constraint(equalTo: modulePicker.bottomAnchor), rightEdge.bottomAnchor.constraint(equalTo: filmstripBar.topAnchor),
-            navigatorBox.leadingAnchor.constraint(equalTo: leftEdge.trailingAnchor), navigatorBox.topAnchor.constraint(equalTo: modulePicker.bottomAnchor), navigatorBox.widthAnchor.constraint(equalToConstant: 250),
-            // The Navigator keeps its own height (header, 160-point preview and padding) so the panel below gets the rest.
-            navigatorBox.heightAnchor.constraint(equalToConstant: navigatorSection.isOpen ? 210 : 28),
-            librarySidebar.leadingAnchor.constraint(equalTo: navigatorBox.leadingAnchor), librarySidebar.topAnchor.constraint(equalTo: navigatorBox.bottomAnchor), librarySidebar.bottomAnchor.constraint(equalTo: libraryButtons.topAnchor),
-            libraryButtons.leadingAnchor.constraint(equalTo: navigatorBox.leadingAnchor), libraryButtons.widthAnchor.constraint(equalToConstant: 250), libraryButtons.bottomAnchor.constraint(equalTo: filmstripBar.topAnchor), libraryButtons.heightAnchor.constraint(equalToConstant: 40),
-            develop.leadingAnchor.constraint(equalTo: navigatorBox.leadingAnchor), develop.widthAnchor.constraint(equalToConstant: 250), develop.topAnchor.constraint(equalTo: navigatorBox.bottomAnchor), develop.bottomAnchor.constraint(equalTo: filmstripBar.topAnchor),
-            info.trailingAnchor.constraint(equalTo: rightEdge.leadingAnchor), info.topAnchor.constraint(equalTo: modulePicker.bottomAnchor), info.bottomAnchor.constraint(equalTo: filmstripBar.topAnchor),
-            center.topAnchor.constraint(equalTo: modulePicker.bottomAnchor),
-            center.leadingAnchor.constraint(equalTo: left ? navigatorBox.trailingAnchor : leftEdge.trailingAnchor),
-            center.trailingAnchor.constraint(equalTo: right ? info.leadingAnchor : rightEdge.leadingAnchor),
-            center.bottomAnchor.constraint(equalTo: developToolbar.topAnchor),
-            developToolbar.leadingAnchor.constraint(equalTo: center.leadingAnchor), developToolbar.trailingAnchor.constraint(equalTo: center.trailingAnchor),
-            developToolbar.bottomAnchor.constraint(equalTo: filmstripBar.topAnchor), developToolbar.heightAnchor.constraint(equalToConstant: toolbar ? 30 : 0),
-        ]
-        NSLayoutConstraint.activate(lightroomConstraints)
-        applyLights()
-        updateLightroomBars()
-    }
-
-    /// Lights Out (L): dims the panels, then turns them off, leaving the photo.
-    fileprivate func applyLights() {
-        let level = lights
-        for v in lightroomChrome where v !== info && v !== shelf && v !== librarySidebar { v.alphaValue = level.chromeOpacity }
-        for v in [info, shelf, librarySidebar] as [NSView] { v.alphaValue = level.chromeOpacity }
-        workspaceContent.color = level == .normal ? LRColors.backdrop : .black
-        canvas.backdrop = [LRColors.canvas, NSColor(calibratedWhite: 0.05, alpha: 1), .black][level.rawValue]
-    }
-
-    /// Shows or hides a panel (the edge triangles and F5–F8). In the Luminar layout the side panels map to the folders and inspector.
-    fileprivate func togglePanel(_ edge: PanelEdge) {
-        LightroomState.shared.update { $0.toggle(edge) }; updateWorkspaceLayout()
-    }
-    @objc func toggleModulePicker() { togglePanel(.top) }
-    @objc func toggleFilmstripPanel() { togglePanel(.bottom) }
-    @objc func toggleLeftPanel() { togglePanel(.left) }
-    @objc func toggleRightPanel() { togglePanel(.right) }
-    @objc func showMapModule() { chooseModule(.map) }
-    @objc func showSlideshowModule() { chooseModule(.slideshow) }
-    @objc func showPrintModule() { chooseModule(.print) }
-    @objc func showWebModule() { chooseModule(.web) }
-
-    fileprivate func chooseModule(_ module: LightroomModule) {
-        switch module {
-        case .library: showLibrary()
-        case .develop: showEditor()
-        default:
-            guard !urls.isEmpty || !shootCatalog.isEmpty else { info.status("Open a folder of photos first."); NSSound.beep(); return }
-            withLibrary { $0.openModule(module) }
-        }
-    }
-    /// Runs `action` on the library once it has read its photos, creating it if needed.
-    func withLibrary(attempt: Int = 0, _ action: @escaping (ShootWindow) -> Void) {
-        if libraryBrowser == nil { refreshLibrary() }
-        guard let browser = libraryBrowser else { return }
-        if browser.visibleURLs.isEmpty, attempt < 15 {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in self?.withLibrary(attempt: attempt + 1, action) }
-            return
-        }
-        action(browser)
-    }
-
-    /// Lightroom's single keys: G, D, R, Q, Shift-W, L, T, Tab and Shift-Tab.
-    fileprivate func handleWorkspaceKey(_ id: String) -> Bool {
-        guard view.window?.isKeyWindow == true, view.window?.attachedSheet == nil else { return false }
-        switch id {
-        case "workspace.grid": if isLibrary { libraryBrowser?.setViewMode(.grid) }; showLibrary()
-        case "workspace.develop": if isLibrary { showEditor() }
-        case "workspace.crop": openTool("crop")
-        case "workspace.remove": openTool("remove")
-        case "workspace.masking": openTool("masking")
-        case "workspace.lightsOut":
-            lights = lights.next; applyLights()
-        case "workspace.toolbar":
-            LightroomState.shared.update { $0.toolbarHidden.toggle() }; updateWorkspaceLayout()
-        case "workspace.sidePanels", "workspace.allPanels":
-            let all = id == "workspace.allPanels"
-            LightroomState.shared.update { panels in if all { panels.toggleAllPanels() } else { panels.toggleSidePanels() } }
-            updateWorkspaceLayout()
-        default: return false
-        }
-        return true
-    }
-    /// Crop, Remove or Masking: the Develop tool strip.
-    fileprivate func openTool(_ id: String) {
-        if isLibrary { showEditor() }
-        if !lrPanels.isVisible(.right) { LightroomState.shared.update { $0.hidden.remove(.right) }; updateWorkspaceLayout() }
-        let next = info.lightroomToolOpen == id ? nil : id
-        info.showLightroomTool(next); lightroomToolChanged(next)
-    }
-    /// Choosing Crop starts the crop overlay; closing it applies the crop, as Lightroom's Done does.
-    fileprivate func lightroomToolChanged(_ id: String?) {
-        if id == "redeye" { editingCommand("eye:redEye"); return }
-        if canvas.tool == .eyeFix { canvas.clearTool() }
-        if id == "crop" { editingCommand("crop") }
-        else if canvas.tool == .crop { editingCommand("applyCrop") }
-    }
-
-    /// Commands from the Lightroom panels' buttons.
-    func lightroomCommand(_ name: String) {
-        switch name {
-        case "lr:metadata", "lr:syncMetadata": withLibrary { $0.openMetadataEditor() }
-        case "lr:syncSettings": withLibrary { $0.syncSettings() }
-        case "lr:copy", "lr:paste":
-            guard let url = currentSource else { info.status("Open a photo first."); return }
-            withLibrary { [weak self] browser in self?.info.status(name == "lr:copy" ? browser.copySettings(from: url) : browser.pasteSettings(to: url)) }
-        default: break
-        }
-    }
-
-    /// The Library's right panel follows the grid selection: its histogram (from the saved preview), keywords and metadata.
-    func updateLibraryInspector() {
-        guard layoutMode == .lightroom, isLibrary else { return }
-        updateLibraryPanels(); updateSecondaryDisplay()
-        guard let item = libraryBrowser?.selectedItems.first else { info.showKeywords(nil); info.show(nil); info.updateHistogram(nil, sensor: nil); return }
-        info.showKeywords(item.record.metadata?.keywords ?? [])
-        if let index = urls.firstIndex(of: item.url) { collection.selectSingle(index); collection.scrollToItems(at: [IndexPath(item: index, section: 0)], scrollPosition: .centeredHorizontally) }
-        let token = UUID(); libraryInspectorToken = token
-        let request = RenderRequest(photo: item.record, profile: .displayP3, maximumDimension: 420)
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            let metadata = PhotoMetadata.read(item.url)
-            let histogram = PreviewCache.read(request).map { PhotoHistogram.measure(CIImage(cgImage: $0)) }
-            DispatchQueue.main.async {
-                guard let self, self.libraryInspectorToken == token, self.isLibrary else { return }
-                self.info.show(metadata); self.info.updateHistogram(histogram, sensor: nil)
-            }
-        }
-        updateLightroomBars()
-    }
-
-    /// The filmstrip's source line, the Develop toolbar and the Navigator.
-    func updateLightroomBars() {
-        guard layoutMode == .lightroom else { return }
-        let chosen = isLibrary ? (libraryBrowser?.selectedItems.map(\.url) ?? []) : collection.selectionIndexPaths.map(\.item).sorted().filter { urls.indices.contains($0) }.map { urls[$0] }
-        let count = isLibrary ? (libraryBrowser?.visibleURLs.count ?? urls.count) : urls.count
-        filmstripBar.show(source: openCollection == nil ? "Folder" : "Collection", name: openCollection?.name ?? folderURL?.lastPathComponent ?? "No folder open",
-                          count: count, selected: chosen.count, file: chosen.first?.lastPathComponent)
-        developToolbar.show(split: splitCompare, clipping: showClipping, zoom: canvas.image == nil ? "" : (canvas.isFit ? "Fit" : "\(canvas.zoomPercent)%"))
-        zoomLinks.selected = canvas.isFit ? 0 : [100: 1, 200: 2][canvas.zoomPercent] ?? -1
-        navigator.needsDisplay = true
-    }
-}
-
-extension Notification.Name {
-    /// Settings or the View menu switched between the Lightroom Classic and EZ layouts.
-    static let workspaceLayoutChanged = Notification.Name("OpenStillWorkspaceLayoutChanged")
 }

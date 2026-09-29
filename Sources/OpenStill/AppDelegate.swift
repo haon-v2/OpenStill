@@ -102,7 +102,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         add(view, "Zoom Out", #selector(ViewerController.zoomOut), "-", target: viewer)
         add(view, "Fit to Window", #selector(ViewerController.fitPhoto), "0", target: viewer)
         add(view, "Actual Pixels (100%)", #selector(ViewerController.nativePhoto), "1", target: viewer)
-        add(view, "Show / Hide Photo Info", #selector(ViewerController.toggleInfo), "i", target: viewer)
+        add(view, "Info", #selector(ViewerController.toggleInfo), "i", target: viewer)
+        add(view, "Presets & LUTs (⇧P)", #selector(ViewerController.togglePresetsPanel), target: viewer)
+        add(view, "History (H)", #selector(ViewerController.toggleHistoryPanel), target: viewer)
+        add(view, "Navigator", #selector(ViewerController.toggleNavigatorPanel), target: viewer)
+        view.addItem(.separator())
+        let tools = NSMenuItem(title: "Tools", action: nil, keyEquivalent: ""), toolsMenu = NSMenu(title: "Tools")
+        for tool in StudioTool.allCases {
+            let key = tool.shortcutID.flatMap { Shortcuts.map.combo(for: $0)?.display }.map { " (\($0))" } ?? ""
+            let item = NSMenuItem(title: tool.title + key, action: #selector(ViewerController.chooseToolFromMenu(_:)), keyEquivalent: "")
+            item.representedObject = tool.rawValue; item.target = viewer; item.image = Appearance.symbol(tool.symbol, size: 13)
+            toolsMenu.addItem(item)
+        }
+        tools.submenu = toolsMenu; view.addItem(tools)
         add(view, "Show / Hide Clipping (J)", #selector(ViewerController.toggleClippingOverlay), target: viewer)
         add(view, "Before / After Split (Y)", #selector(ViewerController.toggleBeforeAfterSplit), target: viewer)
         view.addItem(.separator())
@@ -146,7 +158,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let windowMenu = menu("Window")
         add(windowMenu, "Minimize", #selector(NSWindow.performMiniaturize(_:)), "m")
         add(windowMenu, "Zoom", #selector(NSWindow.performZoom(_:)))
-        // Lightroom Classic's module shortcuts and panel keys (F5–F8).
+        // Module shortcuts, and the keys that show or hide the bars around the photo.
         windowMenu.addItem(.separator())
         add(windowMenu, "Map", #selector(ViewerController.showMapModule), "3", target: viewer, modifiers: [.command, .option])
         add(windowMenu, "Book", #selector(ViewerController.showBookModule), "4", target: viewer, modifiers: [.command, .option])
@@ -154,10 +166,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         add(windowMenu, "Print", #selector(ViewerController.showPrintModule), "6", target: viewer, modifiers: [.command, .option])
         add(windowMenu, "Web", #selector(ViewerController.showWebModule), "7", target: viewer, modifiers: [.command, .option])
         windowMenu.addItem(.separator())
-        add(windowMenu, "Show / Hide Module Picker", #selector(ViewerController.toggleModulePicker), String(UnicodeScalar(NSF5FunctionKey)!), target: viewer, modifiers: [])
         add(windowMenu, "Show / Hide Filmstrip", #selector(ViewerController.toggleFilmstripPanel), String(UnicodeScalar(NSF6FunctionKey)!), target: viewer, modifiers: [])
-        add(windowMenu, "Show / Hide Left Panel", #selector(ViewerController.toggleLeftPanel), String(UnicodeScalar(NSF7FunctionKey)!), target: viewer, modifiers: [])
-        add(windowMenu, "Show / Hide Right Panel", #selector(ViewerController.toggleRightPanel), String(UnicodeScalar(NSF8FunctionKey)!), target: viewer, modifiers: [])
+        add(windowMenu, "Show / Hide Tool Rail", #selector(ViewerController.toggleToolRail), String(UnicodeScalar(NSF7FunctionKey)!), target: viewer, modifiers: [])
+        add(windowMenu, "Show / Hide Panel", #selector(ViewerController.toggleRightPanel), String(UnicodeScalar(NSF8FunctionKey)!), target: viewer, modifiers: [])
+        add(windowMenu, "Show / Hide Tool Options (T)", #selector(ViewerController.toggleOptionsBar), target: viewer)
         windowMenu.addItem(.separator())
         add(windowMenu, "Secondary Display", #selector(ViewerController.toggleSecondaryDisplay), String(UnicodeScalar(NSF11FunctionKey)!), target: viewer, modifiers: [.command])
         NSApp.windowsMenu = windowMenu

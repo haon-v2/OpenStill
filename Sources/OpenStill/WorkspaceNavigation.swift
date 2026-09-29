@@ -1,36 +1,6 @@
 import AppKit
 import OpenStillCore
 
-/// Compact native navigation for the library and editing sides of the workspace.
-final class WorkspaceRail: GlassChrome {
-    var choose: ((String) -> Void)?
-    private var buttons: [String: ToolbarIconButton] = [:]
-    init(items: [(String, String, String)]) {
-        super.init(frame: .zero)
-        cornerRadius = 16
-        let stack = NSStackView(); stack.orientation = .vertical; stack.spacing = 8
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(stack)
-        for (id, title, symbol) in items {
-            let button = ToolbarIconButton(title: title, target: self, action: #selector(clicked(_:)))
-            button.identifier = NSUserInterfaceItemIdentifier(id)
-            button.image = Appearance.symbol(symbol, description: title)
-            button.isBordered = false; button.imagePosition = .imageOnly; button.setButtonType(.toggle)
-            button.toolTip = title; button.setAccessibilityLabel(title)
-            button.widthAnchor.constraint(equalToConstant: 36).isActive = true
-            button.heightAnchor.constraint(equalToConstant: 38).isActive = true
-            buttons[id] = button; stack.addArrangedSubview(button)
-        }
-        NSLayoutConstraint.activate([stack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 10), stack.centerXAnchor.constraint(equalTo: contentView.centerXAnchor)])
-    }
-    required init?(coder: NSCoder) { fatalError() }
-    func select(_ id: String?) {
-        for (key, button) in buttons { button.state = key == id ? .on : .off; button.needsDisplay = true }
-    }
-    @objc private func clicked(_ sender: NSButton) { if let id = sender.identifier?.rawValue { choose?(id) } }
-}
-
-private final class LibraryStack: NSStackView { override var isFlipped: Bool { true } }
 final class LibrarySidebar: GlassChrome {
     var open: ((URL) -> Void)?
     var browse: (() -> Void)?
@@ -52,6 +22,8 @@ final class LibrarySidebar: GlassChrome {
         }
     }
     private let stack = LibraryStack()
+    /// Which of the Library panel's tabs this shows: 0 Catalog and Folders, 1 Collections and Publish Services.
+    var page = 0 { didSet { if page != oldValue { reloadCollections() } } }
     private var folder: URL?
     private var count = 0
     private var shownCollection: UUID?
@@ -168,6 +140,7 @@ final class LibrarySidebar: GlassChrome {
             fill(s); stack.addArrangedSubview(s); s.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         }
         let current = collections.first { $0.id == collection }
+        if page == 0 {
         section("Catalog") { s in
             s.add(row("All Photographs", count: count, action: #selector(filterPhotos(_:)), tag: 0))
             s.add(row("Picks", action: #selector(filterPhotos(_:)), tag: 1))
@@ -195,6 +168,7 @@ final class LibrarySidebar: GlassChrome {
             let holder = NSStackView(views: [subfolders]); holder.edgeInsets = NSEdgeInsets(top: 4, left: 26, bottom: 2, right: 8); s.add(holder)
             s.add(row("Add Folder…", action: #selector(openFolder), symbol: "plus"))
         }
+        } else {
         section("Collections") { s in
             for (index, c) in collections.enumerated() {
                 let r = row(c.name, action: #selector(chooseCollection(_:)), tag: index, selected: c.id == collection, symbol: c.isSmart ? "gearshape" : "rectangle.stack")
@@ -207,6 +181,7 @@ final class LibrarySidebar: GlassChrome {
             s.add(row("Create Smart Collection…", action: #selector(createSmartCollection), symbol: "plus"))
         }
         section("Publish Services") { s in s.add(row("Set Up Publishing…", action: #selector(publishServices), symbol: "square.and.arrow.up")) }
+        }
     }
     // MARK: Folders tree
 

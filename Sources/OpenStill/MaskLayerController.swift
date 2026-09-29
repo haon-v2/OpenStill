@@ -7,34 +7,37 @@ extension ViewerController {
     /// Return anywhere in Develop: finish the tool (apply a crop, end mask painting, stop red eye) and close its panel.
     override func keyDown(with event: NSEvent) {
         if !isLibrary, Shortcuts.command(for: event, in: .editor) == "editor.done", view.window?.attachedSheet == nil { finishToolAndClose(); return }
-        if !isLibrary, Shortcuts.command(for: event, in: .editor) == "editor.escape", layoutMode == .lightroom, info.lightroomToolOpen != nil {
-            finishMaskEditing(); canvas.clearTool(); closeLightroomTool(); return
+        if !isLibrary, Shortcuts.command(for: event, in: .editor) == "editor.escape", tool != .adjust {
+            finishMaskEditing(); canvas.clearTool(); closeTool(); return
         }
         super.keyDown(with: event)
     }
+    /// Return or Done: finishes the tool (applies the crop, ends mask painting) and goes back to Adjust.
     func finishToolAndClose() {
         guard !isLibrary else { return }
-        let open = layoutMode == .lightroom ? info.lightroomToolOpen : nil
+        let open = tool != .adjust
         let active = canvas.tool != .browse
         switch canvas.tool {
         case .crop: finishCrop()
         case .browse: break
         default: finishMaskEditing(); canvas.clearTool()
         }
-        guard open != nil || active else { return }
-        closeLightroomTool()
+        guard open || active else { return }
+        closeTool()
         info.status("Done. Edits are saved on this Mac.")
     }
-    /// Closes the Lightroom tool strip's drawer (Crop, Remove, Red Eye, Masking) completely.
-    func closeLightroomTool() {
-        guard layoutMode == .lightroom, info.lightroomToolOpen != nil else { return }
-        info.showLightroomTool(nil)
+    /// Leaves the current tool for Adjust without applying anything more.
+    func closeTool() {
         if canvas.tool == .crop { finishCrop() }
-        if canvas.tool == .eyeFix { canvas.clearTool() }
+        if canvas.tool == .eyeFix || canvas.tool == .whiteBalance || canvas.tool == .targeted { canvas.clearTool() }
+        guard tool != .adjust else { return }
+        tool = .adjust
+        info.showToolPanel(nil)
+        updateStudioBars()
     }
 
     /// Applies a drawn crop; with no frame drawn (or the whole photo) it just leaves Crop.
-    private func finishCrop() {
+    func finishCrop() {
         if let rect = canvas.cropSelection, rect.width > 0.01, rect.height > 0.01, rect.width < 0.999 || rect.height < 0.999 { editingCommand("applyCrop") }
         if canvas.tool == .crop { canvas.clearTool() }
     }
