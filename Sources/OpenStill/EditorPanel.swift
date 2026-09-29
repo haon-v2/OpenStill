@@ -48,7 +48,6 @@ final class EditorPanel: ChromePanel {
     /// Snapshots: in the History tab (Luminar) or their own left-panel section (Lightroom).
     private let snapshotStack = EditorStack()
     var retouchSettingsChanged:((RetouchSession)->Void)?
-    private var lutMask: MaskPanel?
     private let looks = LookBrowserView()
     private var hasPhoto = false
     private var busy = false
@@ -144,6 +143,17 @@ final class EditorPanel: ChromePanel {
         action("Save current as preset…","savePreset",to:looks.presetControls)
         action("Import preset…","loadPreset",to:looks.presetControls)
         action("Export current as preset…","exportPreset",to:looks.presetControls)
+        looks.chooseSky = { [weak self] sky in self?.command?("sky:"+sky.entry.id) }
+        slider("Relight scene",path:\.skyRelight,range:0...1,in:looks.skyControls)
+        slider("Horizon",path:\.skyHorizon,range:-1...1,in:looks.skyControls)
+        slider("Sky exposure",path:\.skyExposure,range:-2...2,in:looks.skyControls)
+        slider("Sky defocus",path:\.skyDefocus,range:0...1,in:looks.skyControls)
+        slider("Atmosphere",path:\.skyAtmosphere,range:0...1,in:looks.skyControls)
+        action("Flip sky","skyFlip",to:looks.skyControls)
+        action("Remove sky","removeSky",to:looks.skyControls)
+        action("Use your own sky…","customSky",to:looks.skyControls)
+        addMaskControls(PhotoEdits.skyMaskKey,title:"Refine sky selection…",to:looks.skyControls)
+        help("Skies: Poly Haven (CC0). On-device AI finds the sky; refine it with the mask tools above if it misses an edge.",to:looks.skyControls)
         _ = installScroll(historyScroll, stack: historyStack)
         info.translatesAutoresizingMaskIntoConstraints = false; body.addSubview(info)
         NSLayoutConstraint.activate([info.topAnchor.constraint(equalTo: body.topAnchor), info.bottomAnchor.constraint(equalTo: body.bottomAnchor), info.leadingAnchor.constraint(equalTo: body.leadingAnchor), info.trailingAnchor.constraint(equalTo: body.trailingAnchor)])
@@ -179,9 +189,11 @@ final class EditorPanel: ChromePanel {
         panel.brushChanged = { [weak self] radius,softness,strength in self?.brushChanged?(key,radius,softness,strength) }
         return panel
     }
-    private func addMaskControls(_ key:String,to stack:NSStackView) {
-        let button = NSButton(title:"Mask this LUT…",target:self,action:#selector(toggleLUTMask));button.bezelStyle = .rounded;button.font = .systemFont(ofSize:11);fullWidth(button,in:stack)
-        let panel = makeMaskPanel(key);panel.isHidden = true;fullWidth(panel,in:stack);lutMask = panel
+    /// A button that shows or hides this tool's mask tools under it.
+    private func addMaskControls(_ key:String,title:String = "Mask this LUT…",to stack:NSStackView) {
+        let panel = makeMaskPanel(key);panel.isHidden = true
+        let button = ClosureButton(title:title) { [weak self, weak panel] in self?.command?("finishMask");panel?.isHidden.toggle();panel?.resetInteraction() }
+        button.bezelStyle = .rounded;button.font = .systemFont(ofSize:11);fullWidth(button,in:stack);fullWidth(panel,in:stack)
         panel.done = { [weak panel] in panel?.isHidden = true }
     }
     /// Shows the selected mask layer's mask tools under its sliders.
@@ -193,7 +205,6 @@ final class EditorPanel: ChromePanel {
         if let key, let panel = maskPanels[key] { layerMaskBorrow = lend(panel, into: maskLayers.maskHolder, height: nil); panel.resetInteraction() }
     }
     func selectMaskLayer(_ id: UUID?) { maskLayers.select(id); showLayerMask() }
-    @objc private func toggleLUTMask() { command?("finishMask");lutMask?.isHidden.toggle();lutMask?.resetInteraction() }
     func selectedMaskComponent(key:String)->UUID? { maskPanels[key]?.selectedID }
     func selectMaskComponent(key:String,id:UUID) { maskPanels[key]?.selectComponent(id) }
     func maskInteraction(key:String,kind:String?,subtract:Bool,visible:Bool) { maskPanels[key]?.interaction(kind:kind,subtract:subtract,visible:visible) }
@@ -206,6 +217,9 @@ final class EditorPanel: ChromePanel {
     var lutLibrary: LUTLibrary { looks.luts }
     func preset(id:String) -> PresetRecipe? { looks.preset(id:id) }
     func preset(named name:String) -> PresetRecipe? { looks.preset(named:name) }
+    func sky(id:String) -> SkyItem? { looks.sky(id:id) }
+    func refreshSkies() { looks.reload(); looks.showSkies() }
+    func showSkies() { looks.showSkies() }
     /// After saving or importing a preset: list it and show it as applied.
     func presetSaved(_ name:String) { looks.reload(); looks.showMyPresets(); if let preset = looks.preset(id:"user-"+name) { looks.showApplied(preset) } }
     func updateHistogram(_ value:PhotoHistogram?, sensor:Double?) { histogram.histogram = value; histogram.sensor = sensor }
@@ -559,7 +573,7 @@ extension EditorPanel {
             slider("Hue", path: \.calibrationBlueHue, range: -1...1, in: s.body); slider("Saturation", path: \.calibrationBlueSaturation, range: -1...1, in: s.body)
         }
         // OpenStill's own tools, after Lightroom's panels.
-        section("Sky Replacement") { s in action("Choose sky & replace…", "ai:sky", to: s.body) }
+        section("Sky Replacement") { s in action("Choose a sky…", "chooseSky", to: s.body); action("Use your own sky…", "customSky", to: s.body) }
         section("Layers") { s in
             slider("Edit strength", path: \.opacity, range: 0...1, in: s.body)
             action("Add image layer…", "addLayer", to: s.body)

@@ -100,6 +100,7 @@ public struct PresetRecipe: Codable, Equatable {
         p.advanced!.eyeFixes = c.advanced!.eyeFixes; p.advanced!.autoCA = c.advanced!.autoCA; p.advanced!.localAdjustments = c.advanced!.localAdjustments
         p.advanced!.aiBackgroundAsset = c.advanced!.aiBackgroundAsset; p.advanced!.aiFeatureKey = c.advanced!.aiFeatureKey
         p.advanced!.lutAsset = c.advanced!.lutAsset; p.advanced!.lutName = c.advanced!.lutName; p.advanced!.lutID = c.advanced!.lutID; p.lutAmount = c.lutAmount
+        p.advanced!.sky = c.advanced!.sky
         return p
     }
     /// A photo's edits made ready to save as a preset: the photo-specific parts are cleared.

@@ -138,6 +138,8 @@ public struct AdvancedEdits: Codable, Equatable {
     public var contrastModel: String?
     /// "corrected" once Temperature or Tint is changed: higher Temperature warms and positive Tint adds magenta on rendered photos. nil keeps an older edit's look.
     public var whiteBalanceModel: String?
+    /// A replacement sky composited through the "Sky" mask (M21).
+    public var sky: SkyReplacement?
     /// "regions" once Highlights or Shadows is moved: Lightroom-style −1…+1 sliders centred at 0 (`toneHighlights`, `toneShadows`).
     /// nil keeps an older edit's original highlight/shadow rendering until one of them is changed.
     public var toneModel: String?

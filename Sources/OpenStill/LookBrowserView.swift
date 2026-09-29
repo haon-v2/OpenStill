@@ -1,21 +1,25 @@
 import AppKit
 import CoreImage
+import ImageIO
 import OpenStillCore
 
-/// One card in the browser: a preset or a LUT look (one card per push/pull family).
+/// One card in the browser: a preset, a LUT look (one card per push/pull family) or a replacement sky.
 enum Look: Equatable {
     case lut(LUTItem)
     case preset(PresetRecipe)
+    case sky(SkyItem)
     var id: String {
         switch self {
         case .lut(let item): return "lut:" + item.entry.id
         case .preset(let preset): return "preset:" + preset.id
+        case .sky(let sky): return "sky:" + sky.entry.id
         }
     }
     var title: String {
         switch self {
         case .lut(let item): return item.entry.name
         case .preset(let preset): return preset.name
+        case .sky(let sky): return sky.entry.name
         }
     }
 }
@@ -84,17 +88,21 @@ private final class LookItem: NSCollectionViewItem {
 /// Presets and LUT looks: categories, search, favorites, recent, and thumbnails of each look on the current photo.
 /// Only visible cards exist and only they render thumbnails.
 final class LookBrowserView: NSStackView, NSCollectionViewDataSource, NSCollectionViewDelegate, NSCollectionViewDelegateFlowLayout {
-    enum Mode: Int { case presets, luts }
+    enum Mode: Int { case presets, luts, skies }
     var chooseLUT: ((LUTItem) -> Void)?
+    var chooseSky: ((SkyItem) -> Void)?
     var choosePreset: ((PresetRecipe, Double) -> Void)?
     var command: ((String) -> Void)?
     /// LUT intensity, mask and import controls (filled by the editor panel).
     let lutControls = NSStackView()
     /// Save / import preset actions (filled by the editor panel).
     let presetControls = NSStackView()
+    /// Sky sliders and actions (filled by the editor panel).
+    let skyControls = NSStackView()
     private(set) var luts = LUTLibrary(imported: EditStorage.root.appendingPathComponent("LUTLibrary"))
     private(set) var presets = PresetLibrary.empty
-    private let modePicker = NSSegmentedControl(labels: ["Presets", "LUTs"], trackingMode: .selectOne, target: nil, action: nil)
+    private(set) var skies = SkyLibrary.empty
+    private let modePicker = NSSegmentedControl(labels: ["Presets", "LUTs", "Skies"], trackingMode: .selectOne, target: nil, action: nil)
     private let search = NSSearchField()
     private let picker = NSPopUpButton(frame: .zero, pullsDown: false)
     private let gridScroll = NSScrollView()
@@ -133,7 +141,7 @@ final class LookBrowserView: NSStackView, NSCollectionViewDataSource, NSCollecti
     override init(frame: NSRect) {
         super.init(frame: frame); orientation = .vertical; alignment = .leading; spacing = 8
         images.countLimit = 400
-        modePicker.target = self; modePicker.action = #selector(modeChanged); modePicker.segmentStyle = .capsule; modePicker.setAccessibilityLabel("Presets or LUTs")
+        modePicker.target = self; modePicker.action = #selector(modeChanged); modePicker.segmentStyle = .capsule; modePicker.setAccessibilityLabel("Presets, LUTs or skies")
         mode = Mode(rawValue: UserDefaults.standard.integer(forKey: Self.modeKey)) ?? .presets; modePicker.selectedSegment = mode.rawValue
         add(modePicker)
         search.placeholderString = "Search looks"; search.target = self; search.action = #selector(filterChanged); search.sendsSearchStringImmediately = true; search.font = .systemFont(ofSize: 11); add(search)
@@ -151,7 +159,7 @@ final class LookBrowserView: NSStackView, NSCollectionViewDataSource, NSCollecti
         amount.target = self; amount.action = #selector(amountChanged); amount.isContinuous = true; amount.setAccessibilityLabel("Preset amount")
         amountValue.font = Studio.statusFont; amountValue.textColor = Studio.secondary; amountValue.alignment = .right; amountValue.widthAnchor.constraint(equalToConstant: 40).isActive = true
         amountRow.orientation = .horizontal; amountRow.spacing = 8; [amountLabel, amount, amountValue].forEach(amountRow.addArrangedSubview); add(amountRow)
-        for stack in [lutControls, presetControls] { stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 8; add(stack) }
+        for stack in [lutControls, presetControls, skyControls] { stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 8; add(stack) }
         notice.font = .systemFont(ofSize: 10); notice.textColor = Studio.secondary; add(notice); notice.isHidden = true
         reload()
     }
@@ -168,6 +176,7 @@ final class LookBrowserView: NSStackView, NSCollectionViewDataSource, NSCollecti
         return FileManager.default.fileExists(atPath: bundled.appendingPathComponent("LUTs/catalog.json").path) ? bundled : URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("Resources")
     }
     static var userPresets: URL { EditStorage.root.appendingPathComponent("Presets") }
+    static var userSkies: URL { EditStorage.root.appendingPathComponent("Skies") }
     func reload() {
         let resources = Self.bundledResources, imports = EditStorage.root.appendingPathComponent("LUTLibrary")
         var problems: [String] = []
@@ -175,6 +184,8 @@ final class LookBrowserView: NSStackView, NSCollectionViewDataSource, NSCollecti
         catch { luts = LUTLibrary(imported: imports); problems.append("The included LUT library couldn’t load. Imported looks are still available.") }
         do { presets = try PresetLibrary(bundled: resources.appendingPathComponent("Presets/presets.json"), user: Self.userPresets) }
         catch { presets = (try? PresetLibrary(bundled: nil, user: Self.userPresets)) ?? .empty; problems.append("The included presets couldn’t load. My Presets are still available.") }
+        do { skies = try SkyLibrary(bundled: resources.appendingPathComponent("Skies"), user: Self.userSkies) }
+        catch { skies = SkyLibrary.empty; problems.append("The included skies couldn’t load. Your own skies are still available.") }
         notice.stringValue = problems.joined(separator: "\n"); notice.isHidden = problems.isEmpty
         images.removeAllObjects(); failures.removeAll()
         rebuildPicker(); rebuild()
@@ -183,6 +194,7 @@ final class LookBrowserView: NSStackView, NSCollectionViewDataSource, NSCollecti
     func imported(filename: String) -> LUTItem? { luts.items.first { !$0.isBundled && $0.url.lastPathComponent == filename } }
     func preset(id: String) -> PresetRecipe? { presets.presets.first { $0.id == id } }
     func preset(named name: String) -> PresetRecipe? { presets.presets.first { $0.name == name } }
+    func sky(id: String) -> SkyItem? { skies.items.first { $0.entry.id == id } }
 
     // MARK: Photo and state from the editor
     func setActive(_ value: Bool) { active = value; generation.begin(); if value { requestVisible() } }
@@ -216,6 +228,17 @@ final class LookBrowserView: NSStackView, NSCollectionViewDataSource, NSCollecti
                 for v in variants { variantPicker.addItem(withTitle: v.entry.variant ?? "Normal"); variantPicker.lastItem?.representedObject = v.entry.id }
                 variantPicker.selectItem(withTitle: e.variant ?? "Normal"); variantPicker.isHidden = false
             }
+        } else if mode == .skies {
+            let sky = skies.selected(for: value)
+            let hasMask = value.advanced?.masks[PhotoEdits.skyMaskKey] != nil
+            if let sky {
+                detail.stringValue = "\(sky.entry.name)\n\(sky.entry.creator) · \(licenseName(sky.entry.license))"
+                sourceURL = URL(string: sky.entry.source).flatMap { ["https", "http"].contains($0.scheme ?? "") ? $0 : nil }
+            } else {
+                detail.stringValue = value.sky.map { "\($0.name)\nSaved with this edit." } ?? (hasMask ? "Choose a sky. The rest of the photo is relit to match it."
+                    : "Choose a sky. On-device AI finds the sky in this photo first (one-time setup of about 450 MB), then the rest of the photo is relit to match.")
+                sourceURL = nil
+            }
         } else if mode == .presets, let preset = appliedPreset {
             detail.stringValue = "\(preset.name)\n\(preset.description)" + (preset.lut.flatMap { id in luts.items.first { $0.entry.id == id.id } }.map { "\nLook: \($0.entry.displayName) · \($0.entry.creator) · \(licenseName($0.entry.license))" } ?? "")
             sourceURL = nil
@@ -231,6 +254,7 @@ final class LookBrowserView: NSStackView, NSCollectionViewDataSource, NSCollecti
         switch look {
         case .lut(let item): return selected.map { $0.entry.id == item.entry.id || ($0.entry.family != nil && $0.entry.family == item.entry.family) } ?? false
         case .preset(let p): return appliedPreset?.id == p.id
+        case .sky(let sky): return edits.sky?.id == sky.entry.id
         }
     }
 
@@ -247,6 +271,9 @@ final class LookBrowserView: NSStackView, NSCollectionViewDataSource, NSCollecti
             add("All looks", "All", looks.count); add("★ Favorites", "*favorites", nil); add("Recent", "*recent", nil); picker.menu?.addItem(.separator())
             for category in luts.categories.dropFirst() { add(category, category, looks.filter { $0.entry.category == category }.count) }
             if !luts.categories.contains("Imported") { add("Imported", "Imported", 0) }
+        } else if mode == .skies {
+            add("All skies", "All", skies.items.count); add("★ Favorites", "*favorites", nil); add("Recent", "*recent", nil); picker.menu?.addItem(.separator())
+            for category in SkyLibrary.categories { add(category, category, skies.filtered(category).count) }
         } else {
             add("All presets", "All", presets.presets.count); add("★ Favorites", "*favorites", nil); add("Recent", "*recent", nil); picker.menu?.addItem(.separator())
             for category in presets.categories.dropFirst() { add(category, category, presets.filtered(category).count) }
@@ -259,6 +286,10 @@ final class LookBrowserView: NSStackView, NSCollectionViewDataSource, NSCollecti
         if mode == .luts {
             let base = key.hasPrefix("*") ? luts.items : luts.filtered(key)
             looks = luts.collapsed(luts.search(text, in: base)).map(Look.lut)
+        } else if mode == .skies {
+            let base = key.hasPrefix("*") ? skies.items : skies.filtered(key)
+            let words = text.lowercased().split(separator: " ").map(String.init)
+            looks = base.filter { sky in words.allSatisfy { w in ([sky.entry.name, sky.entry.category] + (sky.entry.tags ?? [])).joined(separator: " ").lowercased().contains(w) } }.map(Look.sky)
         } else {
             let base = key.hasPrefix("*") ? presets.presets : presets.filtered(key)
             looks = presets.search(text, in: base).map(Look.preset)
@@ -271,11 +302,11 @@ final class LookBrowserView: NSStackView, NSCollectionViewDataSource, NSCollecti
         generation.begin(); lock.lock(); wanted.removeAll(); lock.unlock()
         shown = filteredLooks(); collection.reloadData(); collection.scroll(.zero)
         let key = picker.selectedItem?.representedObject as? String
-        empty.stringValue = key == "Imported" ? "No imported LUTs yet. Use Import .cube LUT below." : key == PresetLibrary.myPresets ? "No presets of your own yet. Use Save current as preset below."
+        empty.stringValue = key == "Imported" ? "No imported LUTs yet. Use Import .cube LUT below." : key == "Your Skies" ? "No skies of your own yet. Use Use your own sky… below." : key == PresetLibrary.myPresets ? "No presets of your own yet. Use Save current as preset below."
             : key == "*favorites" ? "No favorites yet. Right-click a look to add it." : key == "*recent" ? "Looks you apply appear here." : "Nothing matches “\(search.stringValue)”."
         empty.isHidden = !shown.isEmpty
-        lutControls.isHidden = mode != .luts; presetControls.isHidden = mode != .presets; amountRow.isHidden = mode != .presets
-        search.placeholderString = mode == .luts ? "Search \(luts.collapsed(luts.items).count) looks" : "Search \(presets.presets.count) presets"
+        lutControls.isHidden = mode != .luts; presetControls.isHidden = mode != .presets; amountRow.isHidden = mode != .presets; skyControls.isHidden = mode != .skies
+        search.placeholderString = mode == .luts ? "Search \(luts.collapsed(luts.items).count) looks" : mode == .skies ? "Search \(skies.items.count) skies" : "Search \(presets.presets.count) presets"
         updateSelection(edits)
     }
     @objc private func modeChanged() {
@@ -298,6 +329,7 @@ final class LookBrowserView: NSStackView, NSCollectionViewDataSource, NSCollecti
         remember(look)
         switch look {
         case .lut(let item): chooseLUT?(item)
+        case .sky(let sky): chooseSky?(sky)
         case .preset(let preset):
             appliedPreset = preset; amount.doubleValue = 100; amountValue.stringValue = "100%"
             choosePreset?(preset, 1)
@@ -321,6 +353,13 @@ final class LookBrowserView: NSStackView, NSCollectionViewDataSource, NSCollecti
                 catch { self.command?("status:" + error.localizedDescription) }
             })
         }
+        if case .sky(let sky) = look, sky.entry.category == "Your Skies" {
+            menu.addItem(.separator())
+            menu.addItem(ClosureMenuItem("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([sky.url]) })
+            menu.addItem(ClosureMenuItem("Delete") { [weak self] in
+                try? FileManager.default.removeItem(at: sky.url); try? FileManager.default.removeItem(at: sky.url.deletingPathExtension().appendingPathExtension("json")); self?.reload()
+            })
+        }
         if case .lut(let item) = look, !item.isBundled {
             menu.addItem(.separator())
             menu.addItem(ClosureMenuItem("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([item.url]) })
@@ -337,6 +376,9 @@ final class LookBrowserView: NSStackView, NSCollectionViewDataSource, NSCollecti
     }
     /// Shows a preset the editor just applied (for example after saving or importing one).
     func showApplied(_ preset: PresetRecipe) { appliedPreset = preset; amount.doubleValue = 100; amountValue.stringValue = "100%"; updateSelection(edits) }
+    func showSkies() {
+        if mode != .skies { modePicker.selectedSegment = Mode.skies.rawValue; modeChanged() }
+    }
     func showMyPresets() {
         if mode != .presets { modePicker.selectedSegment = Mode.presets.rawValue; modeChanged() }
         if let index = picker.itemArray.firstIndex(where: { $0.representedObject as? String == PresetLibrary.myPresets }) { picker.selectItem(at: index); filterChanged() }
@@ -351,6 +393,7 @@ final class LookBrowserView: NSStackView, NSCollectionViewDataSource, NSCollecti
         card.favorite = favorites.contains(look.id); card.applied = isApplied(look, lut: luts.selected(for: edits))
         if case .lut(let lut) = look { card.variants = luts.variants(of: lut).count; card.toolTip = lut.entry.description + "\n" + lut.entry.creator } else { card.variants = 0 }
         if case .preset(let preset) = look { card.toolTip = preset.description }
+        if case .sky(let sky) = look { card.toolTip = sky.entry.category + " · " + sky.entry.creator }
         card.click = { [weak self] in self?.choose(look) }
         card.menuProvider = { [weak self] in self?.menu(for: look) }
         return item
@@ -377,7 +420,7 @@ final class LookBrowserView: NSStackView, NSCollectionViewDataSource, NSCollecti
         for path in collection.indexPathsForVisibleItems().sorted() where path.item < shown.count { want(shown[path.item].id) }
     }
     private func want(_ id: String) {
-        guard active, original != nil || linearSource != nil, images.object(forKey: id as NSString) == nil, !failures.contains(id) else { return }
+        guard active, original != nil || linearSource != nil || id.hasPrefix("sky:"), images.object(forKey: id as NSString) == nil, !failures.contains(id) else { return }
         lock.lock(); if !wanted.contains(id) { wanted.append(id) }; lock.unlock()
         kick()
     }
@@ -410,6 +453,13 @@ final class LookBrowserView: NSStackView, NSCollectionViewDataSource, NSCollecti
                     case .preset(let preset):
                         preview = preset.edits(from: snapshot); preview.ensureAdvanced()
                         if let lut = preset.lut, let item = lutLibrary.items.first(where: { $0.entry.id == lut.id }) { preview.advanced!.lutAsset = nil; preview.lutAmount = lut.amount; override = try item.load() }
+                    case .sky(let sky):
+                        // With a sky selection, the sky on this photo; without one, the sky itself.
+                        guard snapshot.advanced?.masks[PhotoEdits.skyMaskKey] != nil, original != nil || linearSource != nil else { return try Self.thumbnail(sky.url) }
+                        var settings = SkyReplacement(id: sky.entry.id, name: sky.entry.name, asset: sky.url.path, mean: sky.entry.mean, horizonColor: sky.entry.horizon,
+                                                      relight: SkyItem.defaultRelight[sky.entry.category] ?? 0.6)
+                        if let current = snapshot.sky { settings.horizon = current.horizon; settings.exposure = current.exposure; settings.defocus = current.defocus; settings.atmosphere = current.atmosphere; settings.flip = current.flip }
+                        preview.sky = settings
                     }
                     if let url, var recipe { recipe.edits = preview; return try ModernRenderer.display(ModernRenderer.render(source: url, recipe: recipe, maximumDimension: 240, lutOverride: override)) }
                     if let linearSource { return try ModernRenderer.display(ModernRenderer.process(linearSource, edits: preview, maximumDimension: 240, lutOverride: override)) }
@@ -456,6 +506,19 @@ extension LookBrowserView {
     }
 }
 
+extension LookBrowserView {
+    /// A small copy of an image file, for sky cards.
+    static func thumbnail(_ url: URL) throws -> CGImage {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [kCGImageSourceCreateThumbnailFromImageAlways: true, kCGImageSourceThumbnailMaxPixelSize: 320, kCGImageSourceCreateThumbnailWithTransform: true] as CFDictionary) else { throw LUTError.invalid }
+        return image
+    }
+}
+
+extension SkyLibrary {
+    static let empty = try! SkyLibrary(bundled: nil, user: URL(fileURLWithPath: "/nonexistent-openstill-skies"))
+}
+
 extension PresetLibrary {
     static let empty = try! PresetLibrary(bundled: nil, user: URL(fileURLWithPath: "/nonexistent-openstill-presets"))
 }
@@ -467,5 +530,15 @@ final class ClosureMenuItem: NSMenuItem {
         self.handler = handler; super.init(title: title, action: #selector(run), keyEquivalent: ""); target = self
     }
     required init(coder: NSCoder) { fatalError() }
+    @objc private func run() { handler() }
+}
+
+/// A push button that runs a closure.
+final class ClosureButton: NSButton {
+    private var handler: () -> Void = {}
+    convenience init(title: String, handler: @escaping () -> Void) {
+        self.init(title: title, target: nil, action: nil)
+        self.handler = handler; target = self; action = #selector(run)
+    }
     @objc private func run() { handler() }
 }

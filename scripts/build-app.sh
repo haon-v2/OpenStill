@@ -15,6 +15,7 @@ otool -l "$APP/Contents/MacOS/OpenStill" | grep -q "@executable_path/../Framewor
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 cp -R Resources/LUTs "$APP/Contents/Resources/"
 cp -R Resources/Presets "$APP/Contents/Resources/"
+cp -R Resources/Skies "$APP/Contents/Resources/"
 cp -R Resources/AI "$APP/Contents/Resources/"
 cp -R Resources/LensProfiles "$APP/Contents/Resources/"
 cp -R Resources/Licenses "$APP/Contents/Resources/"
