@@ -167,7 +167,9 @@ extension ViewerController {
         let hdrPreview = edits.hdr.enabled && PhotoBackdrop.hdrAvailable
         var sdrEdits = edits; sdrEdits.hdrEnabled = false
         let baseLimit = sourceLimit(baseEdge)
+        let queuedAt = Date()   // TEMPORARY TIMING
         renderQueue.async { [weak self] in
+            let startedAt = Date()   // TEMPORARY TIMING
             let result = Result { try autoreleasepool { () -> (CGImage, CGImage?, (image:CGImage, region:CGRect)?) in
                 func render(_ limit:Int?) throws -> CIImage? {
                     if let recipe, recipe.renderer == .linear2020 { return try ModernRenderer.render(source:source, recipe:hdrPreview ? recipe:recipe.sdr, maximumDimension:limit) }
@@ -189,7 +191,9 @@ extension ViewerController {
                 }
                 return (shown, hdr, detail)
             } }
+            let renderedAt = Date()   // TEMPORARY TIMING
             DispatchQueue.main.async {
+                LayoutDump.trace("render interactive=\(interactive) edge=\(Int(baseEdge)) wait=\(Int(startedAt.timeIntervalSince(queuedAt)*1000)) ms render=\(Int(renderedAt.timeIntervalSince(startedAt)*1000)) ms deliver=\(Int(Date().timeIntervalSince(renderedAt)*1000)) ms")   // TEMPORARY TIMING
                 guard let self, self.renderGeneration == generation else { return }
                 self.renderInFlight = false
                 guard self.currentSource == source else { self.renderQueued = false; return }

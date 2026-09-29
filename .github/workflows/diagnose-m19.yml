@@ -37,17 +37,8 @@ jobs:
               echo "BEGIN $f"; base64 -i $f.jpg | tr -d '\n'; echo; echo "END $f"
             done
           done <<'LIST'
-          empty|0|
-          develop|1|develop
           drag|1|develop;drag:Exposure
           dragcontrast|1|develop;drag:Contrast
-          crop|1|develop;tool:crop
-          masking|1|develop;tool:masking;command:maskLayer:new:radial
           zoom|1|develop;zoom
-          folders|1|library;libtab:0
-          filmstrip|1|develop;filmstrip
-          presets|1|develop;panel:presets
-          history|1|develop;panel:history
-          keys|1|develop;keys:g,d,r,return,q,esc,^w,return,t,t,tab,tab,a
           LIST
           true

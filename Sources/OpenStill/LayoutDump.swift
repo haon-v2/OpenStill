@@ -3,6 +3,9 @@ import OpenStillCore
 
 /// TEMPORARY diagnostics for CI: runs a few steps in the Studio window, captures it, then quits.
 enum LayoutDump {
+    /// TEMPORARY TIMING: printed only while the harness runs.
+    static let tracing = ProcessInfo.processInfo.environment["OPENSTILL_LAYOUT_DUMP"] != nil
+    static func trace(_ text: @autoclosure () -> String) { if tracing { print("TRACE " + text()); fflush(stdout) } }
     static func runIfRequested(window: NSWindow?) {
         let env = ProcessInfo.processInfo.environment
         guard let path = env["OPENSTILL_LAYOUT_DUMP"] else { return }
@@ -95,7 +98,8 @@ enum LayoutDump {
         for i in 1...45 {
             DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.033) {
                 let value = from + span * Double(i) / 45
-                slider.doubleValue = value; slider.changed?(value, false)
+                let t = Date(); slider.doubleValue = value; slider.changed?(value, false)
+                trace("tick main \(String(format: "%.1f", Date().timeIntervalSince(t)*1000)) ms")
                 if i == 45 {
                     let during = frames.count
                     slider.changed?(value, true)

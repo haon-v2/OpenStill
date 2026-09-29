@@ -28,6 +28,7 @@ public enum SmartContrast {
     """)
     /// The middle tone: the average brightness in perceptual terms, kept between 0.3 and 0.7.
     public static func pivot(_ image: CIImage) -> Double {
+        let traceStart = Date(); defer { if ProcessInfo.processInfo.environment["OPENSTILL_LAYOUT_DUMP"] != nil { print("TRACE pivot \(Int(Date().timeIntervalSince(traceStart)*1000)) ms for \(Int(image.extent.width))×\(Int(image.extent.height))"); fflush(stdout) } }   // TEMPORARY TIMING
         let extent = image.extent
         guard extent.width >= 1, extent.height >= 1, extent.width.isFinite else { return 0.5 }
         let scale = min(1, 256 / max(extent.width, extent.height))
