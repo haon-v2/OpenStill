@@ -151,16 +151,23 @@ public enum ModernRenderer {
         }
         return try display(image)
     }
-    /// Runs a tiny image through the common Develop tools once in the background, so Core Image compiles their kernels
-    /// before the first slider drag instead of stalling its first frame.
+    /// Runs a tiny image through each common Develop slider once in the background, so Core Image compiles their kernels
+    /// before the first drag instead of stalling its first frame. Each slider is its own small graph (what a first drag builds),
+    /// so no single compile holds up a render the person starts meanwhile.
     public static func warmUp() {
         DispatchQueue.global(qos: .utility).async {
+            let started = Date()   // TEMPORARY TIMING
             let image = CIImage(color: CIColor(red: 0.5, green: 0.4, blue: 0.3)).cropped(to: CGRect(x: 0, y: 0, width: 64, height: 64))
-            var edits = PhotoEdits()
-            edits.exposure = 0.1; edits.contrast = 1.1; edits.usesSmartContrast = true; edits.clarity = 0.1; edits.texture = 0.1; edits.dehaze = 0.1
-            edits.vibrance = 0.1; edits.saturation = 1.1; edits.highlightsAmount = -0.1; edits.shadowsAmount = 0.1; edits.whites = 0.1; edits.blacks = -0.1
-            edits.sharpness = 0.2; edits.vignette = 0.1
-            for variant in [PhotoEdits(), edits] { if let out = try? process(image, edits: variant) { _ = try? display(out) } }
+            let changes: [(inout PhotoEdits) -> Void] = [
+                { _ in }, { $0.exposure = 0.1 }, { $0.contrast = 1.1; $0.usesSmartContrast = true }, { $0.highlightsAmount = -0.1 }, { $0.shadowsAmount = 0.1 },
+                { $0.whites = 0.1 }, { $0.blacks = -0.1 }, { $0.clarity = 0.1 }, { $0.texture = 0.1 }, { $0.dehaze = 0.1 },
+                { $0.vibrance = 0.1 }, { $0.saturation = 1.1 }, { $0.sharpness = 0.2 }, { $0.vignette = 0.1 },
+            ]
+            for change in changes {
+                var edits = PhotoEdits(); change(&edits)
+                if let out = try? process(image, edits: edits) { _ = try? display(out) }
+            }
+            if ProcessInfo.processInfo.environment["OPENSTILL_LAYOUT_DUMP"] != nil { print("TRACE warm-up \(Int(Date().timeIntervalSince(started)*1000)) ms"); fflush(stdout) }   // TEMPORARY TIMING
         }
     }
     public static func display(_ image: CIImage, profile: ExportProfile = .displayP3) throws -> CGImage {

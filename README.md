@@ -348,10 +348,18 @@ OpenStill has one window, the **Studio layout**, modeled on the photo editor [Co
   - Indexing writes photos in batches, and capture dates are indexed.
   - Search skips per-photo work when the search box is empty.
   - On Macs with 8 or more cores, the grid renders two thumbnails at a time.
+- **Editing, the way Lightroom does it:**
+  - The photo is rendered at the size it's shown on screen, not at full resolution. When you zoom in, only the visible part is rendered in full detail.
+  - While a slider moves, the photo updates continuously with lighter frames. The full-quality frame, the histogram and the mask overlay follow when you let go.
+  - RAW photos keep a screen-sized, half-float copy of the decoded image in a **render cache** on disk (like Lightroom's Camera Raw cache, 10 GB by default). Going back to a photo skips decoding the RAW again.
+  - Other photos open from a screen-sized preview; the full image is decoded only when needed.
+  - Measurements that don't change while you drag (the Smart Contrast midpoint, Auto analysis, brush masks, AI mask images) are computed once and reused.
+  - The photo is shown by a GPU layer; the canvas draws only its overlays.
+  - Core Image compiles the Develop kernels in the background at launch, so the first slider drag doesn't stall.
+  - Saving edits waits until a burst of changes ends, and happens once.
 - **Benchmark:** `PerformanceTests` builds a 50,000-photo catalog on every test run. It times indexing, reading, search, smart collections, keyword counts, the timeline, lookups, the library filter and sort, and grouping 5,000 faces, and prints the timings in the test log.
 - **Not changed:**
   - The Core Image kernels are still written in the Core Image Kernel Language. Core Image compiles them to Metal on the GPU. Moving them to precompiled Metal libraries would need a Metal build step that Swift Package Manager doesn't provide.
-  - The editing canvas still draws a GPU-rendered, display-sized image rather than using an MTKView.
 
 ## Build
 
