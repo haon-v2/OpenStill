@@ -31,10 +31,7 @@ private final class GradientSliderCell: NSSliderCell {
     var gradient: NSGradient?
     override func drawBar(inside rect:NSRect, flipped:Bool) {
         let bar = NSRect(x:rect.minX, y:rect.midY-2, width:rect.width, height:4)
-        // Explicit end points: the first color is always at the minimum (left) end, whatever the context's orientation.
-        NSGraphicsContext.saveGraphicsState(); NSBezierPath(roundedRect:bar, xRadius:2, yRadius:2).addClip()
-        gradient?.draw(from:NSPoint(x:bar.minX, y:bar.midY), to:NSPoint(x:bar.maxX, y:bar.midY), options:[])
-        NSGraphicsContext.restoreGraphicsState()
+        gradient?.draw(in:NSBezierPath(roundedRect:bar, xRadius:2, yRadius:2), angle:0)
     }
 }
 private final class SpectrumSliderCell: NSSliderCell {
@@ -42,7 +39,7 @@ private final class SpectrumSliderCell: NSSliderCell {
     override func drawBar(inside rect:NSRect, flipped:Bool) {
         let track = NSRect(x:rect.minX,y:rect.midY-3,width:rect.width,height:6)
         NSGraphicsContext.saveGraphicsState(); NSBezierPath(roundedRect:track,xRadius:3,yRadius:3).addClip()
-        NSGradient(colors:colors)?.draw(from:NSPoint(x:track.minX,y:track.midY),to:NSPoint(x:track.maxX,y:track.midY),options:[]);NSGraphicsContext.restoreGraphicsState()
+        NSGradient(colors:colors)?.draw(in:track,angle:0);NSGraphicsContext.restoreGraphicsState()
         NSColor.white.withAlphaComponent(0.4).setFill();NSRect(x:track.midX-0.5,y:track.minY,width:1,height:6).fill()
     }
     override func drawKnob(_ rect:NSRect) {
