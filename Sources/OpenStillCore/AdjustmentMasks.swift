@@ -185,13 +185,17 @@ enum MaskRasters {
     /// redraw strokes in the middle of a drag.)
     private static let cache = ByteLimitedCache<CGImage>(limit: 256 << 20)
     static func stroke(_ stroke: MaskStroke, size: CGSize, draw: () throws -> CGImage) throws -> CGImage {
-        guard let data = try? JSONEncoder().encode(stroke) else { return try draw() }
-        var hasher = Hasher(); hasher.combine(data)
-        let key = "stroke|\(Int(size.width))x\(Int(size.height))|\(hasher.finalize())"
+        guard let key = strokeKey(stroke, size: size) else { return try draw() }
         if let known = cache[key] { return known }
         let image = try draw()
         cache.insert(image, for: key, bytes: image.bytesPerRow * image.height)
         return image
+    }
+    /// A stroke's cache key: its size and every drawn property.
+    static func strokeKey(_ stroke: MaskStroke, size: CGSize) -> String? {
+        guard let data = try? JSONEncoder().encode(stroke) else { return nil }
+        var hasher = Hasher(); hasher.combine(data)
+        return "stroke|\(Int(size.width))x\(Int(size.height))|\(hasher.finalize())"
     }
     static func asset(_ name: String) throws -> CGImage {
         let key = "asset|\(name)"

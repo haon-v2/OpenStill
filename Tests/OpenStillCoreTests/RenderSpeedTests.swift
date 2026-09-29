@@ -118,17 +118,27 @@ import Testing
         #expect(pixels(plain) == pixels(cached) && pixels(cached) == pixels(again))
     }
 
-    @Test func brushStrokesAreDrawnOncePerSize() throws {
-        var drawn = 0
+    @Test func brushStrokesAreKeyedBySizeAndContent() throws {
         let stroke = MaskStroke(points: [MaskPoint(CGPoint(x: 0.2, y: 0.2)), MaskPoint(CGPoint(x: 0.6, y: 0.5))], radius: 0.05, subtract: false)
-        func draw() throws -> CGImage { drawn += 1; return try ModernRenderer.display(CIImage(color: .white).cropped(to: CGRect(x: 0, y: 0, width: 8, height: 8))) }
-        _ = try MaskRasters.stroke(stroke, size: CGSize(width: 800, height: 600), draw: draw)
-        _ = try MaskRasters.stroke(stroke, size: CGSize(width: 800, height: 600), draw: draw)
-        #expect(drawn == 1)
-        _ = try MaskRasters.stroke(stroke, size: CGSize(width: 1600, height: 1200), draw: draw)
+        let small = CGSize(width: 800, height: 600)
+        #expect(MaskRasters.strokeKey(stroke, size: small) == MaskRasters.strokeKey(stroke, size: small))
+        #expect(MaskRasters.strokeKey(stroke, size: small) != MaskRasters.strokeKey(stroke, size: CGSize(width: 1600, height: 1200)))
         var moved = stroke; moved.points.append(MaskPoint(CGPoint(x: 0.9, y: 0.9)))
-        _ = try MaskRasters.stroke(moved, size: CGSize(width: 800, height: 600), draw: draw)
-        #expect(drawn == 3, "a new size or a changed stroke is drawn again")
+        var softer = stroke; softer.softness = 0.5
+        #expect(MaskRasters.strokeKey(moved, size: small) != MaskRasters.strokeKey(stroke, size: small))
+        #expect(MaskRasters.strokeKey(softer, size: small) != MaskRasters.strokeKey(stroke, size: small))
+    }
+
+    @Test func cacheKeepsTheMostRecentlyUsedWithinItsBudget() {
+        let cache = ByteLimitedCache<Int>(limit: 100)
+        cache.insert(1, for: "a", bytes: 40); cache.insert(2, for: "b", bytes: 40)
+        #expect(cache["a"] == 1)                       // "a" is now the most recently used
+        cache.insert(3, for: "c", bytes: 40)           // over budget: the least recently used ("b") goes
+        #expect(cache["a"] == 1 && cache["b"] == nil && cache["c"] == 3)
+        cache.insert(4, for: "a", bytes: 90)           // replacing an entry frees its old bytes first
+        #expect(cache["a"] == 4 && cache["c"] == nil)
+        cache.insert(5, for: "huge", bytes: 500)       // one entry larger than the budget is still kept
+        #expect(cache["huge"] == 5)
     }
 
     @Test func previewCacheReplacesOlderPreviewsWithoutListingTheFolderEachTime() throws {
