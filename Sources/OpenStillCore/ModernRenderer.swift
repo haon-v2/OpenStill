@@ -106,11 +106,23 @@ public enum ModernRenderer {
         let input: CIImage
         if let limit = maximumDimension, limit <= RenderCache.longEdge, RenderCache.applies(url, mode: recipe.sourceMode), keepSource || RenderCache.has(url, mode: recipe.sourceMode, raw: recipe.raw) {
             input = try proxy(url, mode: recipe.sourceMode, raw: recipe.raw).image   // screen-size work starts from the cached proxy
+        } else if let limit = maximumDimension, limit <= screenEdge, keepSource {
+            input = try screenSource(url, mode: recipe.sourceMode, raw: recipe.raw)   // other photos: an in-memory screen-size copy
         } else {
             input = try source(url, mode:recipe.sourceMode, raw:recipe.raw,halfSize:maximumDimension.map{$0<=2048} ?? false,fast:maximumDimension != nil,keep:keepSource)
         }
         if recipe.sourceMode == .raw { edits.temperature = 6500; edits.tint = 0; edits.neutralBalance = NeutralBalance() }
         return try process(input, edits:edits, maximumDimension:maximumDimension, lutOverride:lutOverride, stopBeforeTool:stopBeforeTool)
+    }
+    /// The decoded photo scaled to screen size and held as pixels, so screen renders don't resample the full image each time.
+    static func screenSource(_ url: URL, mode: SourceMode, raw: RawSettings) throws -> CIImage {
+        let key = "\(url.standardizedFileURL.path)|\(EditStorage.fingerprint(url))|\(mode.rawValue)|\(raw.cacheKey)|screen" as NSString
+        if let cached = sourceCache.object(forKey: key) { return cached.image }
+        let full = try source(url, mode: mode, raw: raw, fast: true)
+        guard max(full.extent.width, full.extent.height) > CGFloat(screenEdge) else { return full }
+        let image = try RenderCache.materialize(full)
+        sourceCache.setObject(SourceImageBox(image), forKey: key, cost: Int(image.extent.width * image.extent.height) * 8)
+        return image
     }
     /// The screen-size proxy of a RAW photo (see RenderCache). Its sensor clipping figure is remembered for the histogram.
     public static func proxy(_ url: URL, mode: SourceMode, raw: RawSettings) throws -> RenderCache.Proxy {
