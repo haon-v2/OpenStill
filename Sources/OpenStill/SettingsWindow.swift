@@ -203,12 +203,14 @@ class SettingsPage: NSViewController {
         var left: NSView = label
         if let detail {
             let small = settingsNote(detail); small.preferredMaxLayoutWidth = 290
+            small.setContentCompressionResistancePriority(.required, for: .vertical)
             let column = NSStackView(views: [label, small]); column.orientation = .vertical; column.alignment = .leading; column.spacing = 2
             small.widthAnchor.constraint(lessThanOrEqualToConstant: 290).isActive = true
             left = column
         }
         let right = NSStackView(views: controls); right.spacing = 8
         let spacer = NSView(); spacer.setContentHuggingPriority(.init(1), for: .horizontal)
+        right.setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)
         let line = NSStackView(views: [left, spacer, right]); line.alignment = .centerY; line.edgeInsets = NSEdgeInsets(top: 9, left: 0, bottom: 9, right: 0)
         return line
     }
