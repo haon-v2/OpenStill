@@ -492,3 +492,40 @@ Automated fixtures are generated and contain no user photographs. The real S9 fi
   
   Real key presses G, D, R, Return, Q, Esc, Shift-W, Return, T, T, Tab, Tab and A each switched to the expected tool or panel.
 - **Not yet verified by hand on a Mac:** dragging the panel edge; scrubbing a slider's name with a trackpad; photo tabs after renaming files in Finder; floating panels across two displays.
+
+## Editing speed and sliders — September 29, 2026
+
+- **Changed:** Develop renders the way Lightroom does, at the size the photo is shown on screen.
+  - While a slider moves, the photo updates continuously with lighter frames. Only the newest change is rendered, one at a time. Before, each movement cancelled the pending render, so the photo waited until you paused.
+  - Letting go renders the full-quality frame. The histogram, mask overlay and split view update then too.
+  - Zooming to 100% renders only the visible part in full detail.
+  - RAW photos keep a screen-sized half-float copy in a render cache on disk (10 GB by default), so going back to a photo skips decoding the RAW again. Other photos open from a screen-sized preview and decode the full image only when needed.
+  - The decode cache is sized from the Mac's memory, and a larger decode serves smaller requests.
+  - Measurements that don't change while you drag are computed once: the Smart Contrast midpoint, Auto analysis, brush masks and AI mask images.
+  - The photo is shown by a GPU layer; the canvas draws only its overlays.
+  - Core Image compiles the Develop kernels in the background at launch.
+  - Saving waits for a burst of changes to end and writes the record once. It's flushed before switching photos, going to the Library, or quitting.
+  - LUT thumbnails render only while Presets & LUTs is open.
+- **Sliders:**
+  - One slider class replaces three.
+  - A click without moving doesn't add a history step.
+  - Colored tracks follow the slider, not its title, so the three Calibration "Saturation" sliders each get their own color.
+  - A change that's refused (while AI is running) puts the slider back.
+  - Slider fills use the accent color.
+- **Automated tests:** RenderSpeedTests covers:
+  - a 24 MP benchmark (full size, the screen-size copy, a 100% region);
+  - the preview and lazy full image;
+  - decode reuse;
+  - shared Smart Contrast measurements and stable cache keys;
+  - brush stroke keys;
+  - the size-limited cache;
+  - 2,000 preview writes;
+  - one record decode per save.
+
+  The full suite passes: 298 tests.
+- **Measured on macOS 26 CI** (a 24 MP photo, a small CI GPU):
+  - Full-size render, which 0.0.15 did on every slider release: 0.75 s.
+  - From the screen-size copy: 0.22 s.
+  - While dragging, in the real window: each frame renders in 11–60 ms.
+  - First frame of a drag: 0.29 s for Exposure and 0.40 s for Contrast. Before the kernel warm-up, Contrast's first frame took 1.6 s, and 0.0.15 showed no frames at all until you paused.
+- **Not yet verified by hand on a Mac:** 40 MP RAW files from several cameras; the render cache filling past its limit; a Pro Display XDR in HDR mode.
