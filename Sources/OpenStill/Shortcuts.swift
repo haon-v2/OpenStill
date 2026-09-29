@@ -57,8 +57,11 @@ import OpenStillCore
             ("workspace.grid", "Library grid (G)", KeyCombo("g")), ("workspace.develop", "Develop (D)", KeyCombo("d")),
             ("workspace.crop", "Crop tool (R)", KeyCombo("r")), ("workspace.remove", "Remove / retouch tool (Q)", KeyCombo("q")),
             ("workspace.masking", "Masking (Shift-W)", KeyCombo("w", shift: true)),
-            ("workspace.lightsOut", "Lights Out: dim, off, on (L)", KeyCombo("l")), ("workspace.toolbar", "Show or hide the toolbar (T)", KeyCombo("t")),
-            ("workspace.sidePanels", "Show or hide side panels (Tab)", KeyCombo("tab")), ("workspace.allPanels", "Show or hide all panels (Shift-Tab)", KeyCombo("tab", shift: true)),
+            ("workspace.adjust", "Adjust: back to the sliders (A)", KeyCombo("a")), ("workspace.whiteBalance", "White balance picker (W)", KeyCombo("w")),
+            ("workspace.history", "History panel (H)", KeyCombo("h")), ("workspace.presets", "Presets & LUTs panel (Shift-P)", KeyCombo("p", shift: true)),
+            ("workspace.painter", "Library Painter (K)", KeyCombo("k")),
+            ("workspace.lightsOut", "Lights Out: dim, off, on (L)", KeyCombo("l")), ("workspace.toolbar", "Show or hide the tool options bar (T)", KeyCombo("t")),
+            ("workspace.sidePanels", "Show or hide the tool rail and panel (Tab)", KeyCombo("tab")), ("workspace.allPanels", "Show or hide every bar around the photo (Shift-Tab)", KeyCombo("tab", shift: true)),
         ]
         for (id, title, combo) in workspace { map.register(ShortcutCommand(id: id, title: title, group: "Workspace", scope: .workspace, defaultCombo: combo)) }
         map.changed = {

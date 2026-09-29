@@ -1,35 +1,6 @@
 import AppKit
 import OpenStillCore
 
-/// Compact native navigation for the library and editing sides of the workspace.
-final class WorkspaceRail: GlassChrome {
-    var choose: ((String) -> Void)?
-    private var buttons: [String: ToolbarIconButton] = [:]
-    init(items: [(String, String, String)]) {
-        super.init(frame: .zero)
-        cornerRadius = 16
-        let stack = NSStackView(); stack.orientation = .vertical; stack.spacing = 8
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(stack)
-        for (id, title, symbol) in items {
-            let button = ToolbarIconButton(title: title, target: self, action: #selector(clicked(_:)))
-            button.identifier = NSUserInterfaceItemIdentifier(id)
-            button.image = Appearance.symbol(symbol, description: title)
-            button.isBordered = false; button.imagePosition = .imageOnly; button.setButtonType(.toggle)
-            button.toolTip = title; button.setAccessibilityLabel(title)
-            button.widthAnchor.constraint(equalToConstant: 36).isActive = true
-            button.heightAnchor.constraint(equalToConstant: 38).isActive = true
-            buttons[id] = button; stack.addArrangedSubview(button)
-        }
-        NSLayoutConstraint.activate([stack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 10), stack.centerXAnchor.constraint(equalTo: contentView.centerXAnchor)])
-    }
-    required init?(coder: NSCoder) { fatalError() }
-    func select(_ id: String?) {
-        for (key, button) in buttons { button.state = key == id ? .on : .off; button.needsDisplay = true }
-    }
-    @objc private func clicked(_ sender: NSButton) { if let id = sender.identifier?.rawValue { choose?(id) } }
-}
-
 private final class LibraryStack: NSStackView { override var isFlipped: Bool { true } }
 final class LibrarySidebar: GlassChrome {
     var open: ((URL) -> Void)?
@@ -38,20 +9,11 @@ final class LibrarySidebar: GlassChrome {
     var subfoldersChanged: ((Bool) -> Void)?
     var openCollection: ((PhotoCollection) -> Void)?
     var newSmartCollection: (() -> Void)?
-    /// Lightroom layout: Publish Services opens the publish window.
+    /// Publish Services opens the publish window.
     var publish: (() -> Void)?
-    /// Lightroom Classic's Catalog, Folders, Collections and Publish Services sections instead of the Luminar list.
-    var lightroom = false {
-        didSet {
-            guard lightroom != oldValue else { return }
-            flatColor = lightroom ? LRColors.panel : nil
-            stack.edgeInsets = lightroom ? NSEdgeInsets() : NSEdgeInsets(top: 20, left: 16, bottom: 20, right: 16)
-            stack.spacing = lightroom ? 0 : 10
-            reloadCollections()
-            if lightroom { reloadFolders() }
-        }
-    }
     private let stack = LibraryStack()
+    /// Which of the Library panel's tabs this shows: 0 Catalog and Folders, 1 Collections and Publish Services.
+    var page = 0 { didSet { if page != oldValue { reloadCollections() } } }
     private var folder: URL?
     private var count = 0
     private var shownCollection: UUID?
@@ -63,11 +25,12 @@ final class LibrarySidebar: GlassChrome {
         super.init(frame: frame)
         let scroll = NSScrollView(); scroll.drawsBackground = false; scroll.hasVerticalScroller = true; scroll.autohidesScrollers = true
         scroll.translatesAutoresizingMaskIntoConstraints = false; contentView.addSubview(scroll)
-        stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 10
-        stack.edgeInsets = NSEdgeInsets(top: 20, left: 16, bottom: 20, right: 16)
+        flatColor = LRColors.panel
+        stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 0
         stack.translatesAutoresizingMaskIntoConstraints = false; scroll.documentView = stack
         NSLayoutConstraint.activate([scroll.leadingAnchor.constraint(equalTo: contentView.leadingAnchor), scroll.trailingAnchor.constraint(equalTo: contentView.trailingAnchor), scroll.topAnchor.constraint(equalTo: contentView.topAnchor), scroll.bottomAnchor.constraint(equalTo: contentView.bottomAnchor), stack.leadingAnchor.constraint(equalTo: scroll.contentView.leadingAnchor), stack.topAnchor.constraint(equalTo: scroll.contentView.topAnchor), stack.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor)])
         update(folder: nil, count: 0)
+        reloadFolders()
     }
     required init?(coder: NSCoder) { fatalError() }
     /// Rebuilds the list after collections change, keeping the current folder or collection.
@@ -77,60 +40,12 @@ final class LibrarySidebar: GlassChrome {
             recent.removeAll { $0 == folder }; recent.insert(folder, at: 0); recent = Array(recent.prefix(8))
             UserDefaults.standard.set(recent.map(\.path), forKey: "OpenStillRecentFolders")
         }
-        let reload = lightroom && folder != nil && folder != self.folder
+        let reload = folder != nil && folder != self.folder
         self.folder = folder; self.count = count; shownCollection = collection
         if reload { reloadFolders() }
         collections = EditStorage.records.catalog?.collections() ?? []
         stack.arrangedSubviews.forEach { stack.removeArrangedSubview($0); $0.removeFromSuperview() }
-        if lightroom { buildLightroom(collection: collection); return }
-        heading("Local", size: 19)
-        label("Your photos, on this Mac.")
-        let openButton = button("Open folder…", symbol: "folder.badge.plus", action: #selector(openFolder)); Appearance.primary(openButton)
-        let current = collections.first { $0.id == collection }
-        heading(current == nil ? "Current Folder" : "Current Collection")
-        label(current?.name ?? folder?.lastPathComponent ?? "No folder open", emphasized: true)
-        if let folder, current == nil { label(folder.path); button("Show in Finder", symbol: "arrow.up.forward.square", action: #selector(reveal)) }
-        let subfolders = NSButton(checkboxWithTitle: "Include subfolders", target: self, action: #selector(toggleSubfolders(_:)))
-        subfolders.state = Self.includeSubfolders ? .on : .off; subfolders.font = .systemFont(ofSize: 11); add(subfolders)
-        button("All photos · \(count)", symbol: "photo.on.rectangle", action: #selector(filterPhotos(_:)), tag: 0)
-        button("Picks", symbol: "flag", action: #selector(filterPhotos(_:)), tag: 1)
-        button("Rejected", symbol: "flag.slash", action: #selector(filterPhotos(_:)), tag: 2)
-        heading("Collections")
-        for (index, c) in collections.enumerated() {
-            let b = button(c.name, symbol: c.isSmart ? "gearshape" : "rectangle.stack", action: #selector(chooseCollection(_:)), tag: index)
-            b.state = c.id == collection ? .on : .off
-            let menu = NSMenu()
-            for (title, action) in [("Rename…", #selector(renameCollection(_:))), ("Delete…", #selector(deleteCollection(_:)))] {
-                let item = NSMenuItem(title: title, action: action, keyEquivalent: ""); item.target = self; item.tag = index; menu.addItem(item)
-            }
-            b.menu = menu; b.toolTip = (c.isSmart ? "Smart collection" : "Collection") + " · Control-click to rename or delete"
-        }
-        if collections.isEmpty { label("Select photos, then choose Actions → Add to collection.") }
-        button("New smart collection…", symbol: "plus.rectangle.on.rectangle", action: #selector(createSmartCollection))
-        heading("Recent Folders")
-        for (index, url) in recent.enumerated() {
-            let b = button(url.lastPathComponent, symbol: "folder", action: #selector(openRecent(_:)), tag: index)
-            b.toolTip = url.path
-        }
-        if recent.isEmpty { label("Folders you open appear here.") }
-        Appearance.applyAccent(in: contentView)
-    }
-    private func add(_ view: NSView) { stack.addArrangedSubview(view); view.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -32).isActive = true }
-    private func heading(_ text: String, size: CGFloat = 11) {
-        let label = NSTextField(labelWithString: text); label.font = .systemFont(ofSize: size, weight: .semibold)
-        label.textColor = size > 11 ? .labelColor : .secondaryLabelColor
-        if let previous = stack.arrangedSubviews.last { stack.setCustomSpacing(22, after: previous) }
-        add(label)
-    }
-    private func label(_ text: String, emphasized: Bool = false) {
-        let label = NSTextField(wrappingLabelWithString: text); label.font = .systemFont(ofSize: 11, weight: emphasized ? .medium : .regular)
-        label.textColor = emphasized ? .labelColor : .secondaryLabelColor; label.maximumNumberOfLines = 3; label.lineBreakMode = .byTruncatingMiddle
-        add(label)
-    }
-    @discardableResult private func button(_ title: String, symbol: String, action: Selector, tag: Int = 0) -> NSButton {
-        let button = NSButton(title: title, target: self, action: action); button.tag = tag
-        button.bezelStyle = .rounded; button.font = .systemFont(ofSize: 12); button.image = Appearance.symbol(symbol, size: 13)
-        button.imagePosition = .imageLeading; button.lineBreakMode = .byTruncatingMiddle; add(button); return button
+        buildLightroom(collection: collection)
     }
     @objc private func openFolder() { browse?() }
     @objc private func reveal() { if let folder { NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: folder.path) } }
@@ -168,6 +83,7 @@ final class LibrarySidebar: GlassChrome {
             fill(s); stack.addArrangedSubview(s); s.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         }
         let current = collections.first { $0.id == collection }
+        if page == 0 {
         section("Catalog") { s in
             s.add(row("All Photographs", count: count, action: #selector(filterPhotos(_:)), tag: 0))
             s.add(row("Picks", action: #selector(filterPhotos(_:)), tag: 1))
@@ -195,6 +111,7 @@ final class LibrarySidebar: GlassChrome {
             let holder = NSStackView(views: [subfolders]); holder.edgeInsets = NSEdgeInsets(top: 4, left: 26, bottom: 2, right: 8); s.add(holder)
             s.add(row("Add Folder…", action: #selector(openFolder), symbol: "plus"))
         }
+        } else {
         section("Collections") { s in
             for (index, c) in collections.enumerated() {
                 let r = row(c.name, action: #selector(chooseCollection(_:)), tag: index, selected: c.id == collection, symbol: c.isSmart ? "gearshape" : "rectangle.stack")
@@ -207,6 +124,7 @@ final class LibrarySidebar: GlassChrome {
             s.add(row("Create Smart Collection…", action: #selector(createSmartCollection), symbol: "plus"))
         }
         section("Publish Services") { s in s.add(row("Set Up Publishing…", action: #selector(publishServices), symbol: "square.and.arrow.up")) }
+        }
     }
     // MARK: Folders tree
 
@@ -222,7 +140,7 @@ final class LibrarySidebar: GlassChrome {
             let volumes = FolderTree.volumes(EditStorage.records.catalog?.photoPaths() ?? [])
             DispatchQueue.main.async {
                 guard let self, self.folderLoad == token else { return }
-                self.volumes = volumes; if self.lightroom { self.reloadCollections() }
+                self.volumes = volumes; self.reloadCollections()
             }
         }
     }

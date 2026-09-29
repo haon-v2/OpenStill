@@ -228,7 +228,7 @@ extension ViewerController {
         guard let window = view.window else { return }
         let alert = NSAlert(); alert.messageText = "Identity Plate"
         alert.informativeText = "Your name or studio in the top-left of the Lightroom layout, or a logo image. Leave it empty for “OpenStill”."
-        let text = NSTextField(string: UserDefaults.standard.string(forKey: LRModulePicker.plateTextKey) ?? ""); text.placeholderString = "OpenStill"
+        let text = NSTextField(string: UserDefaults.standard.string(forKey: IdentityPlate.textKey) ?? ""); text.placeholderString = "OpenStill"
         text.frame = NSRect(x: 0, y: 0, width: 300, height: 24)
         // Logos made or imported in the logo designer (Export → Watermark) can be used here too.
         let logos = Watermarks.library(), saved = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 300, height: 26))
@@ -241,8 +241,8 @@ extension ViewerController {
             guard let self else { return }
             switch response {
             case .alertFirstButtonReturn:
-                UserDefaults.standard.set(text.stringValue, forKey: LRModulePicker.plateTextKey); UserDefaults.standard.removeObject(forKey: LRModulePicker.plateImageKey)
-                self.modulePicker.refreshIdentityPlate()
+                UserDefaults.standard.set(text.stringValue, forKey: IdentityPlate.textKey); UserDefaults.standard.removeObject(forKey: IdentityPlate.imageKey)
+                self.identityPlate.refresh()
             case .alertSecondButtonReturn:
                 let panel = NSOpenPanel(); panel.allowedContentTypes = [.png, .jpeg, .tiff, .pdf]
                 guard panel.runModal() == .OK, let url = panel.url else { return }
@@ -250,7 +250,7 @@ extension ViewerController {
                 let copy = EditStorage.root.appendingPathComponent("IdentityPlate." + url.pathExtension)
                 try? FileManager.default.createDirectory(at: EditStorage.root, withIntermediateDirectories: true)
                 try? FileManager.default.removeItem(at: copy); try? FileManager.default.copyItem(at: url, to: copy)
-                UserDefaults.standard.set(copy.path, forKey: LRModulePicker.plateImageKey); self.modulePicker.refreshIdentityPlate()
+                UserDefaults.standard.set(copy.path, forKey: IdentityPlate.imageKey); self.identityPlate.refresh()
             case .alertThirdButtonReturn:
                 guard saved.indexOfSelectedItem > 0, logos.indices.contains(saved.indexOfSelectedItem - 1) else { return }
                 let logo = logos[saved.indexOfSelectedItem - 1]
@@ -260,7 +260,7 @@ extension ViewerController {
                     let copy = EditStorage.root.appendingPathComponent("IdentityPlate.png")
                     try FileManager.default.createDirectory(at: EditStorage.root, withIntermediateDirectories: true)
                     try png.write(to: copy, options: .atomic)
-                    UserDefaults.standard.set(copy.path, forKey: LRModulePicker.plateImageKey); self.modulePicker.refreshIdentityPlate()
+                    UserDefaults.standard.set(copy.path, forKey: IdentityPlate.imageKey); self.identityPlate.refresh()
                 } catch { NSSound.beep() }
             default: break
             }

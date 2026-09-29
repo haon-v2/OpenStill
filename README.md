@@ -77,7 +77,7 @@ OpenStill keeps a local SQLite catalog (`Catalog.sqlite`, next to your edit reco
 
 Moved or deleted files drop out of collections until they're found again.
 
-### Library views, filter bar, stacks and more (Lightroom layout)
+### Library views, filter bar, stacks and more
 
 - **Views.** The toolbar under the grid switches between **Grid (G)**, **Loupe (E)**, **Compare (C)** and **Survey (N)**.
   - **Loupe** shows the selected photo large; ← and → step through the photos.
@@ -246,50 +246,59 @@ Sharing copies are kept in OpenStill's temporary sharing folder so other apps ca
 
 ## Layout and keyboard shortcuts
 
-OpenStill has one layout, modeled on Lightroom Classic's window, with flat dark-gray panels and square corners. (The EZ Layout of earlier versions is gone; a saved EZ Layout choice is ignored.)
-- **The window:**
-  - **Module picker** across the top: the identity plate on the left, **Library | Develop | Map | Slideshow | Print | Web** on the right. Map, Slideshow, Print and Web open their windows for the selected photos (⌥⌘3, ⌥⌘5, ⌥⌘6, ⌥⌘7). OpenStill has no Book module.
-  - **Left panel:**
-    - The **Navigator** sits at the top: the whole photo, with a frame around the zoomed-in area. Click or drag in it to move around, or use **FIT / 100% / 200%**.
-    - Library has **Catalog, Folders, Collections** and **Publish Services**, with **Import… / Export…** at the bottom.
-    - **Folders** works like Lightroom's: each drive (the startup disk first, then external drives, dimmed when not connected), then the folders that hold your library's photos, with photo counts. Click a triangle to open or close a folder, click a folder to show its photos, and right-click it for **Show in Finder**, **Import to This Folder…** and **Synchronize Folder**. Folders above your photos that hold nothing else are skipped, so the list starts where your photos are.
-    - Develop has **Presets, Versions** and **History**, with **Copy… / Paste**. Versions take the place of Lightroom's Snapshots and are OpenStill's named alternatives.
-  - **Right panel:**
-    - Library has **Histogram, Keywording** and **Metadata** for the photo selected in the grid, with **Sync Metadata… / Sync Settings…**.
-    - Develop has the **Histogram** with the camera settings under it, then the **Crop / Remove / Red Eye / Masking** tool strip. Below that, in Lightroom's order:
-      - **Basic**: the **Profile** first, then Treatment, White Balance, Tone, Presence and HDR;
-      - **Tone Curve**, **HSL / Color**, **B&W Mix** and **Color Grading**;
-      - **Detail**: sharpening, noise reduction, chromatic aberration, defringe and the AI enhancements;
-      - **Geometry**: Crop & Straighten, Lens Corrections and Transform together;
-      - **Effects**: vignetting, grain, **Lens Blur**, Glow, Sunrays and Structure;
-      - **Calibration**;
-      - then OpenStill's own **Sky Replacement**, **Layers** and **On-Device AI**.
+OpenStill has one window, the **Studio layout**, modeled on the photo editor [Compositor](https://github.com/robbietilton/Compositor). It is always dark, it uses one accent color, and it shows only the controls for what you're doing now. (It replaces the Lightroom-style chrome of 0.0.14; your panel settings carry over.)
 
-      Only Basic starts open; the others remember whether you left them open.
-    - At the bottom of Develop are **Previous**, which copies the last photo's settings but not its crop, retouching, lens or transform, and **Reset**.
-  - **Panels:**
-    - Headers open and close sections. Option-click a header, or Control-click it and choose **Solo Mode**, so opening one section closes the rest. **Expand All / Collapse All** are in the same menu.
-    - The triangles at each window edge show and hide that panel. Your panels and sections are remembered.
-  - **Filmstrip:** it runs across the bottom in both Library and Develop. Its bar shows the grid button, back / forward, and the source, e.g. "Folder : Trip 124 photos / 1 selected / IMG_0001.CR3".
-  - **Toolbar:** Develop's toolbar under the photo has Loupe, Before / After and the clipping warning.
-  - **Lightroom's keys:**
+```
+┌ toolbar ─ [Library|Develop] [photo tab][photo tab]…      Fit 100% − +  Presets History  Share Export ┐
+├ tool options (the current tool's settings) ……………………………………………………………………………… Cancel  Done ┤
+├ tools │                         the photo                                   ┊ right panel            │
+│       │                                                                     ┊ (drag its edge)        │
+├ filmstrip (F6, optional) ────────────────────────────────────────────────────────────────────────────┤
+└ status ─ Fit · 6000 × 4000 · IMG_0042.RAF · ★★★ · 3 of 124          the current tool's keys / messages ┘
+```
 
-    | Key | Action |
-    | --- | --- |
-    | G / D | Library grid / Develop (anywhere in the window, except while typing in a field) |
-    | R | Crop |
-    | Q | Remove |
-    | Shift-W | Masking |
-    | L | Lights Out: dim, then off, then on |
-    | T | Toolbar |
-    | Tab | Side panels |
-    | Shift-Tab | All panels |
-    | F5 / F6 / F7 / F8 | Module picker / filmstrip / left panel / right panel |
+- **Toolbar:**
+  - **Library | Develop** (G / D) on the left, next to the identity plate if you set one.
+  - **Photo tabs:** every photo you open in Develop gets a tab. Click to switch, click × (or middle-click) to close, right-click for Close Other Tabs and Show in Finder. A dot marks a photo with edits. Up to 12 stay open, and the oldest unedited one closes first. Tabs are remembered for each catalog, and the strip scrolls when there are more than fit.
+  - **Fit, 100%, zoom out / in**, then **Presets**, **History**, **Share** and **Export**.
+- **Tools** (the rail on the left):
+  - Develop: **Adjust** (A), **Crop** (R), **Remove** (Q), **Red Eye**, **Masking** (Shift-W), **White Balance** (W) and **Targeted Adjustment**, with **Before / After** and **Clipping** at the bottom.
+  - Library: **Grid** (G), **Loupe**, **Compare**, **Survey**, **Painter** (K), with **People**, **Map** and **Timeline** at the bottom.
+  - One tool is always chosen; Adjust means "no tool". **Return** or **Done** finishes a tool and goes back to Adjust, and **Escape** cancels it.
+- **Tool options** (the bar above the photo) holds just the current tool's settings, e.g.:
+  - Crop: aspect ratio, swap, **Angle**, Auto straighten, Horizon, rotate and flip.
+  - Remove: Heal / Clone, Size, Feather, Opacity, Remove with AI, Visualize Spots.
+  - Red Eye: Red / Pet eye, Pupil, Darken, Catchlight.
+  - Masking: **New Mask** (Brush, Linear, Radial, Subject, Sky, Background, People, Object, Color / Luminance / Depth range) and Show Overlay.
+  - Library: view, filters, sort, search and thumbnail size.
 
-    You can change them all in **Settings → Shortcuts → Workspace**.
-  - **Masking works like Lightroom's.** **New mask** (Brush, Linear, Radial, Subject, Sky, Background, People, Object, Color / Luminance / Depth range) adds a mask with its own Exposure, Contrast, Highlights, Shadows, Whites, Blacks, Temperature, Tint, Saturation, Clarity, Texture, Dehaze, Sharpness and Noise sliders. Add as many as you like; each one changes only its own area. Rename, duplicate, invert, hide or delete a mask from its list. Below the list you can still limit a whole tool (Develop, Clarity, Color grading…) to a mask, as before.
-  - **Return finishes a tool.** In Crop, Remove, Red Eye and Masking, Return (or **Done**) applies the crop or ends painting and closes the panel. Escape closes it too.
-  - **Look and behavior are close to Lightroom Classic, not a copy.** The panel names, order and keys follow it, and the controls are OpenStill's own. There are no Adobe icons or artwork, and slider scales are OpenStill's (for example, Contrast runs 0.5–1.5), not Lightroom's −100 to +100.
+  Its height never changes, so switching tools never moves the photo. **T** hides it.
+- **Right panel:**
+  - Develop: the **Histogram** with the camera settings, then the adjustment sections in Lightroom's order: **Basic** (Profile first), **Tone Curve**, **HSL / Color**, **B&W Mix**, **Color Grading**, **Detail**, **Geometry**, **Effects**, **Calibration**, then **Sky Replacement**, **Layers** and **On-Device AI**. **Masking** adds the list of masks at the top. **Previous** and **Reset** are at the bottom.
+  - Library: three tabs. **Folders** has the catalog (All Photos, Picks, Rejected) and the drive and folder tree; **Collections** has collections, smart collections and publish services; **Info** has the histogram, Quick Develop, keywords and metadata for the selected photo.
+  - Drag its left edge to make it wider or narrower (240–420 points). Section headers open and close; Option-click one to keep just that section open.
+- **Numbers you can scrub:** drag any slider's name sideways to change it, double-click the name to reset it, or click the number and use the Up / Down arrows (Shift for bigger steps). Temperature, Tint, Vibrance, Saturation and the tone sliders show their effect as a colored track.
+- **Status line:** the zoom, pixel size, file name, rating and position on the left. On the right, the keys for the current tool, or what OpenStill is doing ("Edits saved", an AI step…). A spinner appears only when something takes more than a quarter of a second.
+- **Floating panels** stay beside the window and remember where you put them: **Presets & LUTs** (Shift-P), **History, Snapshots and Versions** (H), **Info** (⌘I in Develop) and **Navigator** (View menu).
+- **Keys:**
+
+  | Key | Action |
+  | --- | --- |
+  | G / D | Library grid / Develop (anywhere in the window, except while typing in a field) |
+  | A | Adjust (no tool) |
+  | R / Q / Shift-W / W | Crop / Remove / Masking / White balance picker |
+  | Return / Escape | Finish / cancel the tool |
+  | H / Shift-P | History / Presets & LUTs panel |
+  | K | Painter (Library) |
+  | L | Lights Out: dim, then off, then on |
+  | T | Tool options bar |
+  | Tab | Tool rail and right panel |
+  | Shift-Tab | All bars and panels |
+  | F6 / F7 / F8 | Filmstrip / tool rail / right panel |
+
+  You can change them all in **Settings → Shortcuts → Workspace**. Map, Book, Slideshow, Print and Web are in the **Window** menu (⌥⌘3–7).
+- **Masking works like Lightroom's.** Each new mask has its own Exposure, Contrast, Highlights, Shadows, Whites, Blacks, Temperature, Tint, Saturation, Clarity, Texture, Dehaze, Sharpness and Noise sliders. Add as many as you like; each one changes only its own area. Rename, duplicate, invert, hide or delete a mask from its list.
+- **Close to Lightroom Classic in naming, not a copy.** Section names, order and keys follow Lightroom; the look follows Compositor. There are no Adobe icons or artwork, and slider scales are OpenStill's (for example, Contrast runs 0.5–1.5).
 
 **Settings → Shortcuts** lists every command and its shortcut:
 - **What you can change:** every menu command, plus the single keys used in the library grid (ratings, labels, flags, open) and on the photo (clipping, before/after, compare, next and previous, Trash, brush size). A search box finds commands by name or by keys, e.g. “export” or “⌘E”.
@@ -318,7 +327,7 @@ OpenStill has one layout, modeled on Lightroom Classic's window, with flat dark-
   - **Catalog Settings…** schedules backups when OpenStill quits (every quit, daily or weekly), sets how many backups to keep, and can move the catalog to another folder (after a relaunch).
   - **Export as Catalog…** saves the selected photos' edits (and, if you like, the originals) as a folder of portable edit packages; **Import Catalog…** brings one in.
 - **Secondary Display** (**Window → Secondary Display**, ⌘F11). A second window, on your other screen when there is one, showing the selected photo in Loupe, Compare or Survey. It follows the main window's selection.
-- **Book** (**Window → Book**, ⌥⌘4, or Book in the Lightroom module picker).
+- **Book** (**Window → Book**, ⌥⌘4).
   - Pages of one photo, full bleed, two or four photos, with captions.
   - **Auto Layout** fills pages in order; any spot can be changed from its menu, and pages can be added, moved or removed.
   - **Save PDF…** renders each photo at about 300 dpi. The book is made on this Mac; there's no print-service upload.
@@ -328,7 +337,7 @@ OpenStill has one layout, modeled on Lightroom Classic's window, with flat dark-
 - **Adaptive presets** (**Develop → Adaptive Presets**). Subject: Pop, Subject: Soften, Background: Soften, Background: Clear haze, Sky: Deepen and Sky: Soft.
   - They find the subject (Apple Vision, on this Mac) or the sky (on-device AI) in each photo and apply their settings only there.
   - The masks appear in each tool's Masking tab, where you can refine them.
-- **Identity plate** (**Develop → Identity Plate…**). Your own text or logo in place of "OpenStill" at the top left of the Lightroom layout. **Use Saved Logo** picks a logo made or imported in the watermark logo designer.
+- **Identity plate** (**Develop → Identity Plate…**). Your own text or logo in place of "OpenStill" at the left end of the toolbar. **Use Saved Logo** picks a logo made or imported in the watermark logo designer.
 
 ## Performance
 
@@ -394,7 +403,7 @@ The Lightroom-desktop-inspired workspace has a slim local-library rail on the le
 - Remove chromatic aberration (Lens corrections): measures the red and blue fringing toward the corners of this photo and lines the colors up again. It works without a lens profile. Measuring again replaces the old values; **Turn off chromatic aberration removal** removes it.
 - Red eye and Pet eye (the Red Eye button in the Develop tool strip): drag an ellipse over an eye. Red eye darkens and desaturates the red pupil; Pet eye fills the pupil and can add a catchlight. **Pupil size** and **Darken** change the last eye. Eyes follow crop, rotation and flips.
 - Visualize spots (Retouch / Remove): shows the photo as a black-and-white edge map so dust and small blemishes stand out; the slider sets how much detail it shows. It is never exported.
-- Snapshots (Develop's left panel): **New snapshot…** saves the current edits under a name. Click one to go back to it in one undo step; Control-click it to rename or delete it. Snapshots belong to the version and are saved with it.
+- Snapshots (the History panel, H): **New snapshot…** saves the current edits under a name. Click one to go back to it in one undo step; Control-click it to rename or delete it. Snapshots belong to the version and are saved with it.
 - Color: global saturation/vibrance plus eight visible swatches for red, orange, yellow, green, aqua, blue, purple, and magenta. Each color remembers its Saturation or HSL view. HSL provides Hue, Saturation, and Lightness with shade-gradient tracks and a live color indicator; switching views keeps your adjustments. Reset this color clears only the selected band.
 - Black & white: monochrome strength plus separate Blacks and Whites tonal sliders.
 - Vignette: negative darkens the edges, zero is neutral, positive lightens them.

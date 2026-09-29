@@ -90,13 +90,4 @@ import Testing
         #expect(m.search("shift command e").map(\.id) == ["file.export"])
         #expect(m.search("zzz").isEmpty)
     }
-
-    @Test func thereIsOneLayout() {
-        let key = WorkspaceLayout.defaultsKey, saved = UserDefaults.standard.string(forKey: key)
-        defer { if let saved { UserDefaults.standard.set(saved, forKey: key) } else { UserDefaults.standard.removeObject(forKey: key) } }
-        // An EZ Layout choice saved by an older version is ignored.
-        UserDefaults.standard.set("luminar", forKey: key)
-        #expect(WorkspaceLayout.current == .lightroom)
-        #expect(WorkspaceLayout.current.modeNames.library == "Library" && WorkspaceLayout.current.modeNames.edit == "Develop")
-    }
 }

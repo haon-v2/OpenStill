@@ -60,54 +60,6 @@ enum Appearance {
     }
 }
 
-class HoverButton: NSButton {
-    private var tracking: NSTrackingArea?
-    var hovered = false
-    override var isFlipped: Bool { true }
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        if let tracking { removeTrackingArea(tracking) }
-        let next = NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect], owner: self)
-        addTrackingArea(next); tracking = next
-    }
-    override func mouseEntered(with event: NSEvent) { hovered = true; needsDisplay = true }
-    override func mouseExited(with event: NSEvent) { hovered = false; needsDisplay = true }
-    func drawHighlight(selected: Bool = false) {
-        guard selected || hovered && isEnabled || isHighlighted else { return }
-        (selected ? Appearance.accent.withAlphaComponent(0.14) : NSColor.labelColor.withAlphaComponent(isHighlighted ? 0.12 : 0.055)).setFill()
-        NSBezierPath(roundedRect: bounds.insetBy(dx: 1, dy: 1), xRadius: 9, yRadius: 9).fill()
-    }
-    func drawSymbol(_ symbol: NSImage?, in rect: NSRect, opacity: CGFloat = 0.8) {
-        guard let symbol else { return }
-        let scale = min(rect.width / symbol.size.width, rect.height / symbol.size.height)
-        let size = NSSize(width: symbol.size.width * scale, height: symbol.size.height * scale)
-        let fitted = NSRect(x: rect.midX-size.width/2, y: rect.midY-size.height/2, width: size.width, height: size.height)
-        symbol.draw(in: fitted, from: .zero, operation: .sourceOver, fraction: isEnabled ? opacity : 0.25, respectFlipped: true, hints: nil)
-    }
-}
-
-final class ToolbarIconButton: HoverButton {
-    override func draw(_ dirtyRect: NSRect) {
-        drawHighlight(selected: state == .on)
-        drawSymbol(image, in: NSRect(x: (bounds.width-17)/2, y: (bounds.height-17)/2, width: 17, height: 17))
-    }
-}
-
-final class ToolHeaderButton: HoverButton {
-    var expanded = false { didSet { needsDisplay = true } }
-    var ai = false
-    override func draw(_ dirtyRect: NSRect) {
-        drawHighlight(selected: expanded)
-        drawSymbol(image, in: NSRect(x: 9, y: (bounds.height-17)/2, width: 17, height: 17))
-        let style = NSMutableParagraphStyle(); style.lineBreakMode = .byTruncatingTail
-        (title as NSString).draw(in: NSRect(x: 36, y: (bounds.height-17)/2, width: bounds.width-(ai ? 92 : 62), height: 17), withAttributes: [.font: NSFont.systemFont(ofSize: 13, weight: expanded ? .medium : .regular), .foregroundColor: NSColor.labelColor, .paragraphStyle: style])
-        if ai {
-            ("AI" as NSString).draw(in: NSRect(x: bounds.width-49, y: (bounds.height-13)/2, width: 20, height: 13), withAttributes: [.font: NSFont.systemFont(ofSize: 9, weight: .medium), .foregroundColor: NSColor.secondaryLabelColor])
-        }
-        drawSymbol(Appearance.symbol(expanded ? "chevron.down" : "chevron.right", size: 9), in: NSRect(x: bounds.width-18, y: (bounds.height-9)/2, width: 9, height: 9), opacity: hovered || expanded ? 0.8 : 0.35)
-    }
-}
-
 /// Native Liquid Glass on macOS 26; a system material on earlier releases.
 /// Children live inside contentView, never above an unrelated simulated glass layer.
 class GlassChrome: NSView {

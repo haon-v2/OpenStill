@@ -9,6 +9,26 @@ final class CropPresetPanel: NSStackView {
     private let warning = NSTextField(wrappingLabelWithString:"")
     private enum Choice { case freeform, original, preset(CropPreset) }
     private var choices: [Choice] = []
+    private var fullWidth: [NSLayoutConstraint] = []
+    private var label: NSTextField?, hint: NSTextField?
+    /// One line for the tool options bar: preset menu, ↔ and the live size. The warning shows as an orange size.
+    var compact = false {
+        didSet {
+            guard compact != oldValue else { return }
+            NSLayoutConstraint.deactivate(fullWidth)
+            orientation = compact ? .horizontal : .vertical; spacing = compact ? 8 : 10; alignment = compact ? .centerY : .leading
+            label?.isHidden = compact; hint?.isHidden = compact; warning.isHidden = true
+            swap.title = compact ? "↔" : "Swap horizontal ↔ vertical"; swap.toolTip = "Swap horizontal and vertical"
+            preset.controlSize = compact ? .small : .regular
+            readout.maximumNumberOfLines = compact ? 1 : 0; readout.lineBreakMode = compact ? .byTruncatingTail : .byWordWrapping
+            readout.font = compact ? .monospacedDigitSystemFont(ofSize: 11, weight: .regular) : .monospacedDigitSystemFont(ofSize: 11, weight: .medium)
+            compactWidth.isActive = compact
+            if !compact { NSLayoutConstraint.activate(fullWidth) }
+            showCrop(selection: nil, photo: lastPhoto)
+        }
+    }
+    private var lastPhoto: CGSize?
+    private lazy var compactWidth = readout.widthAnchor.constraint(equalToConstant: 170)
     override init(frame:NSRect) {
         super.init(frame:frame)
         orientation = .vertical; alignment = .leading; spacing = 10
@@ -23,8 +43,10 @@ final class CropPresetPanel: NSStackView {
         warning.font = .systemFont(ofSize:11); warning.textColor = .systemOrange; warning.isHidden = true
         let hint = NSTextField(wrappingLabelWithString:"Drag the frame to compose. Drag a corner to resize. Cropping keeps source detail; choose output pixel dimensions in Export.")
         hint.font = .systemFont(ofSize:11); hint.textColor = .secondaryLabelColor
+        self.label = label; self.hint = hint
         for view in [label,preset,swap,readout,warning,hint] {
-            view.translatesAutoresizingMaskIntoConstraints = false; addArrangedSubview(view); view.widthAnchor.constraint(equalTo:widthAnchor).isActive = true
+            view.translatesAutoresizingMaskIntoConstraints = false; addArrangedSubview(view)
+            let w = view.widthAnchor.constraint(equalTo:widthAnchor); w.isActive = true; fullWidth.append(w)
         }
         showCrop(selection:nil,photo:nil)
         setEnabled(false)
@@ -60,18 +82,19 @@ final class CropPresetPanel: NSStackView {
     }
     /// Shows the live crop size, or the photo being cropped before a frame is drawn.
     func showCrop(selection:CGSize?,photo:CGSize?) {
-        warning.isHidden = true
+        warning.isHidden = true; readout.textColor = compact ? Studio.secondary : .labelColor
+        if photo != nil { lastPhoto = photo }
         if let selection {
             let w = Int(selection.width.rounded()), h = Int(selection.height.rounded())
             readout.stringValue = "Crop  " + CropGeometry.sizeLabel(width:w,height:h)
             if let p = selectedPreset, !p.isFilled(byWidth:w,height:h) {
                 warning.stringValue = "Smaller than \(p.width) × \(p.height). Exporting at that size will enlarge the photo."
-                warning.isHidden = false
+                if compact { readout.textColor = .systemOrange; readout.toolTip = warning.stringValue; return } else { warning.isHidden = false }
             }
         } else if let photo {
             readout.stringValue = "Photo  " + CropGeometry.sizeLabel(width:Int(photo.width.rounded()),height:Int(photo.height.rounded()))
         } else {
-            readout.stringValue = "Choose a preset or Draw crop to see the size and aspect ratio."
+            readout.stringValue = compact ? "" : "Choose a preset or Draw crop to see the size and aspect ratio."
         }
         readout.toolTip = readout.stringValue
     }
