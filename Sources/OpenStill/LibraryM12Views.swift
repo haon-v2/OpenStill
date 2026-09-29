@@ -365,65 +365,6 @@ final class RenameAccessory: NSStackView, NSComboBoxDelegate, NSTextFieldDelegat
     }
 }
 
-/// Library › Auto Import Settings: a watched folder whose new photos are moved into the library.
-final class AutoImportWindow: NSWindowController {
-    var saved: ((AutoImportSettings) -> Void)?
-    private var settings = AutoImport.load()
-    private let enabled = NSButton(checkboxWithTitle: "Enable Auto Import", target: nil, action: nil)
-    private let watched = NSTextField(labelWithString: ""), destination = NSTextField(labelWithString: "")
-    private let folders = NSPopUpButton(), mode = NSPopUpButton(), keywords = NSTextField(), status = NSTextField(wrappingLabelWithString: "")
-    init() {
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 340), styleMask: [.titled, .closable], backing: .buffered, defer: false)
-        window.title = "Auto Import Settings"; Appearance.configure(window)
-        super.init(window: window)
-        let root = Appearance.panel(in: window)
-        let intro = NSTextField(wrappingLabelWithString: "Photos saved into the watched folder (for example by tethering software or a card reader app) are added to the library automatically. OpenStill checks the folder while it's open; nothing leaves this Mac.")
-        intro.font = .systemFont(ofSize: 11); intro.textColor = .secondaryLabelColor
-        for f in [watched, destination] { f.lineBreakMode = .byTruncatingMiddle; f.font = .systemFont(ofSize: 11) }
-        folders.addItems(withTitles: ImportSettings.folderTemplates.map { $0.isEmpty ? "No subfolders" : $0 })
-        mode.addItems(withTitles: ["Move photos into the library", "Copy photos (leave the originals)"])
-        keywords.placeholderString = "Keywords to add (optional)"
-        enabled.target = self; enabled.action = #selector(changed)
-        for c in [folders, mode] as [NSControl] { c.target = self; c.action = #selector(changed) }
-        func row(_ title: String, _ views: [NSView]) -> NSStackView { let l = NSTextField(labelWithString: title); l.widthAnchor.constraint(equalToConstant: 110).isActive = true; let r = NSStackView(views: [l] + views); r.spacing = 8; return r }
-        let chooseWatched = NSButton(title: "Choose…", target: self, action: #selector(pickWatched)), chooseDestination = NSButton(title: "Choose…", target: self, action: #selector(pickDestination))
-        let save = NSButton(title: "Save", target: self, action: #selector(saveSettings)); save.keyEquivalent = "\r"
-        let stack = NSStackView(views: [intro, enabled, row("Watched folder", [watched, chooseWatched]), row("Destination", [destination, chooseDestination]),
-                                        row("Subfolders", [folders]), row("Files", [mode]), row("Keywords", [keywords]), status, save])
-        stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 10; stack.translatesAutoresizingMaskIntoConstraints = false; root.addSubview(stack)
-        NSLayoutConstraint.activate([stack.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 20), stack.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -20),
-                                     stack.topAnchor.constraint(equalTo: root.topAnchor, constant: 20), intro.widthAnchor.constraint(equalToConstant: 480), status.widthAnchor.constraint(equalToConstant: 480),
-                                     watched.widthAnchor.constraint(equalToConstant: 270), destination.widthAnchor.constraint(equalToConstant: 270), keywords.widthAnchor.constraint(equalToConstant: 360)])
-        load()
-    }
-    required init?(coder: NSCoder) { fatalError() }
-    private func load() {
-        enabled.state = settings.enabled ? .on : .off
-        watched.stringValue = settings.watched?.path ?? "Not chosen"; destination.stringValue = settings.destination?.path ?? "Not chosen"
-        folders.selectItem(at: ImportSettings.folderTemplates.firstIndex(of: settings.folderTemplate) ?? 0)
-        mode.selectItem(at: settings.move ? 0 : 1); keywords.stringValue = settings.metadata?.keywords.joined(separator: ", ") ?? ""
-        changed()
-    }
-    @objc private func changed() {
-        settings.enabled = enabled.state == .on
-        settings.folderTemplate = ImportSettings.folderTemplates[max(0, folders.indexOfSelectedItem)]; settings.move = mode.indexOfSelectedItem == 0
-        status.stringValue = !settings.enabled ? "Auto Import is off." : settings.isReady ? "Watching \(settings.watched?.lastPathComponent ?? "")." : "Choose a watched folder and a destination outside it."
-    }
-    private func choose(_ done: @escaping (URL) -> Void) {
-        let panel = NSOpenPanel(); panel.canChooseDirectories = true; panel.canChooseFiles = false; panel.canCreateDirectories = true
-        guard let window else { return }
-        panel.beginSheetModal(for: window) { if $0 == .OK, let url = panel.url { done(url) } }
-    }
-    @objc private func pickWatched() { choose { [weak self] url in self?.settings.watched = url; self?.watched.stringValue = url.path; self?.changed() } }
-    @objc private func pickDestination() { choose { [weak self] url in self?.settings.destination = url; self?.destination.stringValue = url.path; self?.changed() } }
-    @objc private func saveSettings() {
-        changed()
-        let words = IPTCMetadata.parseKeywords(keywords.stringValue)
-        if words.isEmpty { settings.metadata = nil } else { var m = IPTCMetadata(); m.keywords = words; settings.metadata = m }
-        do { try AutoImport.save(settings); saved?(settings); close() } catch { status.stringValue = error.localizedDescription }
-    }
-}
-
 /// Watches the Auto Import folder while the app is open and imports what settles there.
 final class AutoImportMonitor {
     var imported: (([URL], ImportReport) -> Void)?

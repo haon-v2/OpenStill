@@ -99,11 +99,6 @@ extension ViewerController {
     @objc func showLoupeView() { library { $0.setViewMode(.loupe) } }
     @objc func showCompareView() { library { $0.setViewMode(.compare) } }
     @objc func showSurveyView() { library { $0.setViewMode(.survey) } }
-    @objc func showAutoImportSettings() {
-        let window = autoImportWindow ?? AutoImportWindow(); autoImportWindow = window
-        window.saved = { [weak self] settings in self?.autoImportMonitor.start(settings) }
-        window.showWindow(nil); window.window?.center(); window.window?.makeKeyAndOrderFront(nil)
-    }
     /// Reference View: the photo being edited (or the one selected in the library) is kept in its own window for comparison.
     @objc func showReferenceView() {
         let window = referenceWindow ?? ReferenceWindow(); referenceWindow = window

@@ -42,7 +42,6 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
     var libraryBrowser: ShootWindow?
     // Library tools: Auto Import, the Reference view and their windows.
     let autoImportMonitor = AutoImportMonitor()
-    var autoImportWindow: AutoImportWindow?
     var referenceWindow: ReferenceWindow?
     // Workflow: the second display window and Auto Sync.
     var secondaryWindow: SecondaryDisplayWindow?
