@@ -9,6 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         createWindow()
+        LayoutDump.runIfRequested(window: window)
         Shortcuts.registerKeys()
         viewer.startAutoImport()
         buildMenu()
