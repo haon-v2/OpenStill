@@ -24,26 +24,15 @@ Apple Vision supplies foreground-instance segmentation and horizon detection thr
 
 Additional local-only QA photograph: [Horizon Sea.jpg](https://commons.wikimedia.org/wiki/File:Horizon_Sea.jpg) by Yvessurbano0, CC BY-SA 4.0. A rotated derivative is stored only in the temporary QA folder. Neither is bundled with the source/app.
 
-## Bundled LUT library
+## Bundled look library
 
-The 12 `.cube` files in `Resources/LUTs` are CC0-1.0 data assets from the FreshLUTs creator community, distributed by OpenShot. No OpenShot application code is included. Files are pinned to revision `9004af74b02c67e507190e9950b5fc690fb0a900`. Each creator page explicitly displayed CC0 Creative Commons / free commercial use when checked on September 24, 2026.
+`Resources/LUTs/Library.lutpack` holds OpenStill's bundled looks. `Resources/LUTs/catalog.json` names each look's creator, source, license and SHA-256; `Resources/Licenses/LUTs/PROVENANCE.md` lists every look with its original name and source. OpenStill's categories, names and descriptions are editorial suggestions, not creator endorsements.
 
-`Resources/LUTs/catalog.json` records each creator, original source page, pinned download, and SHA-256 checksum. `Resources/Licenses/LUTs/CC0-1.0.txt` contains the full dedication; `PROVENANCE.md` records retrieval details. OpenStill's photography categories and descriptions are editorial suggestions, not creator endorsements.
+- **RawTherapee Film Simulation Collection** (version 2015-09-20) by Pat David, Pavlov Dmitry and Michael Ezra, licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) (full text in `Resources/Licenses/LUTs/CC-BY-SA-4.0.txt`). Source: https://rawpedia.rawtherapee.com/Film_Simulation . OpenStill converted the 293 Hald CLUT images to 33×33×33 tables at 8-bit precision with `scripts/build-lut-pack.py`; the converted tables are shared under the same CC BY-SA 4.0 license. Film stock names appear in the collection's file names for information only; OpenStill shows its own descriptive names, and neither OpenStill nor the collection's authors are affiliated with or endorsed by the film makers.
+- **FreshLUTs community looks** (50), CC0-1.0, from OpenShot revision `9004af74b02c67e507190e9950b5fc690fb0a900`, whose [src/colors/AUTHORS.md](https://github.com/OpenShot/openshot-qt/blob/9004af74b02c67e507190e9950b5fc690fb0a900/src/colors/AUTHORS.md) states that every entry is released under Creative Commons CC0. Each look links to its creator's FreshLUTs page. No OpenShot application code is included.
+- **OpenStill Originals** (77), CC0-1.0, generated from `Resources/LUTs/originals.json`.
 
-| Look | Creator | Source |
-| --- | --- | --- |
-| Vintage 400 Film | M.Fahri | https://freshluts.com/luts/1660 |
-| Romantic Cinema | SHAAM WORX | https://freshluts.com/luts/169 |
-| Golden Years Film | jackofalltrades | https://freshluts.com/luts/1015 |
-| City Neon Cinema | Gina | https://freshluts.com/luts/2426 |
-| City Night Film | SHAAM WORX | https://freshluts.com/luts/148 |
-| Night Glow | maisayantan | https://freshluts.com/luts/357 |
-| Cool Cinema | Andy | https://freshluts.com/luts/218 |
-| Teal Punch | tjtop | https://freshluts.com/luts/285 |
-| Noir Era | jackofalltrades | https://freshluts.com/luts/1053 |
-| Emerald Film | pushpak dsilva | https://freshluts.com/luts/276 |
-| Woodland Drama | SHAAM WORX | https://freshluts.com/luts/166 |
-| Tropical Teal | Andy | https://freshluts.com/luts/217 |
+The full CC0 dedication is in `Resources/Licenses/LUTs/CC0-1.0.txt`.
 
 ## LibRaw 0.22.2
 
