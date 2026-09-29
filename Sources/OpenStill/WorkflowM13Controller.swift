@@ -85,32 +85,6 @@ extension ViewerController {
         guard CatalogBackup.isDue(settings) else { return }
         if (try? CatalogBackup.run(into: settings.folder, keep: settings.keep)) != nil { settings.last = Date(); try? CatalogBackup.save(settings) }
     }
-    @objc func catalogSettings() {
-        guard let window = view.window else { return }
-        var settings = CatalogBackup.load()
-        let alert = NSAlert(); alert.messageText = "Catalog Settings"
-        alert.informativeText = "Catalog: \(EditStorage.root.path)\nBackups: \((settings.folder ?? CatalogBackup.defaultFolder()).path)" + (settings.last.map { "\nLast backup: " + DateFormatter.localizedString(from: $0, dateStyle: .medium, timeStyle: .short) } ?? "")
-        let frequency = NSPopUpButton(); frequency.addItems(withTitles: BackupFrequency.allCases.map(\.title)); frequency.selectItem(at: BackupFrequency.allCases.firstIndex(of: settings.frequency) ?? 0)
-        let keep = NSTextField(string: "\(settings.keep)"); keep.widthAnchor.constraint(equalToConstant: 50).isActive = true
-        let keepRow = NSStackView(views: [NSTextField(labelWithString: "Keep"), keep, NSTextField(labelWithString: "backups")]); keepRow.spacing = 6
-        let move = NSButton(checkboxWithTitle: "Use a different catalog folder (takes effect after relaunch)…", target: nil, action: nil)
-        let stack = NSStackView(views: [NSTextField(labelWithString: "Back up the catalog:"), frequency, keepRow, move]); stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 8
-        stack.frame = NSRect(x: 0, y: 0, width: 380, height: 120); alert.accessoryView = stack
-        alert.addButton(withTitle: "Save"); alert.addButton(withTitle: "Cancel")
-        alert.beginSheetModal(for: window) { [weak self] response in
-            guard response == .alertFirstButtonReturn else { return }
-            settings.frequency = BackupFrequency.allCases[max(0, frequency.indexOfSelectedItem)]; settings.keep = max(1, min(100, Int(keep.stringValue) ?? 5))
-            try? CatalogBackup.save(settings)
-            if move.state == .on { self?.chooseCatalogFolder() }
-        }
-    }
-    private func chooseCatalogFolder() {
-        let panel = NSOpenPanel(); panel.canChooseDirectories = true; panel.canChooseFiles = false; panel.canCreateDirectories = true
-        panel.message = "Choose a folder for the catalog. An empty folder starts a new catalog; a folder with an OpenStill catalog opens it."
-        guard panel.runModal() == .OK, let folder = panel.url else { return }
-        CatalogLocation.choose(folder)
-        let alert = NSAlert(); alert.messageText = "Relaunch OpenStill to use this catalog"; alert.informativeText = folder.path; alert.runModal()
-    }
     @objc func exportAsCatalog() {
         let items = isLibrary ? (libraryBrowser?.selectedItems ?? []) : chosenItems()
         guard !items.isEmpty, let window = view.window else { info.status("Select the photos to export as a catalog."); return }

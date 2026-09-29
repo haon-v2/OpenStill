@@ -5,9 +5,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var window: NSWindow!
     private let viewer = ViewerController()
     private let updates = UpdateController()
-    private lazy var settings = SettingsWindowController(updates: updates)
+    private lazy var settings: SettingsWindowController = {
+        let settings = SettingsWindowController(updates: updates)
+        settings.autoImportSaved = { [weak self] in self?.viewer.autoImportMonitor.start($0) }
+        return settings
+    }()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.appearance = NSAppearance(named: .darkAqua)   // OpenStill is always dark, like its Studio window
         ModernRenderer.warmUp()
         createWindow()
         Shortcuts.registerKeys()
@@ -86,7 +91,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         add(file, "Export as Catalog…", #selector(ViewerController.exportAsCatalog), target: viewer)
         add(file, "Import Catalog…", #selector(ViewerController.importCatalog), target: viewer)
         add(file, "Back Up Catalog Now", #selector(ViewerController.backUpCatalogNow), target: viewer)
-        add(file, "Catalog Settings…", #selector(ViewerController.catalogSettings), target: viewer)
+        add(file, "Catalog Settings…", #selector(showCatalogSettings), target: self)
         file.addItem(.separator())
         add(file, "Close Window", #selector(NSWindow.performClose(_:)), "w")
         let edit = menu("Edit")
@@ -138,7 +143,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         add(library, "Rename Photos…", #selector(ViewerController.renamePhotos), String(UnicodeScalar(NSF2FunctionKey)!), target: viewer, modifiers: [])
         add(library, "Undo Rename", #selector(ViewerController.undoRename), target: viewer)
         library.addItem(.separator())
-        add(library, "Auto Import Settings…", #selector(ViewerController.showAutoImportSettings), target: viewer)
+        add(library, "Auto Import Settings…", #selector(showAutoImportSettings), target: self)
         add(library, "Reference View", #selector(ViewerController.showReferenceView), target: viewer)
         let develop = menu("Develop")
         add(develop, "Edit In App", #selector(ViewerController.editInApp), "e", target: viewer, modifiers: [.command])
@@ -175,7 +180,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         add(windowMenu, "Secondary Display", #selector(ViewerController.toggleSecondaryDisplay), String(UnicodeScalar(NSF11FunctionKey)!), target: viewer, modifiers: [.command])
         NSApp.windowsMenu = windowMenu
     }
-    @objc private func showSettings() { settings.showWindow(nil); settings.window?.center(); settings.window?.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true) }
+    @objc private func showSettings() { settings.open(settings.section) }
+    @objc private func showCatalogSettings() { settings.open(.library) }
+    @objc private func showAutoImportSettings() { settings.open(.autoImport) }
     @objc private func showAbout() {
         NSApp.orderFrontStandardAboutPanel(options: [
             .applicationName: "OpenStill", .applicationVersion: Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "",

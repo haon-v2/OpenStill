@@ -33,7 +33,7 @@ extension ViewerController {
         canvas.backdrop = Studio.canvas
         canvas.viewportChanged = { [weak self] in self?.navigatorView?.needsDisplay = true; self?.updateStudioInfo(); self?.viewportSettled() }
         librarySidebar.publish = { [weak self] in self?.withLibrary { $0.openPublish() } }
-        info.setLightroom(.develop)
+        info.showModule(.develop)
         Shortcuts.workspace = { [weak self] id in self?.handleWorkspaceKey(id) ?? false }
         // Workspace keys (G, D, R, Q, L, T, Tab…) work wherever focus is in this window, except while typing in a text field.
         if workspaceKeyMonitor == nil {

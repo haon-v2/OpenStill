@@ -38,7 +38,7 @@ private final class SurveyTile: NSView {
         super.init(frame: .zero)
         wantsLayer = true; layer?.cornerRadius = 4; layer?.borderColor = NSColor.white.cgColor
         imageView.imageScaling = .scaleProportionallyUpOrDown
-        name.font = .systemFont(ofSize: 10); name.textColor = LRColors.dim; name.lineBreakMode = .byTruncatingMiddle; name.alignment = .center
+        name.font = .systemFont(ofSize: 10); name.textColor = Studio.secondary; name.lineBreakMode = .byTruncatingMiddle; name.alignment = .center
         close.bezelStyle = .circular; close.isBordered = false; close.image = Appearance.symbol("xmark.circle.fill", size: 14); close.target = self; close.action = #selector(remove)
         close.setAccessibilityLabel("Remove from survey")
         for v in [imageView, name, close] { v.translatesAutoresizingMaskIntoConstraints = false; addSubview(v) }
@@ -74,12 +74,12 @@ final class LibraryStage: NSView {
     private var token = UUID()
     override init(frame: NSRect) {
         super.init(frame: frame)
-        wantsLayer = true; layer?.backgroundColor = LRColors.canvas.cgColor
+        wantsLayer = true; layer?.backgroundColor = Studio.canvas.cgColor
         for (i, canvas) in canvases.enumerated() {
             canvas.appearance = NSAppearance(named: .darkAqua)
             canvas.viewportChanged = { [weak self] in guard let self, self.mode == .compare else { return }; self.canvases[1 - i].setViewport(self.canvases[i].viewport) }
             canvas.toggleZoom = { [weak canvas] in guard let canvas else { return }; canvas.native = !canvas.native }
-            titles[i].font = .systemFont(ofSize: 11, weight: .medium); titles[i].textColor = LRColors.text
+            titles[i].font = .systemFont(ofSize: 11, weight: .medium); titles[i].textColor = Studio.text
         }
         swapButton.bezelStyle = .rounded; swapButton.controlSize = .small; swapButton.target = self; swapButton.action = #selector(swap)
         let columns = (0..<2).map { i -> NSStackView in
@@ -202,13 +202,13 @@ final class QuickDevelopPanel: NSStackView {
         let auto = LRButton("Auto Tone") { [weak self] in self?.command?("lib:qd:auto") }, reset = LRButton("Reset All") { [weak self] in self?.command?("lib:qd:reset") }
         buttons += [auto, reset]
         addRow("", [auto, reset])
-        let note = NSTextField(wrappingLabelWithString: "Changes every selected photo. Actions → Undo batch reverses it."); note.font = .systemFont(ofSize: 10); note.textColor = LRColors.dim
+        let note = NSTextField(wrappingLabelWithString: "Changes every selected photo. Actions → Undo batch reverses it."); note.font = .systemFont(ofSize: 10); note.textColor = Studio.secondary
         addArrangedSubview(note); note.widthAnchor.constraint(equalTo: widthAnchor).isActive = true
         setEnabled(false)
     }
     required init?(coder: NSCoder) { fatalError() }
     private func addRow(_ title: String, _ controls: [NSView]) {
-        let label = NSTextField(labelWithString: title); label.font = .systemFont(ofSize: 11); label.textColor = LRColors.text; label.alignment = .right
+        let label = NSTextField(labelWithString: title); label.font = .systemFont(ofSize: 11); label.textColor = Studio.text; label.alignment = .right
         label.widthAnchor.constraint(equalToConstant: 76).isActive = true
         let row = NSStackView(views: [label] + controls); row.spacing = 3; addArrangedSubview(row)
     }
@@ -247,14 +247,14 @@ final class KeywordListPanel: NSStackView, NSSearchFieldDelegate {
         rows.arrangedSubviews.forEach { rows.removeArrangedSubview($0); $0.removeFromSuperview() }
         let list = KeywordTree.rows(tree, filter: search.stringValue)
         if list.isEmpty {
-            let empty = NSTextField(wrappingLabelWithString: tree.isEmpty ? "No keywords yet. Add some in Keywording." : "No keywords match."); empty.font = .systemFont(ofSize: 10); empty.textColor = LRColors.dim
+            let empty = NSTextField(wrappingLabelWithString: tree.isEmpty ? "No keywords yet. Add some in Keywording." : "No keywords match."); empty.font = .systemFont(ofSize: 10); empty.textColor = Studio.secondary
             rows.addArrangedSubview(empty); return
         }
         for (node, depth) in list.prefix(400) {
             let check = NSButton(checkboxWithTitle: node.name, target: self, action: #selector(toggle(_:)))
             check.allowsMixedState = true; check.state = states[node.path] ?? .off; check.isEnabled = enabled; check.font = .systemFont(ofSize: 11)
             check.identifier = NSUserInterfaceItemIdentifier(node.path); check.setAccessibilityLabel("Keyword \(node.path)")
-            let count = NSTextField(labelWithString: "\(node.count)"); count.font = .monospacedDigitSystemFont(ofSize: 10, weight: .regular); count.textColor = LRColors.dim
+            let count = NSTextField(labelWithString: "\(node.count)"); count.font = .monospacedDigitSystemFont(ofSize: 10, weight: .regular); count.textColor = Studio.secondary
             let show = NSButton(title: "›", target: self, action: #selector(filter(_:))); show.isBordered = false; show.identifier = check.identifier
             show.toolTip = "Show the photos with this keyword"; show.setAccessibilityLabel("Show photos with \(node.path)")
             let indent = NSView(); indent.widthAnchor.constraint(equalToConstant: CGFloat(depth) * 14).isActive = true
@@ -286,8 +286,8 @@ final class KeywordSetPanel: NSStackView, NSTextFieldDelegate {
         entry.placeholderString = "Add keywords, separated by commas"; entry.controlSize = .small; entry.font = .systemFont(ofSize: 11); entry.delegate = self
         entry.target = self; entry.action = #selector(addTyped); entry.setAccessibilityLabel("Add keywords to the selected photos")
         setPicker.controlSize = .small; setPicker.font = .systemFont(ofSize: 11); setPicker.target = self; setPicker.action = #selector(pickSet); setPicker.setAccessibilityLabel("Keyword set")
-        suggestionTitle.font = .systemFont(ofSize: 11, weight: .medium); suggestionTitle.textColor = LRColors.dim
-        let setTitle = NSTextField(labelWithString: "Keyword Set"); setTitle.font = .systemFont(ofSize: 11, weight: .medium); setTitle.textColor = LRColors.dim
+        suggestionTitle.font = .systemFont(ofSize: 11, weight: .medium); suggestionTitle.textColor = Studio.secondary
+        let setTitle = NSTextField(labelWithString: "Keyword Set"); setTitle.font = .systemFont(ofSize: 11, weight: .medium); setTitle.textColor = Studio.secondary
         for v in [entry, suggestionTitle, suggestionGrid, setTitle, setPicker, setGrid] as [NSView] { addArrangedSubview(v); v.widthAnchor.constraint(equalTo: widthAnchor).isActive = true }
         for g in [setGrid, suggestionGrid] { g.rowSpacing = 3; g.columnSpacing = 3 }
         reloadSets()
@@ -365,65 +365,6 @@ final class RenameAccessory: NSStackView, NSComboBoxDelegate, NSTextFieldDelegat
     }
 }
 
-/// Library › Auto Import Settings: a watched folder whose new photos are moved into the library.
-final class AutoImportWindow: NSWindowController {
-    var saved: ((AutoImportSettings) -> Void)?
-    private var settings = AutoImport.load()
-    private let enabled = NSButton(checkboxWithTitle: "Enable Auto Import", target: nil, action: nil)
-    private let watched = NSTextField(labelWithString: ""), destination = NSTextField(labelWithString: "")
-    private let folders = NSPopUpButton(), mode = NSPopUpButton(), keywords = NSTextField(), status = NSTextField(wrappingLabelWithString: "")
-    init() {
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 340), styleMask: [.titled, .closable], backing: .buffered, defer: false)
-        window.title = "Auto Import Settings"; Appearance.configure(window)
-        super.init(window: window)
-        let root = Appearance.panel(in: window)
-        let intro = NSTextField(wrappingLabelWithString: "Photos saved into the watched folder (for example by tethering software or a card reader app) are added to the library automatically. OpenStill checks the folder while it's open; nothing leaves this Mac.")
-        intro.font = .systemFont(ofSize: 11); intro.textColor = .secondaryLabelColor
-        for f in [watched, destination] { f.lineBreakMode = .byTruncatingMiddle; f.font = .systemFont(ofSize: 11) }
-        folders.addItems(withTitles: ImportSettings.folderTemplates.map { $0.isEmpty ? "No subfolders" : $0 })
-        mode.addItems(withTitles: ["Move photos into the library", "Copy photos (leave the originals)"])
-        keywords.placeholderString = "Keywords to add (optional)"
-        enabled.target = self; enabled.action = #selector(changed)
-        for c in [folders, mode] as [NSControl] { c.target = self; c.action = #selector(changed) }
-        func row(_ title: String, _ views: [NSView]) -> NSStackView { let l = NSTextField(labelWithString: title); l.widthAnchor.constraint(equalToConstant: 110).isActive = true; let r = NSStackView(views: [l] + views); r.spacing = 8; return r }
-        let chooseWatched = NSButton(title: "Choose…", target: self, action: #selector(pickWatched)), chooseDestination = NSButton(title: "Choose…", target: self, action: #selector(pickDestination))
-        let save = NSButton(title: "Save", target: self, action: #selector(saveSettings)); save.keyEquivalent = "\r"
-        let stack = NSStackView(views: [intro, enabled, row("Watched folder", [watched, chooseWatched]), row("Destination", [destination, chooseDestination]),
-                                        row("Subfolders", [folders]), row("Files", [mode]), row("Keywords", [keywords]), status, save])
-        stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 10; stack.translatesAutoresizingMaskIntoConstraints = false; root.addSubview(stack)
-        NSLayoutConstraint.activate([stack.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 20), stack.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -20),
-                                     stack.topAnchor.constraint(equalTo: root.topAnchor, constant: 20), intro.widthAnchor.constraint(equalToConstant: 480), status.widthAnchor.constraint(equalToConstant: 480),
-                                     watched.widthAnchor.constraint(equalToConstant: 270), destination.widthAnchor.constraint(equalToConstant: 270), keywords.widthAnchor.constraint(equalToConstant: 360)])
-        load()
-    }
-    required init?(coder: NSCoder) { fatalError() }
-    private func load() {
-        enabled.state = settings.enabled ? .on : .off
-        watched.stringValue = settings.watched?.path ?? "Not chosen"; destination.stringValue = settings.destination?.path ?? "Not chosen"
-        folders.selectItem(at: ImportSettings.folderTemplates.firstIndex(of: settings.folderTemplate) ?? 0)
-        mode.selectItem(at: settings.move ? 0 : 1); keywords.stringValue = settings.metadata?.keywords.joined(separator: ", ") ?? ""
-        changed()
-    }
-    @objc private func changed() {
-        settings.enabled = enabled.state == .on
-        settings.folderTemplate = ImportSettings.folderTemplates[max(0, folders.indexOfSelectedItem)]; settings.move = mode.indexOfSelectedItem == 0
-        status.stringValue = !settings.enabled ? "Auto Import is off." : settings.isReady ? "Watching \(settings.watched?.lastPathComponent ?? "")." : "Choose a watched folder and a destination outside it."
-    }
-    private func choose(_ done: @escaping (URL) -> Void) {
-        let panel = NSOpenPanel(); panel.canChooseDirectories = true; panel.canChooseFiles = false; panel.canCreateDirectories = true
-        guard let window else { return }
-        panel.beginSheetModal(for: window) { if $0 == .OK, let url = panel.url { done(url) } }
-    }
-    @objc private func pickWatched() { choose { [weak self] url in self?.settings.watched = url; self?.watched.stringValue = url.path; self?.changed() } }
-    @objc private func pickDestination() { choose { [weak self] url in self?.settings.destination = url; self?.destination.stringValue = url.path; self?.changed() } }
-    @objc private func saveSettings() {
-        changed()
-        let words = IPTCMetadata.parseKeywords(keywords.stringValue)
-        if words.isEmpty { settings.metadata = nil } else { var m = IPTCMetadata(); m.keywords = words; settings.metadata = m }
-        do { try AutoImport.save(settings); saved?(settings); close() } catch { status.stringValue = error.localizedDescription }
-    }
-}
-
 /// Watches the Auto Import folder while the app is open and imports what settles there.
 final class AutoImportMonitor {
     var imported: (([URL], ImportReport) -> Void)?
@@ -475,10 +416,10 @@ final class ReferenceWindow: NSWindowController, NSWindowDelegate {
         let window = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 620, height: 520), styleMask: [.titled, .closable, .resizable, .utilityWindow], backing: .buffered, defer: false)
         window.title = "Reference"; window.isFloatingPanel = true; window.hidesOnDeactivate = true
         super.init(window: window); window.delegate = self
-        let root = NSView(); root.wantsLayer = true; root.layer?.backgroundColor = LRColors.canvas.cgColor; window.contentView = root
+        let root = NSView(); root.wantsLayer = true; root.layer?.backgroundColor = Studio.canvas.cgColor; window.contentView = root
         canvas.appearance = NSAppearance(named: .darkAqua); canvas.message = "Choose a reference photo."
         canvas.toggleZoom = { [weak canvas] in guard let canvas else { return }; canvas.native = !canvas.native }
-        name.textColor = LRColors.text; name.font = .systemFont(ofSize: 11)
+        name.textColor = Studio.text; name.font = .systemFont(ofSize: 11)
         let use = LRButton("Use Current Photo as Reference") { [weak self] in self?.useCurrent?() }
         let bar = NSStackView(views: [name, NSView(), use]); bar.spacing = 8
         for v in [canvas, bar] as [NSView] { v.translatesAutoresizingMaskIntoConstraints = false; root.addSubview(v) }

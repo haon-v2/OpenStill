@@ -100,7 +100,7 @@ Moved or deleted files drop out of collections until they're found again.
   - Extensions stay the same, XMP sidecars are renamed too, and edits and collections follow the photos.
   - Names that would clash with another file are refused.
   - **Library → Undo Rename** puts the old names back.
-- **Auto Import.** **Library → Auto Import Settings…** watches a folder.
+- **Auto Import.** **Settings → Auto Import** (also **Library → Auto Import Settings…**) watches a folder.
   - Photos saved into it (for example by tethering software) are moved or copied into a destination folder, with optional keywords, while OpenStill is open.
   - Only the folder's top level is watched, and a file is taken only once it has stopped changing.
 - **Reference View.** **Library → Reference View** keeps a chosen photo in its own window next to the one you're developing, for matching a look. **Use Current Photo as Reference** changes it.
@@ -207,7 +207,7 @@ Alignment is OpenStill's own: it finds the shift between frames, then refines ro
 OpenStill reads and writes `.xmp` sidecars, the files Lightroom, Bridge and Camera Raw keep next to photos (`IMG_0001.CR2` → `IMG_0001.xmp`). Your photos themselves are never changed.
 
 - **Reading.** The first time OpenStill opens a photo, it takes the rating, pick/reject, color label, title, caption, creator, copyright, location and keywords from its sidecar, or from XMP embedded in the photo when there is no sidecar. Bridge's reject rating (−1) becomes a reject flag, and hierarchical keywords (`lr:hierarchicalSubject`) keep their levels. **Actions → Read metadata from XMP** reads them again for the selected photos.
-- **Writing.** **Actions → Write metadata to XMP** writes the selected photos' rating, label, keywords and other metadata to their sidecars. Turn on **Settings → Write metadata to XMP sidecars automatically** to do this whenever they change. OpenStill replaces only the fields it manages and keeps everything else already in the file, including Camera Raw develop settings. Pick/reject is stored as `openstill:Flag`, because Lightroom doesn't write picks to XMP. A photo shot as RAW + JPEG shares one sidecar name, as in Lightroom.
+- **Writing.** **Actions → Write metadata to XMP** writes the selected photos' rating, label, keywords and other metadata to their sidecars. Turn on **Settings → Library & Catalog → Write XMP sidecars** to do this whenever they change. OpenStill replaces only the fields it manages and keeps everything else already in the file, including Camera Raw develop settings. Pick/reject is stored as `openstill:Flag`, because Lightroom doesn't write picks to XMP. A photo shot as RAW + JPEG shares one sidecar name, as in Lightroom.
 - **Camera Raw / Lightroom edits.** **Actions → Import Camera Raw edits from XMP** adds a version named "Camera Raw" developed with the settings in each photo's sidecar. The version keeps the original untouched. It carries over:
   - exposure, contrast, highlights, shadows, whites, blacks, white balance, vibrance and saturation;
   - clarity, texture, dehaze, and the HSL / Color mixer;
@@ -324,7 +324,7 @@ OpenStill has one window, the **Studio layout**, modeled on the photo editor [Co
   - **Discard Smart Previews** frees the space.
 - **Catalog.**
   - **File → Back Up Catalog Now** copies the catalog, edit records and settings into a dated folder.
-  - **Catalog Settings…** schedules backups when OpenStill quits (every quit, daily or weekly), sets how many backups to keep, and can move the catalog to another folder (after a relaunch).
+  - **Settings → Library & Catalog** (also **File → Catalog Settings…**) schedules backups when OpenStill quits (every quit, daily or weekly), sets how many backups to keep, and can move the catalog to another folder (after a relaunch).
   - **Export as Catalog…** saves the selected photos' edits (and, if you like, the originals) as a folder of portable edit packages; **Import Catalog…** brings one in.
 - **Secondary Display** (**Window → Secondary Display**, ⌘F11). A second window, on your other screen when there is one, showing the selected photo in Loupe, Compare or Survey. It follows the main window's selection.
 - **Book** (**Window → Book**, ⌥⌘4).
@@ -338,6 +338,16 @@ OpenStill has one window, the **Studio layout**, modeled on the photo editor [Co
   - They find the subject (Apple Vision, on this Mac) or the sky (on-device AI) in each photo and apply their settings only there.
   - The masks appear in each tool's Masking tab, where you can refine them.
 - **Identity plate** (**Develop → Identity Plate…**). Your own text or logo in place of "OpenStill" at the left end of the toolbar. **Use Saved Logo** picks a logo made or imported in the watermark logo designer.
+
+## Settings
+
+**OpenStill → Settings… (⌘,)** is a dark window like the rest of the app, with a sidebar of sections:
+
+- **General:** the version, automatic update checks, Check Now and all releases.
+- **Editing & Performance:** the render cache's maximum size, how much it uses, and Clear Cache; the GPU; whether HDR editing is available on this display.
+- **Library & Catalog:** XMP sidecars; the catalog's location (Show, Change…); backups (how often, how many to keep, Back Up Now).
+- **Auto Import:** the watched folder, destination, subfolders, move or copy, and keywords. Changes apply right away.
+- **Shortcuts:** every command and its keys.
 
 ## Performance
 

@@ -42,7 +42,6 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
     var libraryBrowser: ShootWindow?
     // Library tools: Auto Import, the Reference view and their windows.
     let autoImportMonitor = AutoImportMonitor()
-    var autoImportWindow: AutoImportWindow?
     var referenceWindow: ReferenceWindow?
     // Workflow: the second display window and Auto Sync.
     var secondaryWindow: SecondaryDisplayWindow?
@@ -501,7 +500,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         finishMaskEditing(); canvas.clearTool()
         if tool != .adjust { tool = .adjust; info.showToolPanel(nil) }
         isLibrary = true
-        info.setLightroom(.library)
+        info.showModule(.library)
         refreshLibrary(); layoutStudio(); updateControls(); updateLibraryInspector()
         withLibrary { $0.focus() }
     }
@@ -509,7 +508,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         let selectedItem = isLibrary ? libraryBrowser?.selectedItems.first : nil
         let wasLibrary = isLibrary
         isLibrary = false
-        info.setLightroom(.develop)
+        info.showModule(.develop)
         // The library showed the selected photo's metadata and histogram; show this photo's again.
         if wasLibrary { info.show(metadata, rendering: renderedPhoto?.description); if renderedPhoto != nil { renderEdits() } }
         layoutStudio(); updateControls()

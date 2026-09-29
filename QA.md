@@ -529,3 +529,32 @@ Automated fixtures are generated and contain no user photographs. The real S9 fi
   - While dragging, in the real window: each frame renders in 11–60 ms.
   - First frame of a drag: 0.29 s for Exposure and 0.40 s for Contrast. Before the kernel warm-up, Contrast's first frame took 1.6 s, and 0.0.15 showed no frames at all until you paused.
 - **Not yet verified by hand on a Mac:** 40 MP RAW files from several cameras; the render cache filling past its limit; a Pro Display XDR in HDR mode.
+
+## Settings, dark windows, every window tested — September 29, 2026
+
+- **Changed:**
+  - Settings is redesigned in the Studio style: always dark, a sidebar of sections (General, Editing & Performance, Library & Catalog, Auto Import, Shortcuts) and grouped rows with a label on the left and the control on the right.
+  - Catalog Settings and Auto Import Settings are now Settings sections instead of separate dialogs, and their menu items open them.
+  - New in Settings: the render cache size with how much it uses and Clear Cache, the GPU and HDR availability, the catalog location with Show / Change…, and Back Up Now.
+  - The whole app is always dark, including Export, Import, Metadata, Book, Print, Slideshow, Web Gallery, Map, People, Timeline, Tethered Capture, the logo designer, alerts and sheets.
+  - The output windows keep their form rows together instead of spreading them over the window.
+- **Fixed:** found while testing every window:
+  - Loupe, Compare, Survey and Reference showed no photo in 0.0.16. This was also released on its own as 0.0.17.
+  - The Settings row notes could be cut off.
+- **Removed:** unused code:
+  - EditorPanel's always-hidden header, and the glass panel code (only the flat color was used);
+  - `LRColors`, merged into the Studio colors;
+  - the separate Catalog Settings dialog and Auto Import window;
+  - `Appearance.glass()` and `line(in:)`, an unused person-count helper, and the Settings tab API.
+- **Verified on macOS 26 CI:** captures of every window and panel were reviewed:
+  - each Settings section;
+  - Library grid, Loupe, Compare and Survey;
+  - People, Timeline, Metadata, Rename, Export, Import;
+  - Map, Book, Slideshow, Print, Web Gallery;
+  - Identity Plate, Reference, Tethered Capture;
+  - Presets, History, Info and Navigator panels;
+  - Crop and Masking;
+  - a 900-point-wide window and the empty window.
+
+  The build and test suites pass.
+- **Not yet verified by hand on a Mac:** changing the catalog location and relaunching; Clear Cache while a RAW photo is open.

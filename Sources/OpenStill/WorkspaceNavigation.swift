@@ -2,7 +2,7 @@ import AppKit
 import OpenStillCore
 
 private final class LibraryStack: NSStackView { override var isFlipped: Bool { true } }
-final class LibrarySidebar: GlassChrome {
+final class LibrarySidebar: ChromePanel {
     var open: ((URL) -> Void)?
     var browse: (() -> Void)?
     var filter: ((Int) -> Void)?
@@ -25,7 +25,6 @@ final class LibrarySidebar: GlassChrome {
         super.init(frame: frame)
         let scroll = NSScrollView(); scroll.drawsBackground = false; scroll.hasVerticalScroller = true; scroll.autohidesScrollers = true
         scroll.translatesAutoresizingMaskIntoConstraints = false; contentView.addSubview(scroll)
-        flatColor = LRColors.panel
         stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 0
         stack.translatesAutoresizingMaskIntoConstraints = false; scroll.documentView = stack
         NSLayoutConstraint.activate([scroll.leadingAnchor.constraint(equalTo: contentView.leadingAnchor), scroll.trailingAnchor.constraint(equalTo: contentView.trailingAnchor), scroll.topAnchor.constraint(equalTo: contentView.topAnchor), scroll.bottomAnchor.constraint(equalTo: contentView.bottomAnchor), stack.leadingAnchor.constraint(equalTo: scroll.contentView.leadingAnchor), stack.topAnchor.constraint(equalTo: scroll.contentView.topAnchor), stack.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor)])
@@ -229,16 +228,16 @@ final class LRListRow: NSButton {
             let t = NSBezierPath(), cx = start - 9, cy = bounds.midY
             if disclosure { t.move(to: NSPoint(x: cx - 4, y: cy - 2)); t.line(to: NSPoint(x: cx + 4, y: cy - 2)); t.line(to: NSPoint(x: cx, y: cy + 3)) }
             else { t.move(to: NSPoint(x: cx - 2, y: cy - 4)); t.line(to: NSPoint(x: cx - 2, y: cy + 4)); t.line(to: NSPoint(x: cx + 3, y: cy)) }
-            t.close(); LRColors.dim.setFill(); t.fill()
+            t.close(); Studio.secondary.setFill(); t.fill()
         }
         if let symbol, let image = Appearance.symbol(symbol, size: 11) {
             image.draw(in: NSRect(x: x, y: (bounds.height - 12) / 2, width: 13, height: 12), from: .zero, operation: .sourceOver, fraction: fraction, respectFlipped: true, hints: nil); x += 20
         }
         let style = NSMutableParagraphStyle(); style.lineBreakMode = .byTruncatingMiddle
-        let color = dimmed ? LRColors.dim : (selected ? LRColors.bright : LRColors.text)
+        let color = dimmed ? Studio.secondary : (selected ? Studio.text : Studio.text)
         (label as NSString).draw(in: NSRect(x: x, y: (bounds.height - 15) / 2, width: bounds.width - x - 50, height: 15), withAttributes: [.font: NSFont.systemFont(ofSize: 11), .foregroundColor: color, .paragraphStyle: style])
         if let count {
-            let text = "\(count)" as NSString, attrs: [NSAttributedString.Key: Any] = [.font: NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .regular), .foregroundColor: LRColors.dim]
+            let text = "\(count)" as NSString, attrs: [NSAttributedString.Key: Any] = [.font: NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .regular), .foregroundColor: Studio.secondary]
             text.draw(at: NSPoint(x: bounds.width - 12 - text.size(withAttributes: attrs).width, y: (bounds.height - 13) / 2), withAttributes: attrs)
         }
     }

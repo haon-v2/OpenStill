@@ -85,13 +85,6 @@ public enum AIMasks {
         guard coverage(mask) > 0.002 else { throw AIMaskError.nothingFound("person") }
         return mask
     }
-    /// How many separate people Vision finds (up to four), left to right.
-    public static func personCount(_ image: CGImage) throws -> Int {
-        guard #available(macOS 14.0, *) else { throw AIMaskError.systemVersion }
-        let request = VNGeneratePersonInstanceMaskRequest()
-        try VNImageRequestHandler(cgImage: image).perform([request])
-        return request.results?.first?.allInstances.count ?? 0
-    }
     /// One person, numbered from the left (0-based).
     public static func person(_ image: CGImage, index: Int) throws -> CGImage {
         guard #available(macOS 14.0, *) else { throw AIMaskError.systemVersion }

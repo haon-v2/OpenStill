@@ -3,20 +3,16 @@ import CoreImage
 import OpenStillCore
 
 private final class EditorStack: NSStackView { override var isFlipped: Bool { true } }
-final class EditorPanel: GlassChrome {
+final class EditorPanel: ChromePanel {
     var editChanged: ((PhotoEdits, String, Bool) -> Void)?
     var command: ((String) -> Void)?
     var chooseHistory: ((Int) -> Void)?
     private let info = InfoPanel()
     private let body = NSView()
-    private let summary = NSTextField(wrappingLabelWithString: "Open a photograph to begin")
-    private let settings = NSTextField(labelWithString: "—")
-    private let message = NSTextField(wrappingLabelWithString: "Edits are saved on this Mac. Originals stay untouched.")
     private let toolsScroll = NSScrollView()
     private let presetScroll = NSScrollView()
     private let historyScroll = NSScrollView()
     private let historyStack = EditorStack()
-    private let sectionTitle = NSTextField(labelWithString: "Edit")
     private var sliders: [(ContinuousSlider, NSTextField, WritableKeyPath<PhotoEdits, Double>)] = []
     private var toggles: [(NSButton, WritableKeyPath<PhotoEdits, Bool>)] = []
     private var editButtons: [NSButton] = []
@@ -78,26 +74,10 @@ final class EditorPanel: GlassChrome {
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
-        settings.font = .monospacedDigitSystemFont(ofSize: 11, weight: .medium)
-        settings.textColor = .secondaryLabelColor
-        settings.lineBreakMode = .byTruncatingTail
-        summary.font = .systemFont(ofSize: 12)
-        summary.textColor = .secondaryLabelColor
-        summary.maximumNumberOfLines = 2
-        summary.isSelectable = true
-        message.font = .systemFont(ofSize: 11)
-        message.textColor = .secondaryLabelColor
-        message.maximumNumberOfLines = 3
-        message.lineBreakMode = .byTruncatingTail
-        sectionTitle.font = .systemFont(ofSize: 19, weight: .semibold)
-        for v in [sectionTitle, summary, settings, body, message] { v.translatesAutoresizingMaskIntoConstraints = false; contentView.addSubview(v) }
-        NSLayoutConstraint.activate([
-            sectionTitle.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 16), sectionTitle.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16), sectionTitle.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            summary.topAnchor.constraint(equalTo: sectionTitle.bottomAnchor, constant: 16), summary.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 22), summary.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -22), summary.heightAnchor.constraint(equalToConstant: 34),
-            settings.topAnchor.constraint(equalTo: summary.bottomAnchor, constant: 6), settings.leadingAnchor.constraint(equalTo: summary.leadingAnchor), settings.trailingAnchor.constraint(equalTo: summary.trailingAnchor),
-            body.leadingAnchor.constraint(equalTo: contentView.leadingAnchor), body.trailingAnchor.constraint(equalTo: contentView.trailingAnchor), body.topAnchor.constraint(equalTo: settings.bottomAnchor, constant: 12), body.bottomAnchor.constraint(equalTo: message.topAnchor, constant: -12),
-            message.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 22), message.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -22), message.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -16), message.heightAnchor.constraint(greaterThanOrEqualToConstant: 30)
-        ])
+        // The shared panels wait in this hidden holder until the right panel or a floating panel borrows them.
+        body.isHidden = true; body.translatesAutoresizingMaskIntoConstraints = false; contentView.addSubview(body)
+        NSLayoutConstraint.activate([body.leadingAnchor.constraint(equalTo: contentView.leadingAnchor), body.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+                                     body.topAnchor.constraint(equalTo: contentView.topAnchor), body.bottomAnchor.constraint(equalTo: contentView.bottomAnchor)])
         let tools = installScroll(toolsScroll)
         fullWidth(histogram,in:tools)
         histogram.clicked = { [weak self] in self?.command?("toggleClipping") }
@@ -300,11 +280,8 @@ final class EditorPanel: GlassChrome {
     @objc private func toggleEdit(_ sender: NSButton) { let path = toggles[sender.tag].1; states[keyPath: path] = sender.state == .on; editChanged?(states, sender.title, true) }
     func show(_ metadata: PhotoMetadata?, rendering: String? = nil) {
         info.show(metadata, rendering: rendering)
-        summary.stringValue = metadata.map { "\($0.camera)\n\($0.lens)" } ?? "Open a photograph to begin"
         func compact(_ value:String) -> String { value == "Not recorded" ? "—" : value }
-        settings.stringValue = metadata.map { "ISO \(compact($0.iso))  ·  \(compact($0.focalLength))  ·  \(compact($0.aperture))  ·  \(compact($0.shutter))" } ?? "—"
-        summary.toolTip = summary.stringValue; settings.toolTip = settings.stringValue
-        lrCamera.stringValue = metadata == nil ? "" : settings.stringValue
+        lrCamera.stringValue = metadata.map { "ISO \(compact($0.iso))  ·  \(compact($0.focalLength))  ·  \(compact($0.aperture))  ·  \(compact($0.shutter))" } ?? ""
     }
     func update(_ edits: PhotoEdits, document: EditDocument?, enabled: Bool) {
         states = edits; hasPhoto = enabled; controlsEnabled = nil
@@ -358,11 +335,13 @@ final class EditorPanel: GlassChrome {
     private var controlsEnabled: Bool?
     private var historySignature = ""
     func status(_ text: String, busy: Bool = false) {
-        message.stringValue = text; message.toolTip = text
         statusChanged?(text, busy)
-        // Controls change only when their enabled state does (a message alone touches nothing else).
+        setBusy(busy)
+    }
+    /// Controls change only when their enabled state does (a message alone touches nothing else).
+    private func setBusy(_ busy: Bool, force: Bool = false) {
         let enabled = hasPhoto && !busy
-        guard enabled != controlsEnabled || busy != self.busy else { return }
+        guard force || enabled != controlsEnabled || busy != self.busy else { return }
         self.busy = busy; controlsEnabled = enabled
         lutBrowser.setEnabled(hasPhoto && !busy)
         for panel in maskPanels.values { panel.setEnabled(hasPhoto && !busy) }
@@ -393,19 +372,15 @@ fileprivate struct Borrowed {
 // MARK: - Lightroom Classic arrangement
 
 extension EditorPanel {
-    /// Switches between the Luminar arrangement (nil) and Lightroom Classic's Library or Develop panels.
-    /// The same controls are used either way; the Lightroom panels borrow them and give them back.
-    func setLightroom(_ module: LightroomModule?) {
-        let target: LightroomModule? = module.map { $0 == .develop ? .develop : .library }
+    /// Shows the Library or Develop panels. They borrow the shared controls and give them back when switching.
+    func showModule(_ module: LightroomModule) {
+        let target: LightroomModule = module == .develop ? .develop : .library
         guard target != lrModule else { return }
         command?("finishMask")
         showDrawer(nil)
         returnBorrowed()
         for column in lrColumns.values { column.isHidden = true }
         lrModule = target
-        for v in [sectionTitle, summary, settings, body, message] as [NSView] { v.isHidden = target != nil }
-        flatColor = target == nil ? nil : LRColors.panel
-        guard let target else { return }
         let column = lrColumns[target] ?? buildLightroom(target)
         column.isHidden = false
         for (slot, view, height) in lrSlots[target] ?? [] { borrow(view, into: slot, height: height) }
@@ -434,9 +409,9 @@ extension EditorPanel {
         }
         func slot(_ view: NSView, in s: LRSection, height: CGFloat? = nil) { let holder = NSView(); s.add(holder); slots.append((holder, view, height)) }
         func label(_ text: String, in s: LRSection) {
-            let l = NSTextField(labelWithString: text); l.font = .systemFont(ofSize: 11, weight: .medium); l.textColor = LRColors.dim; s.add(l)
+            let l = NSTextField(labelWithString: text); l.font = .systemFont(ofSize: 11, weight: .medium); l.textColor = Studio.secondary; s.add(l)
         }
-        lrCamera.font = .monospacedDigitSystemFont(ofSize: 10, weight: .regular); lrCamera.textColor = LRColors.dim; lrCamera.alignment = .center
+        lrCamera.font = .monospacedDigitSystemFont(ofSize: 10, weight: .regular); lrCamera.textColor = Studio.secondary; lrCamera.alignment = .center
         if module == .library {
             section("Histogram", open: true, pinned: true) { slot(histogram, in: $0) }
             for panel in [quickDevelopPanel, keywordSetPanel, keywordListPanel] as [NSView] {
@@ -446,7 +421,7 @@ extension EditorPanel {
             }
             section("Quick Develop") { $0.add(quickDevelopPanel) }
             section("Keywording", open: true) { s in
-                lrKeywords.font = .systemFont(ofSize: 11); lrKeywords.textColor = LRColors.text; lrKeywords.maximumNumberOfLines = 6
+                lrKeywords.font = .systemFont(ofSize: 11); lrKeywords.textColor = Studio.text; lrKeywords.maximumNumberOfLines = 6
                 s.add(lrKeywords); showKeywords(nil)
                 s.add(keywordSetPanel)
                 s.add(LRButton("Edit Keywords & Metadata…") { [weak self] in self?.command?("lr:metadata") })
@@ -597,7 +572,7 @@ extension EditorPanel {
         buildLeftDevelop()
         // These columns are built after the window applied its accent, so apply it here (slider fills, checkboxes).
         Appearance.applyAccent(in: column); Appearance.applyAccent(in: presetsColumn); Appearance.applyAccent(in: historyColumn)
-        status(message.stringValue, busy: busy)
+        setBusy(busy, force: true)
         return column
     }
     /// The floating panels' contents: Presets & LUTs; and History, Snapshots and Versions with Copy… / Paste.
