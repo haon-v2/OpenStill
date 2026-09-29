@@ -38,8 +38,10 @@ enum RenderAnalysis {
         return filters
     }
     /// A key for one photo with one set of edits.
+    /// Sorted keys, so the same values always encode to the same bytes (JSONEncoder's key order can differ between calls).
+    static var stableEncoder: JSONEncoder { let e = JSONEncoder(); e.outputFormatting = .sortedKeys; return e }
     static func key(source: URL, mode: SourceMode, raw: RawSettings, edits: PhotoEdits) -> String? {
-        guard let data = try? JSONEncoder().encode(edits) else { return nil }
+        guard let data = try? stableEncoder.encode(edits) else { return nil }
         var hasher = Hasher(); hasher.combine(data)
         return "\(source.standardizedFileURL.path)|\(EditStorage.fingerprint(source))|\(mode.rawValue)|\(raw.cacheKey)|\(hasher.finalize())"
     }

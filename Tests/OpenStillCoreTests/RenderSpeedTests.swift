@@ -109,6 +109,8 @@ import Testing
         var edits = PhotoEdits(); let a = RenderAnalysis.key(source: url, mode: .original, raw: RawSettings(), edits: edits)
         edits.exposure = 0.5; let b = RenderAnalysis.key(source: url, mode: .original, raw: RawSettings(), edits: edits)
         #expect(a != nil && a != b)
+        // The same edits always give the same key.
+        for _ in 0..<20 { #expect(RenderAnalysis.key(source: url, mode: .original, raw: RawSettings(), edits: edits) == b) }
         // A Smart Contrast render with a key gives the same pixels as one without.
         var smart = PhotoEdits(); smart.contrast = 1.3; smart.usesSmartContrast = true
         let source = try ModernRenderer.readImage(url)
@@ -121,7 +123,7 @@ import Testing
     @Test func brushStrokesAreKeyedBySizeAndContent() throws {
         let stroke = MaskStroke(points: [MaskPoint(CGPoint(x: 0.2, y: 0.2)), MaskPoint(CGPoint(x: 0.6, y: 0.5))], radius: 0.05, subtract: false)
         let small = CGSize(width: 800, height: 600)
-        #expect(MaskRasters.strokeKey(stroke, size: small) == MaskRasters.strokeKey(stroke, size: small))
+        for _ in 0..<20 { #expect(MaskRasters.strokeKey(stroke, size: small) == MaskRasters.strokeKey(stroke, size: small)) }
         #expect(MaskRasters.strokeKey(stroke, size: small) != MaskRasters.strokeKey(stroke, size: CGSize(width: 1600, height: 1200)))
         var moved = stroke; moved.points.append(MaskPoint(CGPoint(x: 0.9, y: 0.9)))
         var softer = stroke; softer.softness = 0.5

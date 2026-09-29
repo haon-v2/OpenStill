@@ -193,7 +193,7 @@ enum MaskRasters {
     }
     /// A stroke's cache key: its size and every drawn property.
     static func strokeKey(_ stroke: MaskStroke, size: CGSize) -> String? {
-        guard let data = try? JSONEncoder().encode(stroke) else { return nil }
+        guard let data = try? RenderAnalysis.stableEncoder.encode(stroke) else { return nil }
         var hasher = Hasher(); hasher.combine(data)
         return "stroke|\(Int(size.width))x\(Int(size.height))|\(hasher.finalize())"
     }
