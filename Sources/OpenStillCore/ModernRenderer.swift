@@ -103,9 +103,23 @@ public enum ModernRenderer {
             }
             return try process(base, edits:edits, maximumDimension:maximumDimension, lutOverride:lutOverride, stopBeforeTool:stopBeforeTool)
         }
-        let input = try source(url, mode:recipe.sourceMode, raw:recipe.raw,halfSize:maximumDimension.map{$0<=2048} ?? false,fast:maximumDimension != nil,keep:keepSource)
+        let input: CIImage
+        if let limit = maximumDimension, limit <= RenderCache.longEdge, RenderCache.applies(url, mode: recipe.sourceMode), keepSource || RenderCache.has(url, mode: recipe.sourceMode, raw: recipe.raw) {
+            input = try proxy(url, mode: recipe.sourceMode, raw: recipe.raw).image   // screen-size work starts from the cached proxy
+        } else {
+            input = try source(url, mode:recipe.sourceMode, raw:recipe.raw,halfSize:maximumDimension.map{$0<=2048} ?? false,fast:maximumDimension != nil,keep:keepSource)
+        }
         if recipe.sourceMode == .raw { edits.temperature = 6500; edits.tint = 0; edits.neutralBalance = NeutralBalance() }
         return try process(input, edits:edits, maximumDimension:maximumDimension, lutOverride:lutOverride, stopBeforeTool:stopBeforeTool)
+    }
+    /// The screen-size proxy of a RAW photo (see RenderCache). Its sensor clipping figure is remembered for the histogram.
+    public static func proxy(_ url: URL, mode: SourceMode, raw: RawSettings) throws -> RenderCache.Proxy {
+        let proxy = try RenderCache.proxy(url, mode: mode, raw: raw) {
+            let image = try source(url, mode: mode, raw: raw, fast: true)
+            return (image, sensorClipping(url))
+        }
+        if let clipped = proxy.sensorClipped { sensorCache.setObject(NSNumber(value: clipped), forKey: (url.path + EditStorage.fingerprint(url)) as NSString) }
+        return proxy
     }
     /// A small preview for grids and strips. Unedited RAWs use the camera's embedded JPEG, as Lightroom's embedded
     /// previews do, which skips the RAW decode entirely; everything else renders without keeping its decode.

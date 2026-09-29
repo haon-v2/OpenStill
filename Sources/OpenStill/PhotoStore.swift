@@ -37,6 +37,12 @@ final class PhotoStore {
         operation.addExecutionBlock { [weak operation] in
             guard operation?.isCancelled == false else { return }
             let result = Result { () -> DecodedPhoto in
+                if !thumbnail, let version, version.renderer == .linear2020, RenderCache.applies(url, mode: version.sourceMode) {
+                    // RAW: open from the screen-size proxy (decoded once, then cached on disk); the full decode waits until needed.
+                    let proxy = try ModernRenderer.proxy(url, mode:version.sourceMode, raw:version.raw)
+                    return DecodedPhoto(preview:try ModernRenderer.display(proxy.image), pixelSize:proxy.fullSize, rendering:.rawDevelopment,
+                                        sourceImage:proxy.image, full:{ try ModernRenderer.display(ModernRenderer.source(url, mode:version.sourceMode, raw:version.raw, fast:true)) })
+                }
                 if !thumbnail, let version, version.renderer == .linear2020 {
                     let source = try ModernRenderer.source(url, mode:version.sourceMode, raw:version.raw, fast:true)
                     // The screen gets a preview; the full frame is only made if a tool needs every pixel.
