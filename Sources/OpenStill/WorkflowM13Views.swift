@@ -111,7 +111,7 @@ final class BookWindow: OutputWindow {
         for item in items {
             let request = RenderRequest(photo: item.record, profile: .displayP3, maximumDimension: 420)
             queue.addOperation { [weak self] in
-                let image = PreviewCache.read(request) ?? (try? ModernRenderer.display(ModernRenderer.render(source: item.url, recipe: item.record.active.recipe.sdr, maximumDimension: 420)))
+                let image = PreviewCache.read(request) ?? (try? ModernRenderer.thumbnail(source: item.url, recipe: item.record.active.recipe.sdr, edge: 420))
                 DispatchQueue.main.async { guard let self, let image else { return }; self.thumbnails[item.id] = image; self.refreshPreview() }
             }
         }

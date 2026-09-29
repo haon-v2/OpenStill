@@ -5,7 +5,7 @@ import OpenStillCore
 /// Auto tone, clipping warnings and the before/after split view.
 extension ViewerController {
     func autoTone() {
-        guard let source = currentSource, let record = photoRecord, let original = renderedPhoto?.image else { return }
+        guard let source = currentSource, let record = photoRecord, let original = renderedPhoto else { return }
         let edits = currentEdits, token = editToken
         var recipe = record.active.recipe
         info.status("Analyzing tones…")
@@ -15,7 +15,7 @@ extension ViewerController {
                 var neutral = edits
                 neutral.exposure = 0; neutral.contrast = 1; neutral.highlights = 1; neutral.shadows = 0; neutral.whites = 0; neutral.blacks = 0
                 let input: CIImage
-                if recipe.renderer == .legacy { input = CIImage(cgImage: try PhotoEditor.render(original, edits: neutral, previewMaxDimension: 1024)) }
+                if recipe.renderer == .legacy { input = CIImage(cgImage: try PhotoEditor.render(original.image, edits: neutral, previewMaxDimension: 1024)) }
                 else { recipe.edits = neutral; input = try ModernRenderer.render(source: source, recipe: recipe, maximumDimension: 1024, stopBeforeTool: "Develop") }
                 return AutoTone.apply(PhotoHistogram.measure(input), to: edits)
             }
@@ -50,7 +50,7 @@ extension ViewerController {
             }
         } else { canvas.clippingOverlay = nil }
         guard splitCompare, !comparing, !currentEdits.isOriginal, currentEdits.baseAsset == nil,
-              let source = currentSource, let record = photoRecord, let original = renderedPhoto?.image else {
+              let source = currentSource, let record = photoRecord, let original = renderedPhoto else {
             if !splitCompare || comparing { canvas.beforeImage = nil }
             return
         }
@@ -58,10 +58,11 @@ extension ViewerController {
         if interactive && canvas.beforeImage != nil { return }
         let before = ClippingOverlay.geometryOnly(currentEdits)
         var recipe = record.active.recipe; recipe.edits = before
-        let limit: Int? = interactive ? 1600 : nil
+        // The before half only needs the resolution the screen shows.
+        let limit: Int? = ModernRenderer.screenEdge
         editQueue.async { [weak self] in
             let image = try? autoreleasepool { () -> CGImage in
-                if recipe.renderer == .legacy { return try PhotoEditor.render(original, edits: before, previewMaxDimension: limit) }
+                if recipe.renderer == .legacy { return try PhotoEditor.render(original.image, edits: before, previewMaxDimension: limit) }
                 return try ModernRenderer.display(ModernRenderer.render(source: source, recipe: recipe, maximumDimension: limit))
             }
             DispatchQueue.main.async { guard let self, self.compareToken == token, self.splitCompare else { return }; self.canvas.beforeImage = image }

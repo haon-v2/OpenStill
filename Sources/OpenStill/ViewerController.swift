@@ -83,7 +83,12 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
     var photoRecord: PhotoRecord?
     var editToken = UUID()
     var lastSunPreviewAt: TimeInterval = 0
-    var editWork: DispatchWorkItem?
+    /// Render scheduling (see `renderEdits`): one render at a time, the newest edits next.
+    var renderInFlight = false, renderQueued = false, queuedInteractive = true, renderGeneration = UUID()
+    var detailWork: DispatchWorkItem?, pendingSave: DispatchWorkItem?
+    let renderQueue = DispatchQueue(label: "OpenStill.screenRender", qos: .userInteractive)
+    /// Pixel sizes of AI-edited base images, so they are read from disk once.
+    var baseSizes: [String: CGSize] = [:]
     let editQueue = DispatchQueue(label: "OpenStill.render", qos: .userInitiated)
     let localAI = LocalAI()
     var comparing = false
@@ -100,6 +105,9 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
     var maskStrength = 1.0
     var maskSubtract = false
     var maskToken = UUID()
+    /// Mask overlays render on their own queue; only the newest request runs.
+    let maskOverlayGate = LUTPreviewGeneration(), histogramGate = LUTPreviewGeneration()
+    let maskQueue = DispatchQueue(label: "OpenStill.maskOverlay", qos: .userInitiated)
     var histogramToken = UUID()
     let histogramQueue = DispatchQueue(label:"OpenStill.histogram",qos:.utility)
 
@@ -158,7 +166,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         for child in [libraryTabsBar, info, librarySidebar] as [NSView] {
             child.translatesAutoresizingMaskIntoConstraints = false; rightPanel.addSubview(child)
         }
-        for child in [canvas.hdrBackdrop, canvas, libraryHost] {
+        for child in [canvas.photoBackdrop, canvas, libraryHost] {
             child.translatesAutoresizingMaskIntoConstraints = false; center.addSubview(child)
             NSLayoutConstraint.activate([child.leadingAnchor.constraint(equalTo:center.leadingAnchor),child.trailingAnchor.constraint(equalTo:center.trailingAnchor),child.topAnchor.constraint(equalTo:center.topAnchor),child.bottomAnchor.constraint(equalTo:center.bottomAnchor)])
         }
@@ -344,7 +352,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         renderedPhoto = nil
         info.show(nil)
         info.setLUTPhoto(nil,edits:PhotoEdits())
-        localAI.cancel(); aiPreparing = false; editWork?.cancel(); editToken = UUID(); canvas.clearTool()
+        localAI.cancel(); aiPreparing = false; cancelRenders(); editToken = UUID(); canvas.clearTool()
         info.update(PhotoEdits(), document: nil, enabled: false)
         collection.reloadData()
         updateControls()
@@ -420,7 +428,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
             switch result {
             case .success(let photo):
                 self.renderedPhoto = photo
-                self.canvas.image = photo.image
+                self.canvas.image = nil; self.canvas.replaceRenderedImage(photo.preview, pixelSize:photo.pixelSize)
                 self.canvas.message = ""
                 self.info.update(self.currentEdits, document: self.editDocument, enabled: true)
                 self.renderEdits()
@@ -431,7 +439,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         // RAW files can take a moment to develop (Fuji X-Trans most of all): show the camera's own preview meanwhile.
         if RawDecoder.isRAW(url) {
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                guard let preview = try? RawDecoder.cameraPreview(url), let image = try? ModernRenderer.display(preview) else { return }
+                guard let preview = try? RawDecoder.cameraPreview(url), let image = try? ModernRenderer.screenImage(preview) else { return }
                 DispatchQueue.main.async {
                     guard let self, self.generation == token, self.renderedPhoto == nil else { return }
                     self.canvas.image = image; self.canvas.message = ""
@@ -489,6 +497,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
     /// View › Tools.
     @objc func chooseToolFromMenu(_ sender: NSMenuItem) { if let raw = sender.representedObject as? String, let t = StudioTool(rawValue: raw) { selectTool(t) } }
     @objc func showLibrary() {
+        flushPendingSave()
         finishMaskEditing(); canvas.clearTool()
         if tool != .adjust { tool = .adjust; info.showToolPanel(nil) }
         isLibrary = true

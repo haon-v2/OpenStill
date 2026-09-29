@@ -79,18 +79,39 @@ public enum PhotoReadError: LocalizedError {
     public var errorDescription: String? { "This image couldn’t be decoded. It may be damaged or use a format this Mac doesn’t support." }
 }
 
-public struct DecodedPhoto {
+/// A decoded photo. `preview` is what the screen shows; `image` is the full-size frame, made the first time
+/// something needs every pixel (AI tools, legacy rendering), so opening a large RAW doesn't copy it all back from the GPU.
+public final class DecodedPhoto {
     public enum Rendering { case original, cameraPreview, rawDevelopment }
-    public let image: CGImage
     public let rendering: Rendering
     public let sourceImage: CIImage?
+    /// The frame at screen size (the full image when it is already small).
+    public let preview: CGImage
+    /// The full frame's pixel size.
+    public let pixelSize: CGSize
+    private var full: CGImage?
+    private let makeFull: (() throws -> CGImage)?
+    private let lock = NSLock()
     public init(image: CGImage, rendering: Rendering, sourceImage: CIImage? = nil) {
-        self.image = image; self.rendering = rendering; self.sourceImage = sourceImage
+        full = image; preview = image; makeFull = nil
+        pixelSize = CGSize(width: image.width, height: image.height)
+        self.rendering = rendering; self.sourceImage = sourceImage
+    }
+    public init(preview: CGImage, pixelSize: CGSize, rendering: Rendering, sourceImage: CIImage, full: @escaping () throws -> CGImage) {
+        self.preview = preview; self.pixelSize = pixelSize; self.rendering = rendering; self.sourceImage = sourceImage; makeFull = full
+    }
+    /// The full-size frame. Falls back to the preview if it can't be made.
+    public var image: CGImage {
+        lock.lock(); defer { lock.unlock() }
+        if let full { return full }
+        let made = (try? makeFull?()) ?? preview
+        full = made
+        return made
     }
     public var description: String {
         switch rendering {
         case .original: return "Original image"
-        case .cameraPreview: return "Camera preview · \(image.width) × \(image.height) px"
+        case .cameraPreview: return "Camera preview · \(Int(pixelSize.width)) × \(Int(pixelSize.height)) px"
         case .rawDevelopment: return "RAW rendering · Camera LUT not applied"
         }
     }

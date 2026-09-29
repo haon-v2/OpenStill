@@ -490,7 +490,7 @@ final class ShootWindow:NSWindowController,NSCollectionViewDataSource,NSCollecti
             // Previews saved on disk skip rendering; they're keyed by the edit revision, so edits make a new one.
             var result=PreviewCache.read(request)
             if result==nil{
-                result=try? autoreleasepool{try ModernRenderer.display(ModernRenderer.render(source:item.url,recipe:item.record.active.recipe,maximumDimension:420))}
+                result=try? autoreleasepool{try ModernRenderer.thumbnail(source:item.url,recipe:item.record.active.recipe,edge:420)}
                 if let rendered=result{PreviewCache.write(rendered,for:request)}
             }
             guard operation?.isCancelled==false else{return}

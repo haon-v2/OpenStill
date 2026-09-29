@@ -213,14 +213,15 @@ public final class PhotoRecordStore {
     /// Read-modify-write under one lock so culling cannot overwrite newer edits.
     @discardableResult public func update(_ id:UUID,_ mutation:(inout PhotoRecord)throws->Void)throws->PhotoRecord {
         lock.lock();defer{lock.unlock()}
-        var record=try read(id);try mutation(&record);try save(record);return record
+        let previous=try read(id);var record=previous;try mutation(&record);try save(record,previous:previous);return record
     }
-    public func save(_ record: PhotoRecord) throws {
+    /// Saves a record. `previous` is the saved version when the caller already read it (skips decoding it again).
+    public func save(_ record: PhotoRecord, previous known: PhotoRecord? = nil) throws {
         lock.lock(); defer { lock.unlock() }
         guard record.isValid else { throw WorkflowError.invalidDocument }
         try FileManager.default.createDirectory(at: records, withIntermediateDirectories: true)
         let destination = url(record.id)
-        let previous = try? decode(destination)
+        let previous = known ?? (try? decode(destination))
         if let previous {
             let directory = snapshot(record.id, 0).deletingLastPathComponent()
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

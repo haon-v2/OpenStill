@@ -1,18 +1,6 @@
 import AppKit
 import OpenStillCore
 
-/// A slider that reports whether the change is final (mouse released) or live.
-final class TrackingSlider: NSSlider {
-    var change: ((Double, Bool) -> Void)?
-    private var tracking = false
-    convenience init(range: ClosedRange<Double>) {
-        self.init(value: 0, minValue: range.lowerBound, maxValue: range.upperBound, target: nil, action: nil)
-        target = self; action = #selector(adjust); isContinuous = true; controlSize = .small
-    }
-    @objc private func adjust() { change?(doubleValue, !tracking) }
-    override func mouseDown(with event: NSEvent) { tracking = true; super.mouseDown(with: event); tracking = false; change?(doubleValue, true) }
-}
-
 /// A round swatch of a picked color; the selected one has a ring.
 private final class ColorSwatch: NSButton {
     var color = NSColor.gray { didSet { needsDisplay = true } }
@@ -35,7 +23,7 @@ final class PointColorPanel: NSStackView {
     private let pick = NSButton(title: "Pick a color from the photo", target: nil, action: nil)
     private let remove = NSButton(title: "Remove this color", target: nil, action: nil)
     private let empty = NSTextField(wrappingLabelWithString: "Pick up to 8 colors. Each one changes only colors near it.")
-    private var sliders: [(TrackingSlider, NSTextField, WritableKeyPath<PointColor, Double>)] = []
+    private var sliders: [(ContinuousSlider, NSTextField, WritableKeyPath<PointColor, Double>)] = []
     private var enabled = false
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -52,8 +40,8 @@ final class PointColorPanel: NSStackView {
             let label = NSTextField(labelWithString: title); label.font = .systemFont(ofSize: 11); label.widthAnchor.constraint(equalToConstant: 70).isActive = true
             let value = NSTextField(labelWithString: ""); value.font = .monospacedDigitSystemFont(ofSize: 10, weight: .regular); value.textColor = .secondaryLabelColor
             value.widthAnchor.constraint(equalToConstant: 32).isActive = true
-            let slider = TrackingSlider(range: range); slider.setAccessibilityLabel("Point Color " + title)
-            slider.change = { [weak self] v, final in
+            let slider = ContinuousSlider(range: range); slider.setAccessibilityLabel("Point Color " + title)
+            slider.changed = { [weak self] v, final in
                 guard let self, let i = self.selected, self.colors.indices.contains(i) else { return }
                 self.colors[i][keyPath: path] = v; value.stringValue = String(format: "%.0f", v * 100)
                 self.changed?(self.colors, "Point Color " + title.lowercased(), final)

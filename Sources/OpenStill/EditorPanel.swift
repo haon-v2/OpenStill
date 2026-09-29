@@ -3,34 +3,6 @@ import CoreImage
 import OpenStillCore
 
 private final class EditorStack: NSStackView { override var isFlipped: Bool { true } }
-private final class EditSlider: NSSlider {
-    var changed: ((Double, Bool) -> Void)?
-    private var tracking = false
-    convenience init(range: ClosedRange<Double>, value: Double) {
-        self.init(value: value, minValue: range.lowerBound, maxValue: range.upperBound, target: nil, action: nil)
-        target = self; action = #selector(change); isContinuous = true
-    }
-    @objc private func change() { changed?(doubleValue, !tracking) }
-    override func mouseDown(with event: NSEvent) { tracking = true; super.mouseDown(with: event); tracking = false; changed?(doubleValue, true) }
-    /// Draws the track as a gradient that shows what the slider does (cool → warm for Temp, green → magenta for Tint).
-    func useGradient(_ colors: [NSColor]) {
-        let (min, max, value, size) = (minValue, maxValue, doubleValue, controlSize)
-        let cell = GradientSliderCell(); cell.colors = colors
-        self.cell = cell
-        minValue = min; maxValue = max; doubleValue = value; controlSize = size
-        target = self; action = #selector(change); isContinuous = true
-    }
-}
-
-/// A slider cell whose track is a thin gradient across its whole width.
-final class GradientSliderCell: NSSliderCell {
-    var colors: [NSColor] = [.gray, .white]
-    override func drawBar(inside rect: NSRect, flipped: Bool) {
-        let bar = NSRect(x: rect.minX, y: rect.midY - 2, width: rect.width, height: 4)
-        NSGradient(colors: colors)?.draw(in: NSBezierPath(roundedRect: bar, xRadius: 2, yRadius: 2), angle: 0)
-    }
-}
-
 final class EditorPanel: GlassChrome {
     var editChanged: ((PhotoEdits, String, Bool) -> Void)?
     var command: ((String) -> Void)?
@@ -45,7 +17,7 @@ final class EditorPanel: GlassChrome {
     private let historyScroll = NSScrollView()
     private let historyStack = EditorStack()
     private let sectionTitle = NSTextField(labelWithString: "Edit")
-    private var sliders: [(EditSlider, NSTextField, WritableKeyPath<PhotoEdits, Double>)] = []
+    private var sliders: [(ContinuousSlider, NSTextField, WritableKeyPath<PhotoEdits, Double>)] = []
     private var toggles: [(NSButton, WritableKeyPath<PhotoEdits, Bool>)] = []
     private var editButtons: [NSButton] = []
     private var states = PhotoEdits()
@@ -259,6 +231,8 @@ final class EditorPanel: GlassChrome {
         let isRaw = raw && record?.active.sourceMode == .raw
         if isRaw != rawSource { rawSource = isRaw; profilePanel.update(states, raw:isRaw, enabled:hasPhoto && !busy) }
     }
+    /// LUT thumbnails render only while the Presets panel is open.
+    func setLUTPreviewsActive(_ active:Bool) { lutBrowser.setActive(active) }
     func setLUTPhoto(_ image:CGImage?,edits:PhotoEdits, source:CIImage? = nil, url:URL? = nil, recipe:RenderRecipe? = nil) { lutBrowser.setPhoto(image,edits:edits, source:source, url:url, recipe:recipe) }
     /// A slider row: the name (drag it sideways to scrub, double-click to reset), the value, and the slider beneath.
     private func slider(_ title: String, path: WritableKeyPath<PhotoEdits, Double>, range: ClosedRange<Double>, in stack: NSStackView) {
@@ -266,9 +240,11 @@ final class EditorPanel: GlassChrome {
         let value = NSTextField(labelWithString: ""); value.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular); value.textColor = Studio.secondary
         value.alignment = .right
         let heading = NSStackView(views: [label, NSView(), value]); fullWidth(heading, in: stack)
-        let slider = EditSlider(range: range, value: states[keyPath: path]); slider.controlSize = .small; slider.setAccessibilityLabel(title)
-        if let colors = Self.gradients[title] { slider.useGradient(colors) }
+        let slider = ContinuousSlider(range: range, value: states[keyPath: path]); slider.setAccessibilityLabel(title)
+        if let colors = Self.gradients[path] { slider.useGradient(colors) }
         let reset = PhotoEdits()[keyPath: path]
+        // History names say which panel a slider belongs to when several share a name ("Amount", "Hue").
+        let title = Self.historyTitles[path] ?? title
         let set: (Double, Bool) -> Void = { [weak self, weak slider, weak value] number, final in
             guard let self else { return }
             let clamped = min(range.upperBound, max(range.lowerBound, number))
@@ -276,11 +252,7 @@ final class EditorPanel: GlassChrome {
             value?.stringValue = Self.number(clamped)
             self.editChanged?(self.states, title, final)
         }
-        slider.changed = { [weak self, weak value] number, final in
-            guard let self else { return }; self.states[keyPath: path] = number
-            value?.stringValue = Self.number(number)
-            self.editChanged?(self.states, title, final)
-        }
+        slider.changed = { number, final in set(number, final) }
         label.scrubbed = { [weak self, weak slider] dx, final in
             guard self != nil, let slider, slider.isEnabled else { return }
             set(slider.doubleValue + Double(dx) * (range.upperBound - range.lowerBound) / 300, final)
@@ -290,16 +262,27 @@ final class EditorPanel: GlassChrome {
         sliders.append((slider, value, path)); fullWidth(slider, in: stack)
     }
     /// Sliders whose track shows what they do.
-    private static let gradients: [String: [NSColor]] = [
-        "Temp": [NSColor(srgbRed: 0.22, green: 0.46, blue: 0.95, alpha: 1), NSColor(srgbRed: 0.98, green: 0.82, blue: 0.18, alpha: 1)],
-        "Tint": [NSColor(srgbRed: 0.28, green: 0.70, blue: 0.34, alpha: 1), NSColor(srgbRed: 0.70, green: 0.40, blue: 0.64, alpha: 1)],
-        "Vibrance": [NSColor(white: 0.55, alpha: 1), NSColor(srgbRed: 0.86, green: 0.38, blue: 0.20, alpha: 1)],
-        "Saturation": [NSColor(white: 0.55, alpha: 1), NSColor(srgbRed: 0.86, green: 0.18, blue: 0.20, alpha: 1)],
-        "Exposure": [NSColor(white: 0.12, alpha: 1), NSColor(white: 0.95, alpha: 1)],
-        "Highlights": [NSColor(white: 0.35, alpha: 1), NSColor(white: 0.95, alpha: 1)],
-        "Shadows": [NSColor(white: 0.08, alpha: 1), NSColor(white: 0.6, alpha: 1)],
-        "Whites": [NSColor(white: 0.45, alpha: 1), NSColor(white: 1, alpha: 1)],
-        "Blacks": [NSColor(white: 0, alpha: 1), NSColor(white: 0.5, alpha: 1)],
+    private static let gradients: [WritableKeyPath<PhotoEdits, Double>: [NSColor]] = [
+        \.temperature: [NSColor(srgbRed: 0.22, green: 0.46, blue: 0.95, alpha: 1), NSColor(srgbRed: 0.98, green: 0.82, blue: 0.18, alpha: 1)],
+        \.tint: [NSColor(srgbRed: 0.28, green: 0.70, blue: 0.34, alpha: 1), NSColor(srgbRed: 0.70, green: 0.40, blue: 0.64, alpha: 1)],
+        \.vibrance: [NSColor(white: 0.55, alpha: 1), NSColor(srgbRed: 0.86, green: 0.38, blue: 0.20, alpha: 1)],
+        \.saturation: [NSColor(white: 0.55, alpha: 1), NSColor(srgbRed: 0.86, green: 0.18, blue: 0.20, alpha: 1)],
+        \.exposure: [NSColor(white: 0.12, alpha: 1), NSColor(white: 0.95, alpha: 1)],
+        \.highlightsAmount: [NSColor(white: 0.35, alpha: 1), NSColor(white: 0.95, alpha: 1)],
+        \.shadowsAmount: [NSColor(white: 0.08, alpha: 1), NSColor(white: 0.6, alpha: 1)],
+        \.whites: [NSColor(white: 0.45, alpha: 1), NSColor(white: 1, alpha: 1)],
+        \.blacks: [NSColor(white: 0, alpha: 1), NSColor(white: 0.5, alpha: 1)],
+    ]
+    /// Undo-history names for sliders whose short label repeats across panels.
+    private static let historyTitles: [WritableKeyPath<PhotoEdits, Double>: String] = [
+        \.sharpness: "Sharpening Amount", \.sharpenRadius: "Sharpening Radius", \.sharpenDetail: "Sharpening Detail", \.sharpenMasking: "Sharpening Masking",
+        \.denoise: "Noise Reduction", \.noiseDetail: "Noise Detail", \.noiseContrast: "Noise Contrast", \.colorNoise: "Color Noise", \.colorNoiseDetail: "Color Noise Detail",
+        \.vignette: "Vignette Amount", \.grainAmount: "Grain Amount", \.grainSize: "Grain Size", \.grainRoughness: "Grain Roughness",
+        \.gradeBlending: "Color Grading Blending", \.gradeBalance: "Color Grading Balance",
+        \.calibrationRedHue: "Calibration Red Hue", \.calibrationRedSaturation: "Calibration Red Saturation",
+        \.calibrationGreenHue: "Calibration Green Hue", \.calibrationGreenSaturation: "Calibration Green Saturation",
+        \.calibrationBlueHue: "Calibration Blue Hue", \.calibrationBlueSaturation: "Calibration Blue Saturation",
+        \.lensBlurAmount: "Lens Blur Amount", \.straighten: "Straighten",
     ]
     private func toggle(_ title: String, path: WritableKeyPath<PhotoEdits, Bool>, in stack: NSStackView) {
         let button = NSButton(checkboxWithTitle: title, target: self, action: #selector(toggleEdit(_:)))
@@ -324,7 +307,7 @@ final class EditorPanel: GlassChrome {
         lrCamera.stringValue = metadata == nil ? "" : settings.stringValue
     }
     func update(_ edits: PhotoEdits, document: EditDocument?, enabled: Bool) {
-        states = edits; hasPhoto = enabled
+        states = edits; hasPhoto = enabled; controlsEnabled = nil
         for layer in edits.localAdjustments where maskPanels[layer.maskKey] == nil {
             let panel = makeMaskPanel(layer.maskKey, listed: false); layerPanelStore.addArrangedSubview(panel)
         }
@@ -341,15 +324,23 @@ final class EditorPanel: GlassChrome {
         transformPanel.update(edits.transform,enabled:enabled && !busy)
         profilePanel.update(edits,raw:rawSource,enabled:enabled && !busy)
         retouch.update(edits.retouch)
-        for (slider, label, path) in sliders { slider.doubleValue = edits[keyPath: path]; label.stringValue = Self.number(edits[keyPath: path]); slider.isEnabled = enabled && !busy }
+        // Only controls whose value or state actually changed are touched, so a commit doesn't redraw the whole panel.
+        for (slider, label, path) in sliders {
+            let value = edits[keyPath: path]
+            if slider.doubleValue != value { slider.doubleValue = value; label.stringValue = Self.number(value) }
+            else if label.stringValue.isEmpty { label.stringValue = Self.number(value) }
+            if slider.isEnabled != (enabled && !busy) { slider.isEnabled = enabled && !busy }
+        }
         for (button, path) in toggles { button.state = edits[keyPath: path] ? .on : .off; button.isEnabled = enabled && !busy }
         treatment.selectedSegment = edits.monochrome >= 0.5 ? 1 : 0; treatment.isEnabled = enabled && !busy
         pointColor.update(edits.pointColors, enabled: enabled && !busy)
         for button in editButtons { button.isEnabled = (enabled && !busy) || button.identifier?.rawValue == "setupAI" || (busy && button.identifier?.rawValue == "cancelAI") }
+        // The history list is rebuilt only when the history itself changed.
+        let signature = [document.map { "\($0.fingerprint)|\($0.steps.count)|\($0.cursor)|\($0.steps.last?.title ?? "")|" + ($0.snapshots ?? []).map(\.name).joined(separator: ",") } ?? "none", "\(busy)", "\(enabled)"].joined(separator: "|")
+        guard signature != historySignature else { return }
+        historySignature = signature
         historyStack.arrangedSubviews.forEach { historyStack.removeArrangedSubview($0); $0.removeFromSuperview() }
         rebuildSnapshots(document, enabled: enabled && !busy)
-        // In the Lightroom layout the snapshots have their own section on the left.
-        if lrModule != .develop { addTitle("SNAPSHOTS", to: historyStack); fullWidth(snapshotStack, in: historyStack) }
         addTitle("EDIT HISTORY", to: historyStack)
         action("Undo", "undo", to: historyStack); action("Redo", "redo", to: historyStack)
         action("Compare with original (\\)", "compare", to: historyStack)
@@ -364,9 +355,15 @@ final class EditorPanel: GlassChrome {
         }
     }
     @objc private func historyClicked(_ sender: NSButton) { chooseHistory?(sender.tag) }
+    private var controlsEnabled: Bool?
+    private var historySignature = ""
     func status(_ text: String, busy: Bool = false) {
-        message.stringValue = text; message.toolTip = text; self.busy = busy
+        message.stringValue = text; message.toolTip = text
         statusChanged?(text, busy)
+        // Controls change only when their enabled state does (a message alone touches nothing else).
+        let enabled = hasPhoto && !busy
+        guard enabled != controlsEnabled || busy != self.busy else { return }
+        self.busy = busy; controlsEnabled = enabled
         lutBrowser.setEnabled(hasPhoto && !busy)
         for panel in maskPanels.values { panel.setEnabled(hasPhoto && !busy) }
         mixer.setEnabled(hasPhoto && !busy)
@@ -412,7 +409,6 @@ extension EditorPanel {
         let column = lrColumns[target] ?? buildLightroom(target)
         column.isHidden = false
         for (slot, view, height) in lrSlots[target] ?? [] { borrow(view, into: slot, height: height) }
-        lutBrowser.setActive(target == .develop)
     }
     /// The Studio tool that's open: Masking shows its masks at the top of the panel; the other tools live in the options bar.
     /// The mask chosen in the Masking list, if any.
@@ -459,6 +455,7 @@ extension EditorPanel {
             section("Metadata", open: true) { slot(info, in: $0, height: 460) }
             column.setButtons([("Sync Metadata…", { [weak self] in self?.command?("lr:syncMetadata") }), ("Sync Settings…", { [weak self] in self?.command?("lr:syncSettings") })])
             lrSlots[module] = slots
+            Appearance.applyAccent(in: column)
             return column
         }
         // Develop: the histogram and tool strip stay at the top; the adjustment panels scroll beneath, in Lightroom's order.
@@ -598,6 +595,8 @@ extension EditorPanel {
         column.setButtons([("Previous", { [weak self] in self?.command?("previousSettings") }), ("Reset", { [weak self] in self?.command?("reset") })])
         lrSlots[module] = slots
         buildLeftDevelop()
+        // These columns are built after the window applied its accent, so apply it here (slider fills, checkboxes).
+        Appearance.applyAccent(in: column); Appearance.applyAccent(in: presetsColumn); Appearance.applyAccent(in: historyColumn)
         status(message.stringValue, busy: busy)
         return column
     }

@@ -49,22 +49,25 @@ public struct AdjustmentMask: Codable, Equatable {
         case "object", "depthMap":
             guard let asset else { mask=black; break }
             // Depth maps are data, not pictures: read their values without color management.
-            let decoded = try PhotoDecoder.decode(EditStorage.asset(asset))
+            let decoded = try MaskRasters.asset(asset)
             mask = kind == "depthMap" ? CIImage(cgImage:decoded,options:[.colorSpace:NSNull()]) : CIImage(cgImage:decoded)
             mask = mask.transformed(by:CGAffineTransform(scaleX:size.width/mask.extent.width,y:size.height/mask.extent.height)).cropped(to:bounds)
         default: mask = black
         }
         for stroke in strokes {
             guard let first = stroke.points.first else { continue }
-            let w = max(1,Int(size.width)), h = max(1,Int(size.height))
-            guard let ctx = CGContext(data:nil,width:w,height:h,bitsPerComponent:8,bytesPerRow:0,space:CGColorSpaceCreateDeviceGray(),bitmapInfo:CGImageAlphaInfo.none.rawValue) else { throw EditError.render }
-            ctx.setFillColor(gray:0,alpha:1);ctx.fill(bounds)
             let r = max(1,stroke.radius*min(size.width,size.height))
-            ctx.setStrokeColor(gray:1,alpha:1);ctx.setFillColor(gray:1,alpha:1);ctx.setLineWidth(r*2);ctx.setLineCap(.round);ctx.setLineJoin(.round)
-            ctx.beginPath();ctx.move(to:CGPoint(x:first.x*size.width,y:first.y*size.height))
-            for p in stroke.points.dropFirst() { ctx.addLine(to:CGPoint(x:p.x*size.width,y:p.y*size.height)) };ctx.strokePath()
-            ctx.fillEllipse(in:CGRect(x:first.x*size.width-r,y:first.y*size.height-r,width:r*2,height:r*2))
-            guard let cg = ctx.makeImage() else { throw EditError.render }
+            let cg = try MaskRasters.stroke(stroke, size:size) {
+                let w = max(1,Int(size.width)), h = max(1,Int(size.height))
+                guard let ctx = CGContext(data:nil,width:w,height:h,bitsPerComponent:8,bytesPerRow:0,space:CGColorSpaceCreateDeviceGray(),bitmapInfo:CGImageAlphaInfo.none.rawValue) else { throw EditError.render }
+                ctx.setFillColor(gray:0,alpha:1);ctx.fill(bounds)
+                ctx.setStrokeColor(gray:1,alpha:1);ctx.setFillColor(gray:1,alpha:1);ctx.setLineWidth(r*2);ctx.setLineCap(.round);ctx.setLineJoin(.round)
+                ctx.beginPath();ctx.move(to:CGPoint(x:first.x*size.width,y:first.y*size.height))
+                for p in stroke.points.dropFirst() { ctx.addLine(to:CGPoint(x:p.x*size.width,y:p.y*size.height)) };ctx.strokePath()
+                ctx.fillEllipse(in:CGRect(x:first.x*size.width-r,y:first.y*size.height-r,width:r*2,height:r*2))
+                guard let cg = ctx.makeImage() else { throw EditError.render }
+                return cg
+            }
             var coverage = CIImage(cgImage:cg)
             if let softness = stroke.softness, softness > 0 { coverage = coverage.clampedToExtent().applyingFilter("CIGaussianBlur",parameters:[kCIInputRadiusKey:r*min(1,softness)*0.45]).cropped(to:bounds) }
             let strength = min(1,max(0,stroke.strength ?? 1))
@@ -172,5 +175,58 @@ public struct EditGeometry {
     public func sourcePoint(_ displayed: CGPoint) -> CGPoint {
         let p = CGPoint(x:displayed.x*extent.width,y:displayed.y*extent.height).applying(transform.inverted())
         return CGPoint(x:min(1,max(0,p.x/sourceSize.width)),y:min(1,max(0,p.y/sourceSize.height)))
+    }
+}
+
+/// Mask pixels that don't change between renders: brush strokes drawn at a given size, and AI mask images read from disk.
+/// Kept so moving a slider doesn't redraw every stroke or re-read every mask file on each frame.
+enum MaskRasters {
+    /// Least recently used first out, within a byte budget. (NSCache may drop entries whenever it likes, which would
+    /// redraw strokes in the middle of a drag.)
+    private static let cache = ByteLimitedCache<CGImage>(limit: 256 << 20)
+    static func stroke(_ stroke: MaskStroke, size: CGSize, draw: () throws -> CGImage) throws -> CGImage {
+        guard let key = strokeKey(stroke, size: size) else { return try draw() }
+        if let known = cache[key] { return known }
+        let image = try draw()
+        cache.insert(image, for: key, bytes: image.bytesPerRow * image.height)
+        return image
+    }
+    /// A stroke's cache key: its size and every drawn property.
+    static func strokeKey(_ stroke: MaskStroke, size: CGSize) -> String? {
+        guard let data = try? RenderAnalysis.stableEncoder.encode(stroke) else { return nil }
+        var hasher = Hasher(); hasher.combine(data)
+        return "stroke|\(Int(size.width))x\(Int(size.height))|\(hasher.finalize())"
+    }
+    static func asset(_ name: String) throws -> CGImage {
+        let key = "asset|\(name)"
+        if let known = cache[key] { return known }
+        let image = try PhotoDecoder.decode(EditStorage.asset(name))
+        cache.insert(image, for: key, bytes: image.bytesPerRow * image.height)
+        return image
+    }
+}
+
+/// A thread-safe cache that keeps the most recently used entries within a byte budget.
+final class ByteLimitedCache<Value> {
+    private let lock = NSLock()
+    private var entries: [String: (value: Value, bytes: Int)] = [:]
+    private var order: [String] = []   // least recently used first
+    private var total = 0
+    let limit: Int
+    init(limit: Int) { self.limit = limit }
+    subscript(key: String) -> Value? {
+        lock.lock(); defer { lock.unlock() }
+        guard let entry = entries[key] else { return nil }
+        if let i = order.firstIndex(of: key) { order.remove(at: i); order.append(key) }
+        return entry.value
+    }
+    func insert(_ value: Value, for key: String, bytes: Int) {
+        lock.lock(); defer { lock.unlock() }
+        if let old = entries[key], let i = order.firstIndex(of: key) { total -= old.bytes; order.remove(at: i) }
+        entries[key] = (value, bytes); order.append(key); total += bytes
+        while total > limit, order.count > 1 {
+            let oldest = order.removeFirst()
+            total -= entries.removeValue(forKey: oldest)?.bytes ?? 0
+        }
     }
 }

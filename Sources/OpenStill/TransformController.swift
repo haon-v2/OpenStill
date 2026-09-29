@@ -31,7 +31,7 @@ extension ViewerController {
     }
     private func runUpright(_ mode: UprightMode) {
         guard let source = currentSource, let record = photoRecord else { return }
-        let token = UUID(); editToken = token; editWork?.cancel()
+        let token = UUID(); editToken = token; cancelRenders()
         var recipe = record.active.recipe; recipe.edits = currentEdits
         info.status("Finding straight lines…", busy: true)
         editQueue.async { [weak self] in
@@ -98,7 +98,7 @@ extension ViewerController {
     /// Straighten from long edges: the same line search as Upright Level, measured after any perspective correction.
     func autoStraighten() {
         guard let source = currentSource, let record = photoRecord else { return }
-        let token = UUID(); editToken = token; editWork?.cancel()
+        let token = UUID(); editToken = token; cancelRenders()
         var recipe = record.active.recipe; recipe.edits = currentEdits
         let edits = currentEdits
         info.status("Finding straight lines…", busy: true)

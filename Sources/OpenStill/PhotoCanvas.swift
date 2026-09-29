@@ -76,12 +76,14 @@ final class PhotoCanvas: NSView {
     var brushWidth: CGFloat = 0.035
     func clearTool() { draggingSun = false; tool = .browse; guideLines = []; maskOverlay = nil; maskPath = []; cropStart = nil; cropMoveOrigin = nil; cropSelection = nil; brushPaths = []; needsDisplay = true }
     private var logicalPixels:CGSize?
-    func replaceRenderedImage(_ next: CGImage, pixelSize:CGSize? = nil) {
+    /// Shows a new render. `pixelSize` is the full photo's size when `next` is a smaller preview of it.
+    func replaceRenderedImage(_ next: CGImage, pixelSize:CGSize? = nil, detail: (image: CGImage, region: CGRect)? = nil) {
         let saved = offset
         let oldSize=logicalPixels ?? image.map{CGSize(width:$0.width,height:$0.height)}
         let sameSize = oldSize == (pixelSize ?? CGSize(width:next.width,height:next.height))
         image = next;logicalPixels=pixelSize
         if sameSize { offset = saved }
+        self.detail = detail
     }
     func removalMask(width: Int, height: Int) -> CGImage? {
         guard !brushPaths.isEmpty, let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
@@ -99,10 +101,19 @@ final class PhotoCanvas: NSView {
         }
         return context.makeImage()
     }
-    var image: CGImage? { didSet { logicalPixels=nil;offset = .zero; hdrImage = nil; needsDisplay = true } }
-    /// Extended-range render of the same frame, shown by `hdrBackdrop` on HDR displays.
+    var image: CGImage? { didSet { logicalPixels=nil;offset = .zero; hdrImage = nil; detail = nil; needsDisplay = true } }
+    /// A sharper render of part of the photo (0–1 from the bottom left), shown over the whole-frame image while zoomed in.
+    var detail: (image: CGImage, region: CGRect)? { didSet { needsDisplay = true } }
+    /// Device pixels along the photo's longest edge as it is shown now.
+    var shownPixels: CGFloat { max(photoSize.width, photoSize.height) * (window?.backingScaleFactor ?? 2) }
+    /// Device pixels along the longest edge of a photo this size shown at Fit.
+    func fitPixels(for pixels: CGSize) -> CGFloat {
+        let size = PhotoGeometry.displaySize(pixels: pixels, viewport: bounds.size, backingScale: window?.backingScaleFactor ?? 2, native: false)
+        return max(size.width, size.height) * (window?.backingScaleFactor ?? 2)
+    }
+    /// Extended-range render of the same frame, shown by `photoBackdrop` on HDR displays.
     var hdrImage: CGImage? { didSet { needsDisplay = true } }
-    let hdrBackdrop = HDRBackdrop()
+    let photoBackdrop = PhotoBackdrop()
     private(set) var isFit = true
     private var pixelScale: CGFloat = 1
     var native: Bool {
@@ -244,8 +255,9 @@ final class PhotoCanvas: NSView {
                 context.setFillColor(NSColor.black.cgColor); context.fill(rect)
                 context.restoreGState()
             }
-            if let hdrImage { context.clear(rect); hdrBackdrop.show(hdrImage, in: rect) }
-            else { context.draw(image, in: rect); hdrBackdrop.show(nil, in: rect) }
+            // The photo itself is composited by the GPU layer behind this view; only the overlays are drawn here.
+            context.clear(rect)
+            photoBackdrop.show(hdrImage ?? image, in: rect, detail: hdrImage == nil ? detail : nil, crisp: native && logicalPixels == nil)
             if let beforeImage {
                 let divider = rect.minX + rect.width*splitPosition
                 context.saveGState(); context.clip(to: CGRect(x: rect.minX, y: rect.minY, width: divider-rect.minX, height: rect.height))
@@ -383,6 +395,7 @@ final class PhotoCanvas: NSView {
             ]
             (message as NSString).draw(in: NSRect(x: 30, y: bounds.midY - 35, width: bounds.width - 60, height: 70), withAttributes: attributes)
         }
+        if image == nil { photoBackdrop.show(nil, in: .zero) }
         if dragHighlight {
             Appearance.accent.setStroke()
             let border = NSBezierPath(roundedRect: bounds.insetBy(dx: 6, dy: 6), xRadius: 12, yRadius: 12)
