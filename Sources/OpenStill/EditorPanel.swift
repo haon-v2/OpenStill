@@ -45,14 +45,12 @@ final class EditorPanel: GlassChrome {
     private let historyScroll = NSScrollView()
     private let historyStack = EditorStack()
     private let sectionTitle = NSTextField(labelWithString: "Edit")
-    var sectionChanged: ((Int) -> Void)?
     private var sliders: [(EditSlider, NSTextField, WritableKeyPath<PhotoEdits, Double>)] = []
     private var toggles: [(NSButton, WritableKeyPath<PhotoEdits, Bool>)] = []
     private var editButtons: [NSButton] = []
     private var states = PhotoEdits()
     var brushChanged: ((String,Double,Double,Double)->Void)?
     private var maskPanels:[String:MaskPanel] = [:]
-    private var workspaces:[(NSSegmentedControl,NSView,MaskPanel)] = []
     private let mixer = ColorMixerPanel()
     let cropPresets = CropPresetPanel()
     func cropAspect(for size:CGSize) -> Double? { cropPresets.aspect(for:size) }
@@ -84,12 +82,8 @@ final class EditorPanel: GlassChrome {
     var retouchSettingsChanged:((RetouchSession)->Void)?
     private var lutMask: MaskPanel?
     private let lutBrowser = LUTBrowserView()
-    private var activeTab = 0
-    var selectedTab: Int { activeTab }
     private var hasPhoto = false
     private var busy = false
-    private var toolBodies: [NSView] = []
-    private var headers: [NSButton] = []
     // The Studio arrangement (see the extension at the end of this file).
     /// Presets & LUTs, and History · Snapshots · Versions: shown in their own floating panels.
     let presetsColumn = LRPanelColumn(), historyColumn = LRPanelColumn()
@@ -138,244 +132,53 @@ final class EditorPanel: GlassChrome {
         addTitle("PHOTO & VERSIONS", to: tools)
         fullWidth(versions, in:tools)
         versions.command = { [weak self] in self?.command?($0) }
-        addTitle("TOOLS", to: tools)
-        tool("Layers", symbol: "square.3.layers.3d", in: tools) { content in
-            self.slider("Edit strength", path: \.opacity, range: 0...1, in: content)
-            self.action("Add image layer…", "addLayer", to: content)
-            self.slider("Layer opacity", path: \.overlayOpacity, range: 0...1, in: content)
-            self.action("Normal blend", "blendNormal", to: content)
-            self.action("Screen blend", "blendScreen", to: content)
-            self.action("Multiply blend", "blendMultiply", to: content)
-            self.action("Remove image layer", "removeLayer", to: content)
+        // The shared panels wait here, out of sight, until the right panel or a floating panel borrows them.
+        cropPresets.changed = { [weak self] in self?.command?("crop") }
+        lens.changed = { [weak self] settings,final in guard let self else{return};self.states.lens=settings;self.editChanged?(self.states,"Lens corrections",final) }
+        lens.match = { [weak self] in self?.command?("matchLens") }
+        transformPanel.command = { [weak self] in self?.command?($0) }
+        profilePanel.command = { [weak self] in self?.command?($0) }
+        curves.changed = { [weak self] curves,final in
+            guard let self else { return }; self.states.curves = curves; self.editChanged?(self.states,"Tone curves",final)
         }
-        tool("Crop & rotate", symbol: "crop.rotate", in: tools) { content in
-            self.fullWidth(self.cropPresets,in:content)
-            self.cropPresets.changed = { [weak self] in self?.command?("crop") }
-            self.action("Draw crop", "crop", to: content)
-            self.action("Apply crop", "applyCrop", to: content)
-            self.action("Cancel crop", "cancelTool", to: content)
-            self.action("Rotate clockwise", "rotate", to: content)
-            self.action("Flip horizontally", "flip", to: content)
-            self.slider("Straighten", path: \.straighten, range: -20...20, in: content)
-            self.action("Auto straighten from lines", "autoStraighten", to: content)
-            self.action("AI align horizon", "horizon", to: content)
-            self.action("Reset crop & rotation", "resetCrop", to: content)
+        retouch.command = { [weak self] in self?.command?($0) }
+        retouch.settingsChanged = { [weak self] in self?.retouchSettingsChanged?($0) }
+        maskLayers.command = { [weak self] in self?.command?($0) }
+        maskLayers.changed = { [weak self] layer, title, final in
+            guard let self else { return }
+            self.states.updateLocalAdjustment(layer.id) { $0 = layer }
+            self.editChanged?(self.states, title, final)
         }
-        tool("Lens corrections",symbol:"camera.filters",in:tools) { content in
-            self.fullWidth(self.lens,in:content)
-            self.lens.changed = { [weak self] settings,final in guard let self else{return};self.states.lens=settings;self.editChanged?(self.states,"Lens corrections",final) }
-            self.lens.match = { [weak self] in self?.command?("matchLens") }
-            self.addTitle("CHROMATIC ABERRATION", to: content)
-            self.action("Remove chromatic aberration", "autoCA", to: content)
-            self.action("Turn off chromatic aberration removal", "autoCA:off", to: content)
-            self.help("Measures the red and blue color edges of this photo and lines them up with green. Works without a lens profile.", to: content)
-            self.addTitle("DEFRINGE", to: content)
-            self.help("Removes purple and green color fringes along high-contrast edges.", to: content)
-            self.slider("Purple amount", path: \.defringePurple, range: 0...1, in: content)
-            self.slider("Purple hue from (°)", path: \.defringePurpleLow, range: 180...360, in: content)
-            self.slider("Purple hue to (°)", path: \.defringePurpleHigh, range: 180...360, in: content)
-            self.slider("Green amount", path: \.defringeGreen, range: 0...1, in: content)
-            self.slider("Green hue from (°)", path: \.defringeGreenLow, range: 30...200, in: content)
-            self.slider("Green hue to (°)", path: \.defringeGreenHigh, range: 30...200, in: content)
+        mixer.changed = { [weak self] index,band,title,final in
+            guard let self else { return };self.states.ensureAdvanced();self.states.advanced!.colors[index] = band
+            self.editChanged?(self.states,title,final)
         }
-        tool("Transform", symbol: "perspective", in: tools) { content in
-            self.fullWidth(self.transformPanel, in: content)
-            self.transformPanel.command = { [weak self] in self?.command?($0) }
-            self.addTitle("MANUAL", to: content)
-            self.slider("Vertical", path: \.transformVertical, range: -1...1, in: content)
-            self.slider("Horizontal", path: \.transformHorizontal, range: -1...1, in: content)
-            self.slider("Rotate (°)", path: \.transformRotate, range: -15...15, in: content)
-            self.slider("Aspect", path: \.transformAspect, range: -1...1, in: content)
-            self.slider("Scale", path: \.transformScale, range: 0.5...1.5, in: content)
-            self.slider("X offset", path: \.transformOffsetX, range: -1...1, in: content)
-            self.slider("Y offset", path: \.transformOffsetY, range: -1...1, in: content)
-            self.toggle("Constrain crop", path: \.transformConstrain, in: content)
-            self.help("Constrain crop enlarges the photo so no empty edges show. Turned off, empty edges export as white in JPEG and transparent in PNG and TIFF.", to: content)
-            self.action("Reset transform", "resetTransform", to: content)
+        pointColor.changed = { [weak self] colors,title,final in guard let self else { return }; self.states.pointColors = colors; self.editChanged?(self.states,title,final) }
+        pointColor.command = { [weak self] in self?.command?($0) }
+        grading.changed = { [weak self] index, wheel, title, final in
+            guard let self else { return }
+            var settings = self.states.colorGrading
+            switch index { case 0: settings.shadows = wheel; case 1: settings.midtones = wheel; case 2: settings.highlights = wheel; default: settings.global = wheel }
+            self.states.colorGrading = settings
+            self.editChanged?(self.states, title, final)
         }
-        addTitle("IMAGE QUALITY", to: tools)
-        tool("Noise removal  AI", symbol: "waveform.path", in: tools) { content in
-            self.help("Local SCUNet denoising. Full-resolution photos can take several minutes.", to: content)
-            self.action("Remove noise", "ai:denoise", to: content)
-            self.action("Denoise RAW data (keeps edits)", "ai:rawdenoise", to: content)
-            self.help("For RAW photos: denoises the decoded sensor data, so every slider and mask stays adjustable. White balance changes afterwards are applied relative to the denoised image; RAW decoding options are fixed.", to: content)
+        glow.changed = { [weak self] settings, title, final in
+            guard let self else { return }
+            self.states.glow = settings
+            self.editChanged?(self.states, title, final)
         }
-        tool("Detail restoration  AI", symbol: "viewfinder", in: tools) { content in
-            self.help("Restore detail with Real-ESRGAN while keeping the original dimensions. Review fine textures at 100%.", to: content)
-            self.action("Restore detail", "ai:detail", to: content)
-            self.action("Super resolution 2×", "ai:upscale", to: content)
-            self.help("Doubles the width and height with Real-ESRGAN as a new version; the current version is kept.", to: content)
+        sunrays.changed = { [weak self] settings,title,final in
+            guard let self else {return}
+            // Controller resolves legacy output-relative coordinates against the source.
+            self.states.sunSettings = settings
+            self.editChanged?(self.states,title,final)
         }
-        addTitle("ESSENTIALS", to: tools)
-        tool("Profile & calibration", symbol: "camera.aperture", in: tools) { content in
-            self.fullWidth(self.profilePanel, in: content)
-            self.profilePanel.command = { [weak self] in self?.command?($0) }
-            self.slider("Profile amount", path: \.profileAmount, range: 0...2, in: content)
-            self.addTitle("CALIBRATION", to: content)
-            self.slider("Shadows tint", path: \.calibrationShadowsTint, range: -1...1, in: content)
-            self.slider("Red primary hue", path: \.calibrationRedHue, range: -1...1, in: content)
-            self.slider("Red primary saturation", path: \.calibrationRedSaturation, range: -1...1, in: content)
-            self.slider("Green primary hue", path: \.calibrationGreenHue, range: -1...1, in: content)
-            self.slider("Green primary saturation", path: \.calibrationGreenSaturation, range: -1...1, in: content)
-            self.slider("Blue primary hue", path: \.calibrationBlueHue, range: -1...1, in: content)
-            self.slider("Blue primary saturation", path: \.calibrationBlueSaturation, range: -1...1, in: content)
-            self.help("Hue moves each primary around the color wheel: red toward yellow, green toward cyan, blue toward magenta. Neutral grays stay neutral.", to: content)
-        }
-        tool("Lens blur", symbol: "scope", in: tools) { content in
-            self.help("Blurs the photo by distance, like a wide-aperture lens. First choose where the depth comes from.", to: content)
-            self.action("Use the photo’s depth data", "lensBlur:camera", to: content)
-            self.action("Estimate depth (on-device AI)", "lensBlur:ai", to: content)
-            self.action("Keep the subject sharp", "lensBlur:subject", to: content)
-            self.slider("Blur amount", path: \.lensBlurAmount, range: 0...1, in: content)
-            self.slider("Focus distance", path: \.lensBlurFocus, range: 0...1, in: content)
-            self.slider("Focus range", path: \.lensBlurRange, range: 0...1, in: content)
-            self.toggle("Blur the foreground too", path: \.lensBlurForeground, in: content)
-            self.help("Focus distance 1 is the nearest part of the scene, 0 the farthest. Portrait-mode iPhone photos carry depth data; other photos can use the on-device AI estimate or keep the subject sharp.", to: content)
-            self.action("Remove lens blur", "lensBlur:remove", to: content)
-        }
-        tool("Develop", symbol: "sun.max", in: tools, expanded: false) { content in
-            self.action("Auto", "autoTone", to:content)
-            self.action("White balance eyedropper", "whiteBalance", to:content)
-            self.action("Reset white balance", "resetWhiteBalance", to:content)
-            self.slider("Exposure", path: \.exposure, range: -4...4, in: content)
-            self.slider("Contrast", path: \.contrast, range: 0.5...1.5, in: content)
-            self.slider("Highlights", path: \.highlightsAmount, range: -1...1, in: content)
-            self.slider("Shadows", path: \.shadowsAmount, range: -1...1, in: content)
-            self.slider("Whites", path: \.whites, range: -1...1, in: content)
-            self.slider("Blacks", path: \.blacks, range: -1...1, in: content)
-            self.help("Whites and Blacks are shared with the Black & white tool and use its mask.", to: content)
-            self.slider("Temperature", path: \.temperature, range: 2500...10000, in: content)
-            self.slider("Tint", path: \.tint, range: -100...100, in: content)
-        }
-        tool("HDR", symbol: "sun.max.circle", in: tools) { content in
-            self.toggle("Edit in HDR", path: \.hdrEnabled, in: content)
-            self.slider("Highlight headroom (stops)", path: \.hdrHeadroom, range: 0.5...4, in: content)
-            self.help(HDRBackdrop.available
-                ? "Bright highlights go above SDR white on this display. Export as HDR (PQ, HLG or a gain map) to keep them; SDR exports use the SDR rendition."
-                : "This display shows SDR, so you see the SDR rendition. HDR exports (PQ, HLG or a gain map) still keep the brighter highlights for HDR screens.", to: content)
-        }
-        tool("Dehaze", symbol: "aqi.medium", in: tools) { content in
-            self.slider("Dehaze", path: \.dehaze, range: -1...1, in: content)
-            self.help("Positive removes atmospheric haze; negative adds it.", to: content)
-        }
-        tool("Curves", symbol:"point.topleft.down.curvedto.point.bottomright.up", in:tools) { content in
-            self.fullWidth(self.curves,in:content)
-            self.curves.changed = { [weak self] curves,final in
-                guard let self else { return }; self.states.curves = curves; self.editChanged?(self.states,"Tone curves",final)
-            }
-            self.action("Targeted adjustment: drag up or down on the photo", "tat:curve", to: content)
-        }
-        tool("Enhance", symbol: "wand.and.rays", in: tools) { content in
-            self.toggle("Auto light & color", path: \.autoEnhance, in: content)
-            self.help("Analyzes the photograph for automatic tonal and color adjustments.", to: content)
-        }
-        tool("Retouch",symbol:"bandage",in:tools) { content in
-            self.fullWidth(self.retouch,in:content)
-            self.retouch.command = { [weak self] in self?.command?($0) }
-            self.retouch.settingsChanged = { [weak self] in self?.retouchSettingsChanged?($0) }
-            self.addSpotControls(to: content)
-        }
-        tool("Red eye", symbol: "eye", in: tools) { content in self.addEyeControls(to: content) }
-        tool("Masks", symbol: "circle.lefthalf.filled", in: tools) { content in
-            self.fullWidth(self.maskLayers, in: content)
-            self.maskLayers.command = { [weak self] in self?.command?($0) }
-            self.maskLayers.changed = { [weak self] layer, title, final in
-                guard let self else { return }
-                self.states.updateLocalAdjustment(layer.id) { $0 = layer }
-                self.editChanged?(self.states, title, final)
-            }
-            self.layerPanelStore.orientation = .vertical; self.layerPanelStore.isHidden = true; self.fullWidth(self.layerPanelStore, in: content)
-        }
-        tool("Erase  AI", symbol: "eraser", in: tools) { content in
-            self.help("Choose Masking to select an area, then return here to remove it. AI fills it using the surrounding photograph.", to: content)
-            self.action("Remove selected area", "ai:erase", to: content)
-        }
-        tool("Structure", symbol: "circle.hexagongrid", in: tools) { self.slider("Structure", path: \.structure, range: 0...1, in: $0) }
-        tool("Clarity", symbol: "circle.lefthalf.filled", in: tools) { content in
-            self.slider("Clarity", path: \.clarity, range: -1...1, in: content)
-            self.help("Midtone contrast over broad areas. Negative softens.", to: content)
-        }
-        tool("Texture", symbol: "square.grid.3x3.middle.filled", in: tools) { content in
-            self.slider("Texture", path: \.texture, range: -1...1, in: content)
-            self.help("Medium-sized detail such as skin, bark or fabric. Negative smooths it.", to: content)
-        }
-        tool("Color", symbol: "paintpalette", in: tools) {
-            self.slider("Saturation", path: \.saturation, range: 0...2, in: $0)
-            self.slider("Vibrance", path: \.vibrance, range: -1...1, in: $0)
-            self.addTitle("COLOR MIXER",to:$0)
-            self.fullWidth(self.mixer,in:$0)
-            self.mixer.changed = { [weak self] index,band,title,final in
-                guard let self else { return };self.states.ensureAdvanced();self.states.advanced!.colors[index] = band
-                self.editChanged?(self.states,title,final)
-            }
-            self.addTitle("TARGETED ADJUSTMENT",to:$0)
-            self.addTargetedColorActions(to: $0)
-            self.addTitle("POINT COLOR",to:$0)
-            self.fullWidth(self.pointColor,in:$0)
-            self.pointColor.changed = { [weak self] colors,title,final in guard let self else { return }; self.states.pointColors = colors; self.editChanged?(self.states,title,final) }
-            self.pointColor.command = { [weak self] in self?.command?($0) }
-        }
-        tool("Color grading", symbol: "circle.circle", in: tools) { content in
-            self.fullWidth(self.grading, in: content)
-            self.grading.changed = { [weak self] index, wheel, title, final in
-                guard let self else { return }
-                var settings = self.states.colorGrading
-                switch index { case 0: settings.shadows = wheel; case 1: settings.midtones = wheel; case 2: settings.highlights = wheel; default: settings.global = wheel }
-                self.states.colorGrading = settings
-                self.editChanged?(self.states, title, final)
-            }
-            self.slider("Blending", path: \.gradeBlending, range: 0...1, in: content)
-            self.slider("Balance", path: \.gradeBalance, range: -1...1, in: content)
-            self.help("Drag in a wheel to tint that tonal range. Double-click a wheel to reset it.", to: content)
-        }
-        tool("Black & white", symbol: "circle", in: tools) {
-            self.slider("Monochrome strength", path: \.monochrome, range: 0...1, in: $0)
-            self.slider("Blacks", path: \.blacks, range: -1...1, in: $0)
-            self.slider("Whites", path: \.whites, range: -1...1, in: $0)
-            self.addTitle("B&W MIX", to: $0)
-            self.addGrayMix(to: $0)
-        }
-        tool("Details", symbol: "square.dotted", in: tools) { content in
-            self.slider("Sharpen", path: \.sharpness, range: 0...2, in: content)
-            self.addSharpeningDetail(to: content)
-        }
-        tool("Denoise", symbol: "square.grid.3x3", in: tools) { content in
-            self.slider("Noise reduction", path: \.denoise, range: 0...1, in: content)
-            self.addNoiseDetail(to: content)
-        }
-        tool("Vignette", symbol: "circle.square", in: tools) { self.slider("Black − / White +", path: \.vignette, range: -1...1, in: $0) }
-        addTitle("CREATIVE", to: tools)
-        tool("Glow", symbol: "sun.haze", in: tools) { content in
-            self.fullWidth(self.glow, in: content)
-            self.glow.changed = { [weak self] settings, title, final in
-                guard let self else { return }
-                self.states.glow = settings
-                self.editChanged?(self.states, title, final)
-            }
-        }
-        tool("Grain", symbol: "circle.dotted", in: tools) { content in
-            self.slider("Amount", path: \.grainAmount, range: 0...1, in: content)
-            self.slider("Size", path: \.grainSize, range: 0...1, in: content)
-            self.slider("Roughness", path: \.grainRoughness, range: 0...1, in: content)
-        }
-        addTitle("LANDSCAPE", to: tools)
-        tool("Sky replacement  AI", symbol: "cloud", in: tools) { content in
-            self.help("Choose your own sky photograph. On-device AI finds the sky boundary and blends it into the current photo.", to: content)
-            self.action("Choose sky & replace…", "ai:sky", to: content)
-        }
-        tool("Sunrays", symbol: "sun.max", in: tools) { content in
-            self.fullWidth(self.sunrays, in:content)
-            self.sunrays.changed = { [weak self] settings,title,final in
-                guard let self else {return}
-                // Controller resolves legacy output-relative coordinates against the source.
-                self.states.sunSettings = settings
-                self.editChanged?(self.states,title,final)
-            }
-            self.sunrays.command = { [weak self] in self?.command?($0) }
-        }
-        addTitle("ON THIS MAC", to: tools)
-        action("Set up on-device AI…", "setupAI", to: tools)
-        action("Cancel AI processing", "cancelAI", to: tools)
+        sunrays.command = { [weak self] in self?.command?($0) }
+        layerPanelStore.orientation = .vertical; layerPanelStore.isHidden = true
+        for view in [cropPresets, lens, transformPanel, profilePanel, curves, retouch, maskLayers, layerPanelStore, mixer, pointColor, grading, glow, sunrays] as [NSView] { fullWidth(view, in: tools) }
+        // One mask per tool for "Or limit a whole tool"; the names are the ones the renderer and saved edits use.
+        for key in ["Layers", "Noise removal", "Detail restoration", "Lens blur", "Develop", "HDR", "Dehaze", "Curves", "Enhance", "Retouch", "Red eye", "Masks", "Erase", "Structure", "Clarity", "Texture", "Color", "Color grading", "Black & white", "Details", "Denoise", "Vignette", "Glow", "Grain", "Sky replacement", "Sunrays"] { let mask = makeMaskPanel(key); mask.done = { [weak self] in self?.command?("finishMask") }; mask.isHidden = true; fullWidth(mask, in: tools) }
+        toolsScroll.isHidden = true
         let presets = installScroll(presetScroll)
         addTitle("LUT LIBRARY", to: presets)
         help("12 free looks, ready offline. LUTs add to the look already in your JPEG or S9 camera preview.", to: presets)
@@ -393,7 +196,6 @@ final class EditorPanel: GlassChrome {
         _ = installScroll(historyScroll, stack: historyStack)
         info.translatesAutoresizingMaskIntoConstraints = false; body.addSubview(info)
         NSLayoutConstraint.activate([info.topAnchor.constraint(equalTo: body.topAnchor), info.bottomAnchor.constraint(equalTo: body.bottomAnchor), info.leadingAnchor.constraint(equalTo: body.leadingAnchor), info.trailingAnchor.constraint(equalTo: body.trailingAnchor)])
-        showTab(0)
         show(nil)
         update(PhotoEdits(), document: nil, enabled: false)
     }
@@ -415,38 +217,6 @@ final class EditorPanel: GlassChrome {
         NSLayoutConstraint.activate([label.leadingAnchor.constraint(equalTo: row.leadingAnchor, constant: 9), label.bottomAnchor.constraint(equalTo: row.bottomAnchor, constant: -6)])
     }
     private func help(_ text: String, to stack: NSStackView) { let label = NSTextField(wrappingLabelWithString: text); label.font = .systemFont(ofSize: 11); label.textColor = .secondaryLabelColor; fullWidth(label, in: stack) }
-    private func tool(_ title: String, symbol: String, in stack: NSStackView, expanded: Bool = false, content: (NSStackView) -> Void) {
-        let header = ToolHeaderButton(title: title.replacingOccurrences(of: "  AI", with: ""), target: self, action: #selector(expandTool(_:)))
-        header.ai = title.hasSuffix("  AI"); header.expanded = expanded
-        header.isBordered = false; header.alignment = .left; header.font = .systemFont(ofSize: 13)
-        header.image = Appearance.symbol(symbol); header.imagePosition = .imageLeading
-        header.tag = toolBodies.count; header.heightAnchor.constraint(equalToConstant: 36).isActive = true
-        header.setAccessibilityLabel(title + " controls")
-        fullWidth(header, in: stack)
-        let contentStack = NSStackView(); contentStack.orientation = .vertical; contentStack.alignment = .leading; contentStack.spacing = 12
-        contentStack.edgeInsets = NSEdgeInsets(top: 12, left: 12, bottom: 16, right: 12)
-        fullWidth(contentStack,in:stack)
-        if title == "Crop & rotate" || title == "Lens corrections" || title == "Transform" || title == "Profile & calibration" { content(contentStack) }
-        else {
-            let key = title.replacingOccurrences(of:"  AI",with:"")
-            let tabs = NSSegmentedControl(labels:["Adjustments","Masking"],trackingMode:.selectOne,target:self,action:#selector(workspaceChanged(_:)))
-            tabs.selectedSegment = 0;tabs.segmentStyle = .rounded;tabs.tag = workspaces.count;tabs.setAccessibilityLabel(key+" workspace");fullWidth(tabs,in:contentStack)
-            let adjustments = NSStackView();adjustments.orientation = .vertical;adjustments.alignment = .leading;adjustments.spacing = 12
-            fullWidth(adjustments,in:contentStack);content(adjustments)
-            let mask = makeMaskPanel(key);fullWidth(mask,in:contentStack);mask.isHidden = true
-            mask.done = { [weak self,weak tabs] in guard let tabs else { return };tabs.selectedSegment = 0;self?.workspaceChanged(tabs) }
-            workspaces.append((tabs,adjustments,mask))
-        }
-        contentStack.isHidden = !expanded
-        toolBodies.append(contentStack);headers.append(header)
-    }
-    @objc private func workspaceChanged(_ sender:NSSegmentedControl) {
-        command?("finishMask")
-        let (_,adjustments,mask) = workspaces[sender.tag]
-        adjustments.isHidden = sender.selectedSegment == 1;mask.isHidden = sender.selectedSegment == 0
-        mask.resetInteraction()
-        if let index = toolBodies.firstIndex(where: { $0 === sender.superview }) { focusTool(headers[index]) }
-    }
     private func makeMaskPanel(_ key:String, listed:Bool = true) -> MaskPanel {
         let panel = MaskPanel(key:key);maskPanels[key] = panel;if listed { maskOrder.append(key) }
         panel.command = { [weak self] action in self?.command?("mask:"+key+":"+action) }
@@ -545,56 +315,6 @@ final class EditorPanel: GlassChrome {
     private static func number(_ number: Double) -> String { number.formatted(.number.precision(.fractionLength(abs(number) > 10 ? 0 : 2))) }
     @objc private func actionClicked(_ sender: NSButton) { command?(sender.identifier!.rawValue) }
     @objc private func toggleEdit(_ sender: NSButton) { let path = toggles[sender.tag].1; states[keyPath: path] = sender.state == .on; editChanged?(states, sender.title, true) }
-    @objc private func expandTool(_ sender: NSButton) { command?("finishMask"); let open = toolBodies[sender.tag].isHidden; for body in toolBodies { body.isHidden = true }; toolBodies[sender.tag].isHidden = !open
-        for (index, header) in headers.enumerated() { (header as? ToolHeaderButton)?.expanded = index == sender.tag && open }
-        for panel in maskPanels.values { panel.resetInteraction() }
-        if open { focusTool(sender) }
-    }
-    private func focusTool(_ header:NSView) {
-        DispatchQueue.main.async { [weak self,weak header] in
-            guard let self,let header,let document = self.toolsScroll.documentView else { return }
-            self.layoutSubtreeIfNeeded()
-            let y = header.convert(header.bounds,to:document).minY-8
-            let maximum = max(0,document.bounds.height-self.toolsScroll.contentView.bounds.height)
-            self.toolsScroll.contentView.scroll(to:NSPoint(x:0,y:min(maximum,max(0,y))))
-            self.toolsScroll.reflectScrolledClipView(self.toolsScroll.contentView)
-        }
-    }
-    func showTab(_ index: Int) {
-        command?("finishMask")
-        activeTab = index
-        lutBrowser.setActive(index == 1 || lrModule == .develop)
-        for (i, view) in [toolsScroll, presetScroll, historyScroll, info].enumerated() { view.isHidden = i != index }
-        sectionTitle.stringValue = ["Edit", "Presets", "History", "Info"][index]
-        sectionChanged?(index)
-    }
-    func openTool(_ name: String, masking: Bool = false) {
-        showTab(0)
-        guard let header = headers.first(where: { $0.title == name }) else { return }
-        if toolBodies[header.tag].isHidden { expandTool(header) }
-        if masking, let workspace = workspaces.first(where: { $0.0.superview === toolBodies[header.tag] }) {
-            workspace.0.selectedSegment = 1
-            workspaceChanged(workspace.0)
-        }
-        focusTool(header)
-    }
-    /// Luminar layout, Return: a tool showing its Masking tab goes back to its adjustments; otherwise the open tool collapses
-    /// when a canvas tool was in use or it is the Masks tool. Returns whether anything closed.
-    func finishLuminarTool(canvasToolWasActive: Bool) -> Bool {
-        guard activeTab == 0 else { return false }
-        if let workspace = workspaces.first(where: { $0.0.selectedSegment == 1 && $0.0.superview.map { !$0.isHidden } == true }) {
-            workspace.0.selectedSegment = 0; workspaceChanged(workspace.0); return true
-        }
-        guard let index = toolBodies.firstIndex(where: { !$0.isHidden }), canvasToolWasActive || headers[index].title == "Masks" else { return false }
-        toolBodies[index].isHidden = true
-        (headers[index] as? ToolHeaderButton)?.expanded = false
-        return true
-    }
-    func openCurrentMask() {
-        if activeTab == 1 { if lutMask?.isHidden == true {toggleLUTMask()}; return }
-        let current = headers.enumerated().first { entry in !toolBodies[entry.offset].isHidden && workspaces.contains(where: { $0.0.superview === toolBodies[entry.offset] }) }?.element.title
-        openTool(current ?? "Develop", masking: true)
-    }
     func show(_ metadata: PhotoMetadata?, rendering: String? = nil) {
         info.show(metadata, rendering: rendering)
         summary.stringValue = metadata.map { "\($0.camera)\n\($0.lens)" } ?? "Open a photograph to begin"
@@ -688,7 +408,7 @@ extension EditorPanel {
         lrModule = target
         for v in [sectionTitle, summary, settings, body, message] as [NSView] { v.isHidden = target != nil }
         flatColor = target == nil ? nil : LRColors.panel
-        guard let target else { showTab(activeTab); return }
+        guard let target else { return }
         let column = lrColumns[target] ?? buildLightroom(target)
         column.isHidden = false
         for (slot, view, height) in lrSlots[target] ?? [] { borrow(view, into: slot, height: height) }
@@ -981,22 +701,6 @@ extension EditorPanel {
         action("Drag on photo: Saturation", "tat:saturation", to: stack)
         action("Drag on photo: Hue", "tat:hue", to: stack)
         action("Drag on photo: Luminance", "tat:luminance", to: stack)
-    }
-    fileprivate func addEyeControls(to stack: NSStackView) {
-        action("Red eye: drag over an eye", "eye:redEye", to: stack)
-        action("Pet eye: drag over an eye", "eye:petEye", to: stack)
-        slider("Pupil size", path: \.eyePupil, range: 0.2...1, in: stack)
-        slider("Darken", path: \.eyeDarken, range: 0...1, in: stack)
-        toggle("Pet eye catchlight", path: \.eyeCatchlight, in: stack)
-        action("Remove last eye", "eye:removeLast", to: stack); action("Clear all eyes", "eye:clear", to: stack)
-        help("Sliders change the last eye you corrected.", to: stack)
-    }
-    fileprivate func addSpotControls(to stack: NSStackView) {
-        action("Visualize Spots (on/off)", "spots:toggle", to: stack)
-        let label = NSTextField(labelWithString: "Spot sensitivity"); label.font = .systemFont(ofSize: 11)
-        let slider = TrackingSlider(range: 0...1); slider.doubleValue = 0.3; slider.setAccessibilityLabel("Visualize Spots sensitivity")
-        slider.change = { [weak self] v, final in if final { self?.command?("spots:threshold:\(1 - v)") } }
-        let row = NSStackView(views: [label, slider]); row.spacing = 8; fullWidth(row, in: stack)
     }
     /// Snapshots of the current version: New snapshot, then one row per snapshot (click to restore; Control-click to rename or delete).
     fileprivate func rebuildSnapshots(_ document: EditDocument?, enabled: Bool) {

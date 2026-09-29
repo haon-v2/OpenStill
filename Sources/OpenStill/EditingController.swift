@@ -91,7 +91,7 @@ extension ViewerController {
                     else {var added=version;added.document=editDocument;added.revision=UUID();saved.versions.append(added)}
                     saved.activeVersionID=versionID
                 }
-                photoRecord = record;shootWindow?.refresh()
+                photoRecord = record
                 info.updateVersions(record, raw:RawDecoder.isRAW(source))
             } else { try EditStorage.save(editDocument, for: source) }
         }

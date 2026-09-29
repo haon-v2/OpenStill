@@ -199,7 +199,6 @@ final class LRPanelColumn: LRFill {
         for (title, run) in buttons { footer.addArrangedSubview(LRButton(title, run)) }
         footer.isHidden = buttons.isEmpty
     }
-    func refreshSections() { sections.forEach { $0.refresh() } }
     func scrollToTop() {
         layoutSubtreeIfNeeded()
         let y = scrolling.isFlipped ? 0 : max(0, scrolling.bounds.height - scroll.contentView.bounds.height)

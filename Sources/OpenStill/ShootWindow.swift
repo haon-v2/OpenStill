@@ -108,7 +108,7 @@ private final class ShootCell:NSCollectionViewItem {
         preview.imageScaling = .scaleProportionallyDown;preview.image=Appearance.symbol("photo",size:28)
     }
 }
-final class ShootWindow:NSWindowController,NSCollectionViewDataSource,NSCollectionViewDelegate,NSWindowDelegate {
+final class ShootWindow:NSWindowController,NSCollectionViewDataSource,NSCollectionViewDelegate {
     var edit:(([URL],URL)->Void)?
     var recordsChanged:(()->Void)?
     var selectionChanged:(()->Void)?
@@ -127,7 +127,6 @@ final class ShootWindow:NSWindowController,NSCollectionViewDataSource,NSCollecti
     private let metadataRow=NSStackView()
     private var metadataHeight:NSLayoutConstraint!
     private var metadataPopups:[MetadataColumn:NSPopUpButton]=[:]
-    private let viewModes=NSSegmentedControl(labels:LibraryViewMode.allCases.map(\.title),trackingMode:.selectOne,target:nil,action:nil)
     private let painterButton=NSButton(checkboxWithTitle:"Painter",target:nil,action:nil),painterKind=NSPopUpButton(),painterValue=NSTextField()
     private let flowLayout=FillingFlowLayout()
     /// Survey shows these photos; they start as the selection when Survey opens.
@@ -149,8 +148,6 @@ final class ShootWindow:NSWindowController,NSCollectionViewDataSource,NSCollecti
     private(set) var optionsControls:[NSView]=[]
     private(set) var optionsActions:[NSView]=[]
     var messageChanged:((String)->Void)? { didSet { message.changed=messageChanged } }
-    private var moreMenu:NSPopUpButton?
-    private var sizeSlider:NSSlider?
     private let minimum=NSPopUpButton(frame:.zero,pullsDown:false),flag=NSPopUpButton(frame:.zero,pullsDown:false),sort=NSPopUpButton(frame:.zero,pullsDown:false),labelFilter=NSPopUpButton(frame:.zero,pullsDown:false)
     /// Label filter choices: nil = all, then each label, then unlabeled.
     private static let labelChoices:[ColorLabel?]=[nil,.red,.yellow,.green,.blue,.purple,ColorLabel.none]
@@ -170,94 +167,48 @@ final class ShootWindow:NSWindowController,NSCollectionViewDataSource,NSCollecti
     private var batchPanel:BatchPanel?
     private var exportPanel:ExportPanel?
     private var generation=UUID(),comparisons:[ComparisonWindow]=[]
-    init(urls:[URL], embedded:Bool = false, selectedURL:URL? = nil){
+    /// The Library inside the main window: the grid (or Loupe, Compare, Survey) fills the space; its filters and actions
+    /// go to the window's options bar through `optionsControls` and `optionsActions`.
+    init(urls:[URL], selectedURL:URL? = nil){
         self.urls=urls;self.preferredURL=selectedURL
-        let window = embedded ? nil : NSWindow(contentRect:NSRect(x:0,y:0,width:1080,height:750),styleMask:[.titled,.closable,.miniaturizable,.resizable],backing:.buffered,defer:false)
-        super.init(window:window)
+        super.init(window:nil)
         let content = browserView
-        if let window {
-            window.title="Shoot · OpenStill";window.minSize=NSSize(width:850,height:500);window.center();window.delegate=self;Appearance.configure(window)
-            let root=Appearance.panel(in:window)
-            content.translatesAutoresizingMaskIntoConstraints=false;root.addSubview(content)
-            NSLayoutConstraint.activate([content.leadingAnchor.constraint(equalTo:root.leadingAnchor),content.trailingAnchor.constraint(equalTo:root.trailingAnchor),content.topAnchor.constraint(equalTo:root.topAnchor),content.bottomAnchor.constraint(equalTo:root.bottomAnchor)])
-        }
         // Thumbnails render on the GPU; two at a time keeps the grid filling quickly on Macs with room to spare.
         queue.maxConcurrentOperationCount=ProcessInfo.processInfo.activeProcessorCount>=8 ? 2:1;queue.qualityOfService = .utility;cache.totalCostLimit=64*1024*1024
         minimum.addItems(withTitles:["All ratings","1★ and up","2★ and up","3★ and up","4★ and up","5★"])
         flag.addItems(withTitles:["All flags","Picks","Rejects","Unflagged"]);sort.addItems(withTitles:["Filename","Capture date","Rating"])
         labelFilter.addItems(withTitles:Self.labelChoices.map{$0.map{$0 == ColorLabel.none ? "Unlabeled":$0.title} ?? "All labels"})
-        for (control,title) in [(minimum,"Minimum star rating"),(flag,"Flag filter"),(sort,"Sort photographs"),(labelFilter,"Color label filter")]{control.target=self;control.action = #selector(filterChanged);control.setAccessibilityLabel(title)}
-        search.placeholderString="Search names, titles, keywords, camera, lens";search.target=self;search.action = #selector(filterChanged);search.sendsSearchStringImmediately=true;search.setAccessibilityLabel("Search library filenames")
-        let open=button("Edit selected",#selector(openSelected)),compare=button("Compare two",#selector(compareSelected)),refreshButton=button("Refresh",#selector(refreshAction))
-        let top: NSStackView
-        if embedded {
-            let more = NSPopUpButton(frame:.zero,pullsDown:true)
-            more.addItem(withTitle:"Actions")
-            for (title, action) in [("Edit selected",#selector(openSelected)),("Compare two",#selector(compareSelected)),("Edit metadata…",#selector(editMetadata)),("Write metadata to XMP",#selector(writeXMP)),("Read metadata from XMP",#selector(readXMP)),("Import Camera Raw edits from XMP",#selector(importCameraRaw)),("Add to collection…",#selector(addToCollection)),("Find duplicates…",#selector(findDuplicates)),("Merge to HDR…",#selector(mergeHDR)),("Merge to panorama…",#selector(mergePanorama)),("Focus stack…",#selector(mergeFocusStack)),("Remove from this collection",#selector(removeFromCollection)),("Copy adjustments",#selector(copyAdjustments)),("Paste adjustments…",#selector(pasteAdjustments)),("Undo batch",#selector(undoBatch)),("Export selected…",#selector(exportSelection)),("Print…",#selector(printPhotos)),("Slideshow…",#selector(slideshow)),("Web gallery…",#selector(webGallery)),("Publish…",#selector(publishPhotos)),("People…",#selector(showPeople)),("Map…",#selector(showMap)),("Timeline…",#selector(showTimeline)),("Show all photos",#selector(clearFocus)),("Show / Hide Filter Bar (\\)",#selector(toggleFilterBar)),("Group into Stack",#selector(groupIntoStack)),("Unstack",#selector(unstackSelected)),("Open / Close Stack (S)",#selector(toggleStacks)),("Move to Top of Stack",#selector(moveToStackTop)),("Remove from Stack",#selector(removeFromStack)),("Auto-Stack by Capture Time…",#selector(autoStack)),("Rename Photos…",#selector(renameSelected)),("Undo Rename",#selector(undoRename)),("Refresh",#selector(refreshAction))] {
-                let item=NSMenuItem(title:title,action:action,keyEquivalent:"");item.target=self;more.menu?.addItem(item)
-            }
-            let painterItem=NSMenuItem(title:"Painter (K)",action:#selector(togglePainter),keyEquivalent:"");painterItem.target=self;more.menu?.addItem(.separator());more.menu?.addItem(painterItem)
-            moreMenu=more
-            top=NSStackView(views:[minimum,flag,labelFilter,sort,NSView(),more])
-        } else { top=NSStackView(views:[minimum,flag,labelFilter,sort,NSView(),open,compare,refreshButton]) }
-        top.spacing=8
-        let searchRow=NSStackView(views:[search]);searchRow.spacing=8;searchRow.isHidden = !embedded
-        let marks=NSStackView();marks.spacing=6
-        let title=NSTextField(labelWithString:"Rate selection");title.font = .systemFont(ofSize:11);marks.addArrangedSubview(title)
-        for i in 0...5{let b=button(i==0 ? "Clear":"\(i)★",#selector(rate(_:)));b.tag=i;b.setAccessibilityLabel("Rate selected photos \(i) stars");marks.addArrangedSubview(b)}
-        for (title,tag) in [("Pick",1),("Reject",2),("Unflag",0)]{let b=button(title,#selector(flagSelected(_:)));b.tag=tag;marks.addArrangedSubview(b)}
-        let labels=NSPopUpButton(frame:.zero,pullsDown:true);labels.addItem(withTitle:"Label")
-        for label in ColorLabel.allCases {
-            let item=NSMenuItem(title:label == .none ? "Clear label":label.title+(label.key.map{"  (\($0))"} ?? ""),action:#selector(labelSelected(_:)),keyEquivalent:"");item.target=self;item.representedObject=label.rawValue
-            if label != .none{item.image=NSImage(systemSymbolName:"circle.fill",accessibilityDescription:nil)?.withSymbolConfiguration(.init(paletteColors:[ShootCell.color(label)]))}
-            labels.menu?.addItem(item)
+        for (control,title) in [(minimum,"Minimum star rating"),(flag,"Flag filter"),(sort,"Sort photographs"),(labelFilter,"Color label filter")]{control.target=self;control.action = #selector(filterChanged);control.setAccessibilityLabel(title);control.controlSize = .small;control.font = .systemFont(ofSize:11)}
+        search.placeholderString="Search";search.toolTip="Search names, titles, keywords, camera, lens";search.target=self;search.action = #selector(filterChanged);search.sendsSearchStringImmediately=true;search.setAccessibilityLabel("Search library filenames")
+        search.controlSize = .small;search.font = .systemFont(ofSize:11);search.widthAnchor.constraint(equalToConstant:160).isActive=true
+        let more = NSPopUpButton(frame:.zero,pullsDown:true)
+        more.addItem(withTitle:"Actions")
+        for (title, action) in [("Edit selected",#selector(openSelected)),("Compare two",#selector(compareSelected)),("Edit metadata…",#selector(editMetadata)),("Write metadata to XMP",#selector(writeXMP)),("Read metadata from XMP",#selector(readXMP)),("Import Camera Raw edits from XMP",#selector(importCameraRaw)),("Add to collection…",#selector(addToCollection)),("Find duplicates…",#selector(findDuplicates)),("Merge to HDR…",#selector(mergeHDR)),("Merge to panorama…",#selector(mergePanorama)),("Focus stack…",#selector(mergeFocusStack)),("Remove from this collection",#selector(removeFromCollection)),("Copy adjustments",#selector(copyAdjustments)),("Paste adjustments…",#selector(pasteAdjustments)),("Undo batch",#selector(undoBatch)),("Export selected…",#selector(exportSelection)),("Print…",#selector(printPhotos)),("Slideshow…",#selector(slideshow)),("Web gallery…",#selector(webGallery)),("Publish…",#selector(publishPhotos)),("People…",#selector(showPeople)),("Map…",#selector(showMap)),("Timeline…",#selector(showTimeline)),("Show all photos",#selector(clearFocus)),("Show / Hide Filter Bar (\\)",#selector(toggleFilterBar)),("Group into Stack",#selector(groupIntoStack)),("Unstack",#selector(unstackSelected)),("Open / Close Stack (S)",#selector(toggleStacks)),("Move to Top of Stack",#selector(moveToStackTop)),("Remove from Stack",#selector(removeFromStack)),("Auto-Stack by Capture Time…",#selector(autoStack)),("Rename Photos…",#selector(renameSelected)),("Undo Rename",#selector(undoRename)),("Refresh",#selector(refreshAction))] {
+            let item=NSMenuItem(title:title,action:action,keyEquivalent:"");item.target=self;more.menu?.addItem(item)
         }
-        labels.setAccessibilityLabel("Set color label");marks.addArrangedSubview(labels)
-        let batch=NSStackView(views:[button("Copy adjustments",#selector(copyAdjustments)),button("Paste adjustments…",#selector(pasteAdjustments)),button("Undo batch",#selector(undoBatch)),button("Export selected…",#selector(exportSelection))]);batch.spacing=10
-        let hint=NSTextField(labelWithString:Self.hintText());hint.font = .systemFont(ofSize:10);hint.textColor = .secondaryLabelColor
+        let painterItem=NSMenuItem(title:"Painter (K)",action:#selector(togglePainter),keyEquivalent:"");painterItem.target=self;more.menu?.addItem(.separator());more.menu?.addItem(painterItem)
+        more.controlSize = .small;more.font = .systemFont(ofSize:11);more.isBordered=false
         let flow=flowLayout;flow.itemSize=NSSize(width:210,height:205);flow.minimumInteritemSpacing=12;flow.minimumLineSpacing=12;flow.sectionInset=NSEdgeInsets(top:12,left:16,bottom:16,right:16)
         grid.collectionViewLayout=flow;grid.isSelectable=true;grid.allowsMultipleSelection=true;grid.dataSource=self;grid.delegate=self;grid.backgroundColors=[.clear];grid.register(ShootCell.self,forItemWithIdentifier:NSUserInterfaceItemIdentifier("shoot"))
         grid.handleKey = {[weak self] id in self?.handleLibraryKey(id) ?? false}
         grid.contextMenu = {[weak self] in self?.contextMenu?()}
         grid.mark = {[weak self] rating,flag in self?.mark(rating:rating,flag:flag)};grid.setLabel = {[weak self] label in self?.toggleLabel(label)};grid.openSelection = {[weak self] in self?.openSelected()}
         scroll.documentView=grid;scroll.hasVerticalScroller=true;scroll.drawsBackground=false
-        message.font = .systemFont(ofSize:11);message.textColor = .secondaryLabelColor
-        if embedded { batch.isHidden=true; for control in marks.arrangedSubviews.compactMap({$0 as? NSControl}) {control.controlSize = .small;control.font = .systemFont(ofSize:11)} }
-        let toolbar=buildToolbar();buildMetadataRow()
+        let size=buildPainterAndSize();buildMetadataRow()
         stage.isHidden=true
         stage.keyHandler = {[weak self] event in self?.grid.keyDown(with:event)}
         stage.step = {[weak self] delta in self?.stepSelection(delta)}
         stage.remove = {[weak self] id in self?.removeFromSurvey(id)}
         stage.activate = {[weak self] id in self?.activeID=id;self?.updateStage()}
         stage.swapCompare = {[weak self] in self?.swapCompare()}
-        if embedded {
-            // The Studio window: the grid fills the space; its controls move to the window's options bar.
-            for c in [minimum,flag,labelFilter,sort] as [NSPopUpButton] { c.controlSize = .small; c.font = .systemFont(ofSize:11) }
-            search.controlSize = .small; search.font = .systemFont(ofSize:11); search.placeholderString="Search"
-            search.widthAnchor.constraint(equalToConstant:160).isActive=true
-            viewModes.controlSize = .small; viewModes.font = .systemFont(ofSize:11)
-            moreMenu?.controlSize = .small; moreMenu?.font = .systemFont(ofSize:11); moreMenu?.isBordered=false
-            painterKind.isHidden=true; painterValue.isHidden=true
-            // The views (Grid, Loupe…) and the Painter switch live in the tool rail; the bar keeps the filters.
-            optionsControls=[minimum,flag,labelFilter,sort,search]+(moreMenu.map{[$0]} ?? [])
-            optionsActions=[painterKind,painterValue]+(sizeSlider.map{[$0]} ?? [])
-            for child in [metadataRow,scroll,stage]{child.translatesAutoresizingMaskIntoConstraints=false;content.addSubview(child)}
-            metadataHeight=metadataRow.heightAnchor.constraint(equalToConstant:0)
-            NSLayoutConstraint.activate([metadataRow.topAnchor.constraint(equalTo:content.topAnchor,constant:10),metadataRow.leadingAnchor.constraint(equalTo:content.leadingAnchor,constant:16),metadataRow.trailingAnchor.constraint(lessThanOrEqualTo:content.trailingAnchor,constant:-16),metadataHeight,
-                                         scroll.topAnchor.constraint(equalTo:metadataRow.bottomAnchor,constant:4),scroll.leadingAnchor.constraint(equalTo:content.leadingAnchor),scroll.trailingAnchor.constraint(equalTo:content.trailingAnchor),scroll.bottomAnchor.constraint(equalTo:content.bottomAnchor),
-                                         stage.topAnchor.constraint(equalTo:scroll.topAnchor),stage.leadingAnchor.constraint(equalTo:scroll.leadingAnchor),stage.trailingAnchor.constraint(equalTo:scroll.trailingAnchor),stage.bottomAnchor.constraint(equalTo:scroll.bottomAnchor)])
-            metadataRow.isHidden=true
-            Appearance.applyAccent(in:content)
-            refresh()
-            return
-        }
-        for child in [top,searchRow,metadataRow,marks,batch,hint,scroll,stage,toolbar,message]{child.translatesAutoresizingMaskIntoConstraints=false;content.addSubview(child)}
+        optionsControls=[minimum,flag,labelFilter,sort,search,more]
+        optionsActions=[painterKind,painterValue,size]
+        for child in [metadataRow,scroll,stage]{child.translatesAutoresizingMaskIntoConstraints=false;content.addSubview(child)}
         metadataHeight=metadataRow.heightAnchor.constraint(equalToConstant:0)
-        NSLayoutConstraint.activate([metadataRow.topAnchor.constraint(equalTo:searchRow.bottomAnchor,constant:6),metadataRow.leadingAnchor.constraint(equalTo:top.leadingAnchor),metadataRow.trailingAnchor.constraint(lessThanOrEqualTo:top.trailingAnchor),metadataHeight,
-                                     stage.topAnchor.constraint(equalTo:scroll.topAnchor),stage.leadingAnchor.constraint(equalTo:scroll.leadingAnchor),stage.trailingAnchor.constraint(equalTo:scroll.trailingAnchor),stage.bottomAnchor.constraint(equalTo:scroll.bottomAnchor),
-                                     toolbar.leadingAnchor.constraint(equalTo:top.leadingAnchor),toolbar.trailingAnchor.constraint(equalTo:top.trailingAnchor),toolbar.bottomAnchor.constraint(equalTo:message.topAnchor,constant:-6)])
+        NSLayoutConstraint.activate([metadataRow.topAnchor.constraint(equalTo:content.topAnchor,constant:10),metadataRow.leadingAnchor.constraint(equalTo:content.leadingAnchor,constant:16),metadataRow.trailingAnchor.constraint(lessThanOrEqualTo:content.trailingAnchor,constant:-16),metadataHeight,
+                                     scroll.topAnchor.constraint(equalTo:metadataRow.bottomAnchor,constant:4),scroll.leadingAnchor.constraint(equalTo:content.leadingAnchor),scroll.trailingAnchor.constraint(equalTo:content.trailingAnchor),scroll.bottomAnchor.constraint(equalTo:content.bottomAnchor),
+                                     stage.topAnchor.constraint(equalTo:scroll.topAnchor),stage.leadingAnchor.constraint(equalTo:scroll.leadingAnchor),stage.trailingAnchor.constraint(equalTo:scroll.trailingAnchor),stage.bottomAnchor.constraint(equalTo:scroll.bottomAnchor)])
         metadataRow.isHidden=true
-        NSLayoutConstraint.activate([top.topAnchor.constraint(equalTo:content.topAnchor,constant:16),top.leadingAnchor.constraint(equalTo:content.leadingAnchor,constant:16),top.trailingAnchor.constraint(equalTo:content.trailingAnchor,constant:-16),searchRow.topAnchor.constraint(equalTo:top.bottomAnchor,constant:10),searchRow.leadingAnchor.constraint(equalTo:top.leadingAnchor),searchRow.trailingAnchor.constraint(equalTo:top.trailingAnchor),marks.topAnchor.constraint(equalTo:embedded ? metadataRow.bottomAnchor : top.bottomAnchor,constant:12),marks.leadingAnchor.constraint(equalTo:top.leadingAnchor),batch.topAnchor.constraint(equalTo:marks.bottomAnchor,constant:10),batch.leadingAnchor.constraint(equalTo:top.leadingAnchor),hint.topAnchor.constraint(equalTo:embedded ? marks.bottomAnchor : batch.bottomAnchor,constant:8),hint.leadingAnchor.constraint(equalTo:top.leadingAnchor),scroll.topAnchor.constraint(equalTo:hint.bottomAnchor,constant:10),scroll.leadingAnchor.constraint(equalTo:content.leadingAnchor),scroll.trailingAnchor.constraint(equalTo:content.trailingAnchor),scroll.bottomAnchor.constraint(equalTo:toolbar.topAnchor,constant:-6),message.leadingAnchor.constraint(equalTo:top.leadingAnchor),message.bottomAnchor.constraint(equalTo:content.bottomAnchor,constant:-12),message.trailingAnchor.constraint(equalTo:top.trailingAnchor)])
         Appearance.applyAccent(in:content)
         refresh()
     }
@@ -267,7 +218,6 @@ final class ShootWindow:NSWindowController,NSCollectionViewDataSource,NSCollecti
         func key(_ id:String)->String{Shortcuts.map.combo(for:id)?.display ?? "—"}
         return "\(key("library.rate0"))–\(key("library.rate5")) rate · \(key("library.label.red"))–\(key("library.label.blue")) labels · \(key("library.pick")) pick · \(key("library.reject")) reject · \(key("library.unflag")) unflag · ⌘-click selects multiple"
     }
-    private func button(_ title:String,_ action:Selector)->NSButton{let b=NSButton(title:title,target:self,action:action);b.bezelStyle = .rounded;return b}
     var selectedItems:[ShootItem]{grid.selectionIndexPaths.sorted{$0.item<$1.item}.compactMap{shown.indices.contains($0.item) ? shown[$0.item]:nil}}
     func refresh(){
         guard !closed else{return}
@@ -299,7 +249,6 @@ final class ShootWindow:NSWindowController,NSCollectionViewDataSource,NSCollecti
         message.stringValue=focused.map{"\(shown.count) of \(all.count) photographs · \($0.title) · Actions → Show all photos to see the rest"} ?? "\(shown.count) of \(all.count) photographs · Reject flags never delete files"
         selectionChanged?();updateStage()
     }
-    func exportSelectedPhotos() { exportSelection() }
     func selectAllPhotos() {grid.selectionIndexPaths=Set(shown.indices.map {IndexPath(item:$0,section:0)});selectionChanged?()}
     var visibleURLs:[URL] {shown.map(\.url)}
     func collectionView(_ collectionView:NSCollectionView,didSelectItemsAt indexPaths:Set<IndexPath>){selectionChanged?();updateStage()}
@@ -325,8 +274,6 @@ final class ShootWindow:NSWindowController,NSCollectionViewDataSource,NSCollecti
             DispatchQueue.main.async{guard let self else{return};self.refresh();self.recordsChanged?();switch result{case .success(let undone):let failures=undone.entries.filter{!$0.undone}.count;let alert=NSAlert();alert.messageText="Batch undo";alert.informativeText="\(undone.entries.filter(\.undone).count) photos restored. \(failures) unchanged because they were not applied or were edited afterward.";if let window=self.browserView.window ?? self.window{alert.beginSheetModal(for:window)};case .failure(let error):self.message.stringValue=error.localizedDescription}}
         }
     }
-    @objc private func rate(_ sender:NSButton){mark(rating:sender.tag)}
-    @objc private func labelSelected(_ sender:NSMenuItem){if let raw=sender.representedObject as? String,let label=ColorLabel(rawValue:raw){mark(label:label)}}
     /// Lightroom behavior: pressing a photo's current label key again clears it.
     private func toggleLabel(_ label:ColorLabel){let selected=selectedItems;mark(label:!selected.isEmpty && selected.allSatisfy{$0.record.colorLabel == label} ? ColorLabel.none:label)}
     @objc private func editMetadata(){
@@ -440,7 +387,6 @@ final class ShootWindow:NSWindowController,NSCollectionViewDataSource,NSCollecti
         let path=IndexPath(item:i,section:0);grid.selectionIndexPaths=[path];grid.scrollToItems(at:[path],scrollPosition:.centeredVertically);selectionChanged?()
     }
     func openMetadataEditor(){editMetadata()}
-    func exportSelected(){exportSelection()}
     /// Sync Settings: the first selected photo's adjustments go to the other selected photos, after review.
     func syncSettings(){
         let chosen=selectedItems;guard chosen.count>1,let source=chosen.first else{message.stringValue="Select the source photo, then ⌘-click the photos to sync.";return}
@@ -510,7 +456,6 @@ final class ShootWindow:NSWindowController,NSCollectionViewDataSource,NSCollecti
         do{try EditStorage.records.catalog?.remove(items.map(\.id),from:current.id);all.removeAll{item in items.contains{$0.id==item.id}};applyFilter(preserving:[]);message.stringValue="Removed \(items.count) from “\(current.name)”. The files are untouched.";collectionsChanged?()}
         catch{message.stringValue=error.localizedDescription}
     }
-    @objc private func flagSelected(_ sender:NSButton){mark(flag:PhotoFlag.allCases[sender.tag])}
     private func mark(rating:Int? = nil,flag:PhotoFlag? = nil,label:ColorLabel? = nil){
         let selected=selectedItems;guard !selected.isEmpty else{message.stringValue="Select one or more photographs first.";return}
         do{
@@ -552,7 +497,6 @@ final class ShootWindow:NSWindowController,NSCollectionViewDataSource,NSCollecti
         };queue.addOperation(operation);return cell
     }
     func stopBrowsing(){closed=true;generation=UUID();queue.cancelAllOperations();cache.removeAllObjects();stage.stop()}
-    func windowWillClose(_ notification:Notification){stopBrowsing()}
 }
 
 final class ComparisonWindow:NSWindowController,NSWindowDelegate {
@@ -588,35 +532,18 @@ final class ComparisonWindow:NSWindowController,NSWindowDelegate {
     private func updateZoomControls(){for i in canvases.indices{zoomControls[i].selectedSegment=canvases[i].isFit ? 0:canvases[i].native ? 1:-1}}
     @objc private func changeZoom(_ sender:NSSegmentedControl){canvases[sender.tag].native=sender.selectedSegment==1}
 }
-extension ViewerController {
-    @objc func showShoot(){
-        guard !urls.isEmpty else{info.status("Open a photo folder first.");return}
-        let window=ShootWindow(urls:shootCatalog.isEmpty ? urls:shootCatalog);shootWindow=window
-        window.merged = {[weak self] url in self?.addMergedPhoto(url)}
-        window.edit = {[weak self] filtered,url in
-            guard let self else{return}
-            self.showShootSelection(filtered:filtered,url:url)
-        }
-        window.recordsChanged = {[weak self] in guard let self,let id=self.photoRecord?.id,let latest=try? EditStorage.records.read(id) else{return};let changed=self.photoRecord?.active.revision != latest.active.revision || self.photoRecord?.activeVersionID != latest.activeVersionID;self.photoRecord=latest;if changed{self.editDocument=latest.active.document;self.currentEdits=latest.active.document.current;self.info.update(self.currentEdits,document:self.editDocument,enabled:true);self.renderEdits()}}
-        window.showWindow(nil);window.window?.makeKeyAndOrderFront(nil)
-    }
-}
-
 // MARK: - Library toolbar, filter bar, stacks, painter, rename, Quick Develop and keywords
 extension ShootWindow {
-    fileprivate func buildToolbar()->NSView {
-        viewModes.selectedSegment=0;viewModes.target=self;viewModes.action = #selector(viewModeChosen);viewModes.controlSize = .small
-        viewModes.setAccessibilityLabel("Library view: Grid (G), Loupe (E), Compare (C), Survey (N)")
-        for (i,key) in ["G","E","C","N"].enumerated(){viewModes.setToolTip("\(LibraryViewMode.allCases[i].title) (\(key))",forSegment:i)}
-        painterButton.target=self;painterButton.action = #selector(painterChanged);painterButton.toolTip="Spray a keyword, label, rating or flag onto photos by clicking or dragging over them"
+    /// The Painter's kind and value (shown while it's on) and the thumbnail size slider, for the options bar.
+    fileprivate func buildPainterAndSize()->NSSlider {
+        painterButton.target=self;painterButton.action = #selector(painterChanged)
         painterKind.addItems(withTitles:["Keywords","Label","Rating","Flag"]);painterKind.controlSize = .small;painterKind.target=self;painterKind.action = #selector(painterChanged)
         painterValue.placeholderString="Keyword, red, 3 or pick";painterValue.controlSize = .small;painterValue.font = .systemFont(ofSize:11);painterValue.target=self;painterValue.action = #selector(painterChanged)
         painterValue.widthAnchor.constraint(equalToConstant:140).isActive=true;painterValue.setAccessibilityLabel("What the Painter sprays")
-        let size=NSSlider(value:Double(ShootCell.cellWidth),minValue:120,maxValue:360,target:self,action:#selector(thumbnailSize(_:)));size.controlSize = .small;size.setAccessibilityLabel("Thumbnail size");size.toolTip="Thumbnail size";sizeSlider=size
+        painterKind.isHidden=true;painterValue.isHidden=true
+        let size=NSSlider(value:Double(ShootCell.cellWidth),minValue:120,maxValue:360,target:self,action:#selector(thumbnailSize(_:)));size.controlSize = .small;size.setAccessibilityLabel("Thumbnail size");size.toolTip="Thumbnail size"
         size.widthAnchor.constraint(equalToConstant:120).isActive=true
-        let sizeLabel=NSTextField(labelWithString:"Thumbnails");sizeLabel.font = .systemFont(ofSize:11);sizeLabel.textColor = .secondaryLabelColor
-        let bar=NSStackView(views:[viewModes,painterButton,painterKind,painterValue,NSView(),sizeLabel,size]);bar.spacing=8
-        return bar
+        return size
     }
     @objc fileprivate func thumbnailSize(_ sender:NSSlider){
         ShootCell.cellWidth=CGFloat(sender.doubleValue.rounded())
@@ -676,11 +603,10 @@ extension ShootWindow {
     }
     /// Gives the grid (or the Loupe / Compare / Survey stage) keyboard focus, e.g. after switching to the Library.
     func focus(){(browserView.window ?? window)?.makeFirstResponder(viewMode == .grid ? grid:stage)}
-    @objc fileprivate func viewModeChosen(){setViewMode(LibraryViewMode(rawValue:viewModes.selectedSegment) ?? .grid)}
     func setViewMode(_ mode:LibraryViewMode){
         if mode == .survey{surveyIDs=selectedItems.map(\.id);if surveyIDs.count<2{surveyIDs=Array(shown.prefix(max(2,surveyIDs.count)).map(\.id))}}
         activeID=selectedItems.first?.id
-        viewMode=mode;viewModes.selectedSegment=mode.rawValue
+        viewMode=mode
         scroll.isHidden=mode != .grid;stage.isHidden=mode == .grid
         updateStage()
         let target:NSView=mode == .grid ? grid:stage;(browserView.window ?? window)?.makeFirstResponder(target)

@@ -123,7 +123,6 @@ final class StudioStatusBar: StudioBar {
             }
         }
     }
-    func clearMessage() { busyToken = UUID(); spinner.stopAnimation(nil); messageToken = idleToken; message.stringValue = hint; message.textColor = Studio.secondary }
 }
 
 /// "Label ——●—— 0.50" for the options bar: drag the label to scrub, double-click it to reset, type in the field, Up/Down steps.

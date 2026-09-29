@@ -32,7 +32,6 @@ enum Studio {
     // Type
     static let titleFont = NSFont.systemFont(ofSize: 13, weight: .semibold)
     static let controlFont = NSFont.systemFont(ofSize: 12)
-    static let smallFont = NSFont.systemFont(ofSize: 11)
     static let statusFont = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .regular)
 
     /// A label in the bar's type.
@@ -49,16 +48,6 @@ enum Studio {
     /// A capsule push button in the bar style; `primary` fills it with the accent (Done, Apply).
     static func button(_ title: String, primary: Bool = false, _ run: @escaping () -> Void) -> StudioButton {
         StudioButton(title: title, primary: primary, run: run)
-    }
-    /// Honors motion settings: animations shorten to nothing when Reduce Motion is on.
-    static func animate(_ duration: TimeInterval = 0.18, _ changes: @escaping () -> Void) {
-        let reduce = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = reduce ? 0 : duration
-            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            context.allowsImplicitAnimation = !reduce
-            changes()
-        }
     }
 }
 

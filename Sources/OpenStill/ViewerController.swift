@@ -57,7 +57,6 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
     private var toolbarItems: [String: NSToolbarItem] = [:]
     private var shareWindow: NSWindow?
     var exportPanel: ExportPanel?
-    var shootWindow: ShootWindow?
     var shootCatalog:[URL]=[]
     let welcome = NSStackView()
     private let spinner = NSProgressIndicator()
@@ -337,7 +336,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         // Invalidate work for the previous folder before scanning the new one.
         generation = UUID()
         store.reset()
-        urls = [];shootCatalog=[];shootWindow?.close();shootWindow=nil
+        urls = [];shootCatalog=[]
         libraryBrowser?.stopBrowsing(); libraryBrowser?.browserView.removeFromSuperview(); libraryBrowser=nil; libraryURLs=[]; folderURL=nil; openCollection=libraryCollection
         librarySidebar.update(folder:nil,count:0)
         selected = 0
@@ -518,7 +517,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         let catalog = shootCatalog.isEmpty ? urls : shootCatalog
         if libraryURLs == catalog, let browser = libraryBrowser { browser.refresh(); return }
         libraryBrowser?.stopBrowsing();libraryBrowser?.browserView.removeFromSuperview()
-        let browser = ShootWindow(urls:catalog,embedded:true,selectedURL:currentSource);libraryBrowser=browser;libraryURLs=catalog
+        let browser = ShootWindow(urls:catalog,selectedURL:currentSource);libraryBrowser=browser;libraryURLs=catalog
         browser.collection = openCollection
         browser.collectionsChanged = { [weak self] in self?.librarySidebar.reloadCollections() }
         let content=browser.browserView;content.translatesAutoresizingMaskIntoConstraints=false;libraryHost.addSubview(content)
