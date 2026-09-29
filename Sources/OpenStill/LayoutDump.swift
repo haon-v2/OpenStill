@@ -78,40 +78,33 @@ enum LayoutDump {
         }
     }
 
-    /// Drags a Develop slider with real mouse events over about 1.5 s and counts the frames the canvas shows meanwhile.
+    /// Drags a Develop slider for about 1.5 s the way the slider reports a drag (live values, then the release) and counts
+    /// the frames the canvas shows meanwhile.
     private static func drag(slider title: String, viewer: ViewerController, window: NSWindow?) {
         guard let window, let root = window.contentView else { return }
-        var found: NSSlider?
-        func find(_ v: NSView) { if found == nil, let s = v as? NSSlider, s.accessibilityLabel() == title, !s.isHiddenOrHasHiddenAncestor, s.isEnabled { found = s }; v.subviews.forEach(find) }
+        var found: ContinuousSlider?
+        func find(_ v: NSView) { if found == nil, let s = v as? ContinuousSlider, s.accessibilityLabel() == title, !s.isHiddenOrHasHiddenAncestor { found = s }; v.subviews.forEach(find) }
         find(root)
         guard let slider = found else { print("DRAG no slider \(title)"); fflush(stdout); return }
-        slider.scrollToVisible(slider.bounds)
-        let knobStart = slider.convert(CGPoint(x: slider.bounds.width * CGFloat((slider.doubleValue - slider.minValue) / (slider.maxValue - slider.minValue)), y: slider.bounds.midY), to: nil)
-        let number = window.windowNumber
         var frames = Set<ObjectIdentifier>(), last = viewer.canvas.image.map(ObjectIdentifier.init)
         let sampler = Timer(timeInterval: 0.008, repeats: true) { _ in
             if let image = viewer.canvas.image { let id = ObjectIdentifier(image); if id != last { frames.insert(id); last = id } }
         }
         RunLoop.main.add(sampler, forMode: .common)
-        let start = Date()
-        func event(_ type: NSEvent.EventType, _ x: CGFloat) -> NSEvent? {
-            NSEvent.mouseEvent(with: type, location: CGPoint(x: x, y: knobStart.y), modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: number, context: nil, eventNumber: 0, clickCount: 1, pressure: type == .leftMouseUp ? 0 : 1)
-        }
-        // The slider's tracking loop reads queued events, so the drag is posted from another thread while it runs.
-        DispatchQueue.global().async {
-            for i in 1...45 {
-                Thread.sleep(forTimeInterval: 0.033)
-                let x = knobStart.x + CGFloat(i) * 2.2 * (i % 2 == 0 ? 1 : 1)
-                if let e = event(.leftMouseDragged, x) { NSApp.postEvent(e, atStart: false) }
+        let start = Date(), from = slider.doubleValue, span = (slider.maxValue - slider.minValue) * 0.3
+        for i in 1...45 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.033) {
+                let value = from + span * Double(i) / 45
+                slider.doubleValue = value; slider.changed?(value, false)
+                if i == 45 {
+                    let during = frames.count
+                    slider.changed?(value, true)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        sampler.invalidate()
+                        print("DRAG \(title): \(during) frames shown during a \(String(format: "%.2f", Date().timeIntervalSince(start))) s drag of 45 steps; \(frames.count) including the release; value now \(String(format: "%.2f", slider.doubleValue))"); fflush(stdout)
+                    }
+                }
             }
-            Thread.sleep(forTimeInterval: 0.05)
-            if let e = event(.leftMouseUp, knobStart.x + 99) { NSApp.postEvent(e, atStart: false) }
-        }
-        if let down = event(.leftMouseDown, knobStart.x) { NSApp.sendEvent(down) }
-        let during = frames.count
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            sampler.invalidate()
-            print("DRAG \(title): \(during) frames shown while dragging for \(String(format: "%.2f", Date().timeIntervalSince(start))) s; value now \(String(format: "%.2f", slider.doubleValue))"); fflush(stdout)
         }
     }
 }

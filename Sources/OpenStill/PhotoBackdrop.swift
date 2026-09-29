@@ -11,6 +11,7 @@ final class PhotoBackdrop: NSView {
         super.init(frame: frame)
         wantsLayer = true
         layer?.backgroundColor = NSColor(calibratedWhite: 0.055, alpha: 1).cgColor
+        layer?.masksToBounds = true   // a zoomed-in photo is larger than the view; it must not spill over the bars around it
         for l in [imageLayer, detailLayer] {
             l.contentsGravity = .resize
             l.isHidden = true
