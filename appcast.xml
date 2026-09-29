@@ -180,5 +180,16 @@
             <sparkle:fullReleaseNotesLink>https://github.com/haon-v2/OpenStill/releases/tag/v0.0.16</sparkle:fullReleaseNotesLink>
             <enclosure url="https://github.com/haon-v2/OpenStill/releases/download/v0.0.16/OpenStill-0.0.16.zip" sparkle:edSignature="WCGgtWx7rwEijh+nznBy4IrPUDBkqKqE6WIg/l8aV1o8Mgt+J34R8UkIUvK1Y9SlFqnsyufT/zYuvFPSTt6eCQ==" length="32767231" type="application/octet-stream"/>
         </item>
+        <item>
+            <title>OpenStill 0.0.17</title>
+            <description><![CDATA[<h3>What’s new in 0.0.17</h3><ul><li>Fixed photos not showing in Loupe, Compare, Survey and Reference.</li></ul>]]></description>
+            <pubDate>Tue, 29 Sep 2026 17:40:25 GMT</pubDate>
+            <sparkle:version>33</sparkle:version>
+            <sparkle:shortVersionString>0.0.17</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <sparkle:fullReleaseNotesLink>https://github.com/haon-v2/OpenStill/releases/tag/v0.0.17</sparkle:fullReleaseNotesLink>
+            <enclosure url="https://github.com/haon-v2/OpenStill/releases/download/v0.0.17/OpenStill-0.0.17.zip" sparkle:edSignature="Lkse43OfVRIaDUwq8UzROcRa3mxhWkwwJzaMheo2ofxkcjTiPMIRlQ46Z8DNXq2La5i9RkCwfbP0GPYGWaJfDw==" length="32768183" type="application/octet-stream"/>
+        </item>
     </channel>
 </rss>
