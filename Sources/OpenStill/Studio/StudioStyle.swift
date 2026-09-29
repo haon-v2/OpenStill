@@ -195,7 +195,7 @@ final class StudioSegments: NSView {
 }
 
 /// A flat bar (options bar, status line, panel tabs) with a hairline on one edge.
-final class StudioBar: LRFill {
+class StudioBar: LRFill {
     enum Edge { case top, bottom, none }
     var edge: Edge { didSet { needsDisplay = true } }
     init(edge: Edge) { self.edge = edge; super.init(Studio.chrome) }

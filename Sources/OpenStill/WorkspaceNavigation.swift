@@ -1,6 +1,7 @@
 import AppKit
 import OpenStillCore
 
+private final class LibraryStack: NSStackView { override var isFlipped: Bool { true } }
 final class LibrarySidebar: GlassChrome {
     var open: ((URL) -> Void)?
     var browse: (() -> Void)?
