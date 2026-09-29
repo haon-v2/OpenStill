@@ -501,6 +501,17 @@ Open **Presets & LUTs** (P) and switch between **Presets** and **LUTs**. Every l
 
 Click a LUT to apply it at 70%. The intensity slider, LUT mask, Remove LUT and Undo work as before. Applied looks are copied into the photo's edit assets, so saved edits never change when the library does. Looks add to the color already recorded in a JPEG or camera preview; lower the intensity if that look is already strong. Categories are suggestions, not subject detection.
 
+### Skies: replace the sky and relight the photo
+
+Open **Presets & LUTs** (P) and choose **Skies**, or **Develop › Sky Replacement › Choose a sky…**. There are 30 free skies in six categories: Blue Sky, Clouds, Sunset & Sunrise, Dramatic, Overcast and Night.
+
+- **The sky is found for you.** The first time you choose a sky, the on-device sky AI selects this photo's sky and keeps the selection as the **Sky** mask. It's a one-time setup of about 450 MB, and it runs on this Mac. **Refine sky selection…** opens the usual mask tools (brush, gradients, color and luminance ranges) for edges it missed. Once the photo has a selection, each sky card previews that sky on your photo.
+- **The photo follows the sky**, as in Luminar's Sky AI. **Relight scene** carries the new sky's brightness and color into the rest of the photo: a dark storm or a night sky darkens and cools the land, and a sunset warms it. Each kind of sky starts at a sensible strength; at 0 only the sky changes.
+- **More controls:** **Horizon** moves the sky up or down, and there are **Sky exposure**, **Sky defocus** and **Atmosphere** (a haze of the sky's horizon color over the land). **Flip sky** mirrors the sky and **Remove sky** takes it out again.
+- **Your own skies:** **Use your own sky…** adds a sky photo to **Your Skies**. It's measured once, so relighting works with it too.
+- **It stays editable.** The sky is applied live, not baked in: change any setting later, or undo it. The sky image is copied into the photo's edit assets, so saved edits don't change if the library does.
+- **Credits:** every sky is from [Poly Haven](https://polyhaven.com), CC0. Authors and pages are listed in `Resources/Licenses/Skies/PROVENANCE.md`; `scripts/build-sky-library.py` rebuilds the library.
+
 **Imported** keeps your own `.cube` files in `~/Library/Application Support/OpenStill/LUTLibrary`. Use **Import .cube LUT…** to add 3D LUTs (2–65 points per dimension).
 
 The library is one compact file, `Resources/LUTs/Library.lutpack` (about 18 MB), described by `catalog.json`. Maintainers rebuild it with `scripts/build-lut-pack.py`, which reads the pinned FreshLUTs files, the Film Simulation Hald CLUT images and `originals.json`; the app itself never downloads looks. Film simulations are stored at 8-bit precision, the precision of their source images. Licenses: `Resources/Licenses/LUTs/` (CC0-1.0, CC BY-SA 4.0 and the provenance list).

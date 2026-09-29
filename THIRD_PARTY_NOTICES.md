@@ -34,6 +34,10 @@ Additional local-only QA photograph: [Horizon Sea.jpg](https://commons.wikimedia
 
 The full CC0 dedication is in `Resources/Licenses/LUTs/CC0-1.0.txt`.
 
+## Bundled skies
+
+The 30 skies in `Resources/Skies` come from [Poly Haven](https://polyhaven.com) sky panoramas, released under CC0 1.0. `Resources/Licenses/Skies/PROVENANCE.md` credits each sky's authors and links its page. OpenStill projected the panoramas to 16:9 views and graded the "Storm" and "Moonlit" skies from them (`scripts/build-sky-library.py`).
+
 ## LibRaw 0.22.2
 
 OpenStill's native RAW decoder uses unmodified LibRaw source, distributed under
