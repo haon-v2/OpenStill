@@ -215,7 +215,7 @@ extension ViewerController {
         }
     }
     func applyLibraryLUT(_ item:LUTItem) {
-        do { changeEdits(try item.applying(to:currentEdits),title:"LUT · "+item.entry.name,commit:true) }
+        do { changeEdits(try item.applying(to:currentEdits),title:"LUT · "+item.entry.displayName,commit:true) }
         catch { info.status("Couldn’t apply this LUT: "+error.localizedDescription) }
     }
     func applyLUT(_ filename:String) {

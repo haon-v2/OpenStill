@@ -49,7 +49,7 @@ final class EditorPanel: ChromePanel {
     private let snapshotStack = EditorStack()
     var retouchSettingsChanged:((RetouchSession)->Void)?
     private var lutMask: MaskPanel?
-    private let lutBrowser = LUTBrowserView()
+    private let looks = LookBrowserView()
     private var hasPhoto = false
     private var busy = false
     // The Studio arrangement (see the extension at the end of this file).
@@ -132,19 +132,18 @@ final class EditorPanel: ChromePanel {
         for key in ["Layers", "Noise removal", "Detail restoration", "Lens blur", "Develop", "HDR", "Dehaze", "Curves", "Enhance", "Retouch", "Red eye", "Masks", "Erase", "Structure", "Clarity", "Texture", "Color", "Color grading", "Black & white", "Details", "Denoise", "Vignette", "Glow", "Grain", "Sky replacement", "Sunrays"] { let mask = makeMaskPanel(key); mask.done = { [weak self] in self?.command?("finishMask") }; mask.isHidden = true; fullWidth(mask, in: tools) }
         toolsScroll.isHidden = true
         let presets = installScroll(presetScroll)
-        addTitle("LUT LIBRARY", to: presets)
-        help("12 free looks, ready offline. LUTs add to the look already in your JPEG or S9 camera preview.", to: presets)
-        fullWidth(lutBrowser,in:presets)
-        lutBrowser.choose = { [weak self] item in self?.command?("libraryLUT:"+item.entry.id) }
-        slider("LUT intensity",path:\.lutAmount,range:0...1,in:lutBrowser.controls)
-        action("Remove LUT","removeLUT",to:lutBrowser.controls)
-        addMaskControls("LUT",to:lutBrowser.controls)
-        action("Import .cube LUT…","importLUT",to:presets)
-        addTitle("ADJUSTMENT PRESETS",to:presets)
-        help("Starting points for your edit. Presets keep your crop and image layers.",to:presets)
-        for name in ["Natural", "Warm light", "Cool shadows", "Vivid", "Soft portrait", "Monochrome"] { action(name,"preset:"+name,to:presets) }
-        action("Save current as preset…","savePreset",to:presets)
-        action("Load preset…","loadPreset",to:presets)
+        fullWidth(looks,in:presets)
+        looks.chooseLUT = { [weak self] item in self?.command?("libraryLUT:"+item.entry.id) }
+        looks.choosePreset = { [weak self] preset, amount in self?.command?("applyPreset:\(amount):"+preset.id) }
+        looks.command = { [weak self] name in if name.hasPrefix("status:") { self?.status(String(name.dropFirst(7))) } else { self?.command?(name) } }
+        slider("LUT intensity",path:\.lutAmount,range:0...1,in:looks.lutControls)
+        action("Remove LUT","removeLUT",to:looks.lutControls)
+        addMaskControls("LUT",to:looks.lutControls)
+        action("Import .cube LUT…","importLUT",to:looks.lutControls)
+        help("Looks add to the color already in your photo. Film looks: RawTherapee Film Simulation Collection (CC BY-SA 4.0).",to:looks.lutControls)
+        action("Save current as preset…","savePreset",to:looks.presetControls)
+        action("Import preset…","loadPreset",to:looks.presetControls)
+        action("Export current as preset…","exportPreset",to:looks.presetControls)
         _ = installScroll(historyScroll, stack: historyStack)
         info.translatesAutoresizingMaskIntoConstraints = false; body.addSubview(info)
         NSLayoutConstraint.activate([info.topAnchor.constraint(equalTo: body.topAnchor), info.bottomAnchor.constraint(equalTo: body.bottomAnchor), info.leadingAnchor.constraint(equalTo: body.leadingAnchor), info.trailingAnchor.constraint(equalTo: body.trailingAnchor)])
@@ -201,9 +200,14 @@ final class EditorPanel: ChromePanel {
     func resetMaskInteractions() { for panel in maskPanels.values { panel.resetInteraction() } }
     func resizeBrush(key:String,delta:Double) { maskPanels[key]?.resizeBrush(delta) }
 
-    func refreshLUTs() { lutBrowser.reload() }
-    func libraryLUT(id:String) -> LUTItem? { lutBrowser.item(id:id) }
-    func importedLUT(filename:String) -> LUTItem? { lutBrowser.imported(filename:filename) }
+    func refreshLUTs() { looks.reload() }
+    func libraryLUT(id:String) -> LUTItem? { looks.item(id:id) }
+    func importedLUT(filename:String) -> LUTItem? { looks.imported(filename:filename) }
+    var lutLibrary: LUTLibrary { looks.luts }
+    func preset(id:String) -> PresetRecipe? { looks.preset(id:id) }
+    func preset(named name:String) -> PresetRecipe? { looks.preset(named:name) }
+    /// After saving or importing a preset: list it and show it as applied.
+    func presetSaved(_ name:String) { looks.reload(); looks.showMyPresets(); if let preset = looks.preset(id:"user-"+name) { looks.showApplied(preset) } }
     func updateHistogram(_ value:PhotoHistogram?, sensor:Double?) { histogram.histogram = value; histogram.sensor = sensor }
     func setClippingOverlay(_ on:Bool) { histogram.clippingShown = on }
     func updateVersions(_ record:PhotoRecord?, raw:Bool) {
@@ -211,9 +215,9 @@ final class EditorPanel: ChromePanel {
         let isRaw = raw && record?.active.sourceMode == .raw
         if isRaw != rawSource { rawSource = isRaw; profilePanel.update(states, raw:isRaw, enabled:hasPhoto && !busy) }
     }
-    /// LUT thumbnails render only while the Presets panel is open.
-    func setLUTPreviewsActive(_ active:Bool) { lutBrowser.setActive(active) }
-    func setLUTPhoto(_ image:CGImage?,edits:PhotoEdits, source:CIImage? = nil, url:URL? = nil, recipe:RenderRecipe? = nil) { lutBrowser.setPhoto(image,edits:edits, source:source, url:url, recipe:recipe) }
+    /// Look thumbnails render only while the Presets panel is open.
+    func setLUTPreviewsActive(_ active:Bool) { looks.setActive(active) }
+    func setLUTPhoto(_ image:CGImage?,edits:PhotoEdits, source:CIImage? = nil, url:URL? = nil, recipe:RenderRecipe? = nil) { looks.setPhoto(image,edits:edits, source:source, url:url, recipe:recipe) }
     /// A slider row: the name (drag it sideways to scrub, double-click to reset), the value, and the slider beneath.
     private func slider(_ title: String, path: WritableKeyPath<PhotoEdits, Double>, range: ClosedRange<Double>, in stack: NSStackView) {
         let label = ScrubLabel(title); label.font = .systemFont(ofSize: 12)
@@ -288,7 +292,7 @@ final class EditorPanel: ChromePanel {
         for layer in edits.localAdjustments where maskPanels[layer.maskKey] == nil {
             let panel = makeMaskPanel(layer.maskKey, listed: false); layerPanelStore.addArrangedSubview(panel)
         }
-        lutBrowser.updateSelection(edits);lutBrowser.setEnabled(enabled && !busy)
+        looks.updateSelection(edits);looks.setEnabled(enabled && !busy)
         for (key,panel) in maskPanels { panel.update(edits.advanced?.masks[key],enabled:enabled && !busy) }
         maskLayers.update(edits.localAdjustments, enabled: enabled && !busy); showLayerMask()
         mixer.update(edits.advanced?.colors,enabled:enabled && !busy)
@@ -343,7 +347,7 @@ final class EditorPanel: ChromePanel {
         let enabled = hasPhoto && !busy
         guard force || enabled != controlsEnabled || busy != self.busy else { return }
         self.busy = busy; controlsEnabled = enabled
-        lutBrowser.setEnabled(hasPhoto && !busy)
+        looks.setEnabled(hasPhoto && !busy)
         for panel in maskPanels.values { panel.setEnabled(hasPhoto && !busy) }
         mixer.setEnabled(hasPhoto && !busy)
         cropPresets.setEnabled(hasPhoto && !busy)

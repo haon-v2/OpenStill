@@ -91,6 +91,8 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
     let editQueue = DispatchQueue(label: "OpenStill.render", qos: .userInitiated)
     let localAI = LocalAI()
     var comparing = false
+    /// The preset last applied, the edit it started from and its result, so its Amount can be changed.
+    var lastPreset: (id: String, baseline: PhotoEdits, result: PhotoEdits)?
     var splitCompare = false
     var showClipping = false
     var compareToken = UUID()

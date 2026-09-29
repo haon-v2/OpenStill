@@ -331,8 +331,13 @@ extension ViewerController {
         case "removeLUT": edits.ensureAdvanced(); edits.advanced!.lutAsset = nil; edits.advanced!.lutName = nil; edits.advanced!.lutID = nil; changeEdits(edits,title:"Remove LUT",commit:true)
         case "savePreset": savePreset()
         case "loadPreset": loadPreset()
+        case "exportPreset": exportPreset()
         default:
-            if name.hasPrefix("preset:") { applyPreset(String(name.dropFirst(7))) }
+            if name.hasPrefix("preset:"), let preset = info.preset(named:String(name.dropFirst(7))) { applyPreset(preset,amount:1) }
+            if name.hasPrefix("applyPreset:") {
+                let parts = name.dropFirst(12).split(separator:":",maxSplits:1).map(String.init)
+                if parts.count == 2, let amount = Double(parts[0]), let preset = info.preset(id:parts[1]) { applyPreset(preset,amount:amount) }
+            }
             if name.hasPrefix("profile:") || name.hasPrefix("rawOptions:") || name == "importDCP" { profileCommand(name) }
             if name.hasPrefix("upright:") || ["resetTransform","clearGuides","autoStraighten"].contains(name) { transformCommand(name) }
             if name == "ai:sky" { chooseImage(title: "Choose replacement sky") { [weak self] sky in self?.runAI("sky", sky: sky) } }
@@ -344,51 +349,53 @@ extension ViewerController {
         let panel = NSOpenPanel(); panel.title = title; panel.allowedContentTypes = [.image]; panel.allowsMultipleSelection = false
         panel.beginSheetModal(for: window) { response in if response == .OK, let url = panel.url { completion(url) } }
     }
-    private func applyPreset(_ name: String) {
-        var e = currentEdits
-        e.highlightsAmount = 0; e.shadowsAmount = 0; e.exposure = 0; e.contrast = 1; e.saturation = 1; e.vibrance = 0; e.temperature = 6500; e.tint = 0; e.monochrome = 0; e.blacks = 0; e.whites = 0; e.advanced!.colors = [ColorBand](repeating:ColorBand(),count:8); e.autoEnhance = false
-        e.clarity = 0; e.texture = 0; e.dehaze = 0; e.colorGrading = ColorGrading()
-        e.grayMix = PhotoEdits.neutralGrayMix; e.pointColors = []
-        switch name {
-        case "Warm light": e.temperature = 7800; e.vibrance = 0.15; e.contrast = 1.05
-        case "Cool shadows": e.temperature = 5200; e.shadowsAmount = 0.2; e.contrast = 1.05
-        case "Vivid": e.vibrance = 0.35; e.saturation = 1.12; e.contrast = 1.12; e.clarity = 0.15
-        case "Soft portrait": e.contrast = 0.9; e.shadowsAmount = 0.2; e.saturation = 0.95; e.temperature = 6900
-        case "Monochrome": e.monochrome = 1; e.contrast = 1.2
-        default: break
-        }
-        changeEdits(e, title: name, commit: true)
+    /// Applies a preset; changing its Amount re-applies it to the edit it started from, while nothing else has changed since.
+    private func applyPreset(_ preset: PresetRecipe, amount: Double) {
+        var base = currentEdits
+        if let last = lastPreset, last.id == preset.id, last.result == currentEdits { base = last.baseline }
+        do {
+            let result = try preset.apply(to: base, amount: amount, library: info.lutLibrary)
+            changeEdits(result, title: "Preset · " + preset.name + (amount == 1 ? "" : " \(Int((amount*100).rounded()))%"), commit: true)
+            lastPreset = (preset.id, base, currentEdits)
+        } catch { info.status("Couldn’t apply this preset: " + error.localizedDescription) }
     }
+    /// Saves the current edit (without crop, masks, retouching or the photo's look file) to My Presets.
     private func savePreset() {
         guard let window = view.window else { return }
-        var preset = currentEdits
-        preset.ensureAdvanced(); preset.advanced!.masks = [:]; preset.advanced!.rawWhiteBalance = nil; preset.straighten = 0; preset.advanced!.lutAsset = nil; preset.advanced!.lutName = nil; preset.advanced!.lutID = nil; preset.advanced!.aiBackgroundAsset = nil; preset.advanced!.aiFeatureKey = nil; preset.advanced!.transform = nil; preset.advanced!.lensBlur = nil; preset.advanced!.rawDenoise = nil
-        // Eye fixes and measured chromatic aberration belong to this photo.
-        preset.advanced!.eyeFixes = nil; preset.advanced!.autoCA = nil; preset.advanced!.localAdjustments = nil
-        preset.baseAsset = nil; preset.overlayAsset = nil; preset.crop = nil; preset.rotation = 0; preset.flip = false
-        let panel = NSSavePanel(); panel.title = "Save preset"; panel.nameFieldStringValue = "My preset.openstillpreset"; panel.allowedContentTypes = [UTType(filenameExtension: "openstillpreset") ?? .json]
-        panel.beginSheetModal(for: window) { [weak self] response in
-            guard response == .OK, let url = panel.url else { return }
-            do { try JSONEncoder().encode(preset).write(to: url, options: .atomic); self?.info.status("Preset saved.") }
-            catch { self?.info.status(error.localizedDescription) }
+        let alert = NSAlert(); alert.messageText = "Save current as preset"; alert.informativeText = "Saves tone, color and effects to My Presets. Crop, masks, retouching and AI results stay with this photo."
+        let field = NSTextField(string: "My preset"); field.frame = NSRect(x: 0, y: 0, width: 280, height: 24); alert.accessoryView = field
+        alert.addButton(withTitle: "Save"); alert.addButton(withTitle: "Cancel")
+        let edits = currentEdits
+        alert.beginSheetModal(for: window) { [weak self] response in
+            guard let self, response == .alertFirstButtonReturn else { return }
+            let name = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            do { try PresetLibrary.save(edits, name: name, in: LookBrowserView.userPresets); self.info.presetSaved(name); self.info.status("Saved to My Presets: \(name).") }
+            catch { self.info.status(error.localizedDescription) }
         }
     }
+    /// Copies a `.openstillpreset` into My Presets and applies it.
     private func loadPreset() {
         guard let window = view.window else { return }
-        let panel = NSOpenPanel(); panel.title = "Load preset"; panel.allowedContentTypes = [UTType(filenameExtension: "openstillpreset") ?? .json, .json]
+        let panel = NSOpenPanel(); panel.title = "Import preset"; panel.allowedContentTypes = [UTType(filenameExtension: PresetLibrary.fileExtension) ?? .json, .json]
         panel.beginSheetModal(for: window) { [weak self] response in
             guard let self, response == .OK, let url = panel.url else { return }
             do {
-                var preset = try JSONDecoder().decode(PhotoEdits.self, from: Data(contentsOf: url)).sanitized
-                preset.baseAsset = self.currentEdits.baseAsset; preset.overlayAsset = self.currentEdits.overlayAsset
-                preset.crop = self.currentEdits.crop; preset.rotation = self.currentEdits.rotation; preset.flip = self.currentEdits.flip
-                preset.ensureAdvanced(); preset.straighten = self.currentEdits.straighten
-                preset.advanced!.masks = self.currentEdits.advanced?.masks ?? [:]; preset.advanced!.transform = self.currentEdits.advanced?.transform; preset.advanced!.lensBlur = self.currentEdits.advanced?.lensBlur; preset.advanced!.rawDenoise = self.currentEdits.advanced?.rawDenoise
-                preset.advanced!.eyeFixes = self.currentEdits.advanced?.eyeFixes; preset.advanced!.autoCA = self.currentEdits.advanced?.autoCA; preset.advanced!.localAdjustments = self.currentEdits.advanced?.localAdjustments
-                preset.advanced!.aiBackgroundAsset = self.currentEdits.advanced?.aiBackgroundAsset; preset.advanced!.aiFeatureKey = self.currentEdits.advanced?.aiFeatureKey
-                preset.advanced!.lutAsset = self.currentEdits.advanced?.lutAsset; preset.advanced!.lutName = self.currentEdits.advanced?.lutName; preset.advanced!.lutID = self.currentEdits.advanced?.lutID; preset.lutAmount = self.currentEdits.lutAmount
-                self.changeEdits(preset, title: url.deletingPathExtension().lastPathComponent, commit: true)
+                let saved = try PresetLibrary.importPreset(url, into: LookBrowserView.userPresets)
+                let name = saved.deletingPathExtension().lastPathComponent
+                self.info.presetSaved(name)
+                if let preset = self.info.preset(id: "user-" + name) { self.applyPreset(preset, amount: 1) }
             } catch { self.info.status("Couldn’t read this preset. \(error.localizedDescription)") }
+        }
+    }
+    /// Writes the current edit as a `.openstillpreset` file to share.
+    private func exportPreset() {
+        guard let window = view.window else { return }
+        let preset = PresetRecipe.snapshot(of: currentEdits)
+        let panel = NSSavePanel(); panel.title = "Export preset"; panel.nameFieldStringValue = "My preset." + PresetLibrary.fileExtension; panel.allowedContentTypes = [UTType(filenameExtension: PresetLibrary.fileExtension) ?? .json]
+        panel.beginSheetModal(for: window) { [weak self] response in
+            guard response == .OK, let url = panel.url else { return }
+            do { try JSONEncoder().encode(preset).write(to: url, options: .atomic); self?.info.status("Preset exported.") }
+            catch { self?.info.status(error.localizedDescription) }
         }
     }
     private func exportCurrent(source: URL, edits: PhotoEdits) {
