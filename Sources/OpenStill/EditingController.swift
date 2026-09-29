@@ -151,7 +151,8 @@ extension ViewerController {
         // The source limit that gives an output this many pixels on its longest edge (nil: full size).
         func sourceLimit(_ edge:CGFloat) -> Int? { let limit = edge*fullEdge/outputEdge; return limit >= fullEdge*0.98 ? nil : Int(limit.rounded(.up)) }
         let screen = CGFloat(ModernRenderer.screenEdge)
-        let baseEdge = min(screen, max(canvas.fitPixels(for:logicalSize), min(canvas.shownPixels, screen)))
+        // While a slider moves, frames are lighter (at most 1600 px); the release renders the full screen size.
+        let baseEdge = min(interactive ? 1600 : screen, max(canvas.fitPixels(for:logicalSize), min(canvas.shownPixels, screen)))
         // Zoomed in past the whole-frame render: once the edit settles, render just the visible part at the zoom's resolution.
         var detailPlan: (limit:Int?, region:CGRect)?
         if !interactive, !canvas.isFit, canvas.shownPixels > baseEdge*1.05, let visible = canvas.visibleFraction {
@@ -172,7 +173,7 @@ extension ViewerController {
             let startedAt = Date()   // TEMPORARY TIMING
             let result = Result { try autoreleasepool { () -> (CGImage, CGImage?, (image:CGImage, region:CGRect)?) in
                 func render(_ limit:Int?) throws -> CIImage? {
-                    if let recipe, recipe.renderer == .linear2020 { return try ModernRenderer.render(source:source, recipe:hdrPreview ? recipe:recipe.sdr, maximumDimension:limit) }
+                    if let recipe, recipe.renderer == .linear2020 { return try ModernRenderer.render(source:source, recipe:hdrPreview ? recipe:recipe.sdr, maximumDimension:limit, dragging:interactive) }
                     if let linearSource { return try ModernRenderer.process(linearSource, edits:hdrPreview ? edits:sdrEdits, maximumDimension:limit) }
                     return nil
                 }

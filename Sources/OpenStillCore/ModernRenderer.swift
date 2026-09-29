@@ -78,10 +78,12 @@ public enum ModernRenderer {
     }
     /// `keepSource` false renders without adding the decode to the shared cache (grids and strips), so browsing doesn't
     /// push the photo being edited out of memory.
-    public static func render(source url: URL, recipe: RenderRecipe, maximumDimension: Int? = nil, lutOverride:CubeLUT? = nil, stopBeforeTool:String? = nil, keepSource:Bool = true) throws -> CIImage {
-        // Whole-image measurements are shared by every render of this photo with these edits (see RenderAnalysis).
+    public static func render(source url: URL, recipe: RenderRecipe, maximumDimension: Int? = nil, lutOverride:CubeLUT? = nil, stopBeforeTool:String? = nil, keepSource:Bool = true, dragging:Bool = false) throws -> CIImage {
+        // Whole-image measurements are shared by every render of this photo with these edits (see RenderAnalysis);
+        // while a slider is moving (`dragging`), the photo's last measurement is reused.
         let key = lutOverride == nil && recipe.renderer != .legacy ? RenderAnalysis.key(source: url, mode: recipe.sourceMode, raw: recipe.raw, edits: recipe.edits) : nil
-        return try RenderAnalysis.withKey(key) { try renderUncached(source: url, recipe: recipe, maximumDimension: maximumDimension, lutOverride: lutOverride, stopBeforeTool: stopBeforeTool, keepSource: keepSource) }
+        let photo = dragging ? key?.split(separator: "|").prefix(2).joined(separator: "|") : nil
+        return try RenderAnalysis.withKey(key, photo: photo) { try renderUncached(source: url, recipe: recipe, maximumDimension: maximumDimension, lutOverride: lutOverride, stopBeforeTool: stopBeforeTool, keepSource: keepSource) }
     }
     private static func renderUncached(source url: URL, recipe: RenderRecipe, maximumDimension: Int?, lutOverride:CubeLUT?, stopBeforeTool:String?, keepSource:Bool) throws -> CIImage {
         let recipe = RenderRecipe(renderer:recipe.renderer, sourceMode:recipe.sourceMode, raw:recipe.raw, edits:recipe.edits)
