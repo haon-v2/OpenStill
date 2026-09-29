@@ -37,6 +37,28 @@ public enum LUTPack {
         guard digest == checksum else { throw LUTError.invalid }
         return values
     }
+    private static let tables = NSCache<NSString,LUTTableBox>()
+    /// The look as a table, built without the `.cube` text: each value is `Float(Double(micro) / 1e6)`, which equals
+    /// what parsing that text's six-decimal value gives for every possible value (checked for all 1,000,001), so a
+    /// preview matches the copy applied to a photo exactly.
+    public static func lut(pack url:URL, entry:LUTCatalogEntry) throws -> CubeLUT {
+        guard let offset = entry.offset, let length = entry.length, let dimension = entry.dimension else { throw LUTError.invalid }
+        let key = "\(url.path)#\(entry.id)" as NSString
+        if let box = tables.object(forKey:key) { return box.value }
+        let bits = entry.bits ?? 16
+        guard (8...16).contains(bits) else { throw LUTError.invalid }
+        let values = try planes(pack:url,offset:offset,length:length,dimension:dimension,checksum:entry.checksum), top = (1<<bits)-1
+        guard values.allSatisfy({ Int($0) <= top }) else { throw LUTError.invalid }
+        let count = dimension*dimension*dimension
+        var rgba = [Float](repeating:1,count:count*4)
+        for i in 0..<count {
+            for c in 0..<3 { rgba[i*4+c] = Float(Double(micro(values[c*count+i],top))/1_000_000) }
+        }
+        let lut = CubeLUT(dimension:dimension,rgba:rgba)
+        tables.countLimit = 48; tables.setObject(LUTTableBox(lut),forKey:key)
+        return lut
+    }
+    private static func micro(_ value:UInt16, _ top:Int) -> Int { min(1_000_000,(Int(value)*1_000_000+top/2)/top) }
     /// `.cube` text for a packed look, so an applied look can be copied into the photo's own assets.
     public static func cubeText(pack url:URL, entry:LUTCatalogEntry) throws -> String {
         guard let offset = entry.offset, let length = entry.length, let dimension = entry.dimension else { throw LUTError.invalid }
@@ -57,9 +79,10 @@ public enum LUTPack {
     }
     /// value / top with six decimals, without Foundation formatting (a look has up to 107,811 of these).
     private static func fixed(_ value:UInt16, _ top:Int) -> String {
-        let micro = (Int(value)*1_000_000+top/2)/top
+        let micro = micro(value,top)
         if micro >= 1_000_000 { return "1.000000" }
         let digits = String(micro)
         return "0." + String(repeating:"0",count:6-digits.count) + digits
     }
 }
+private final class LUTTableBox { let value:CubeLUT; init(_ value:CubeLUT) { self.value = value } }

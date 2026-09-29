@@ -103,6 +103,10 @@ import Testing
         let library = try LUTLibrary(bundled:old,imported:imports)
         #expect(library.items.count == 2 && library.categories == ["All","Automotive","Imported"])
         #expect(try library.items[0].load().data == source.load().data)
+        // The table built straight from the pack equals the one parsed from its .cube text, value for value.
+        for item in pack.items.prefix(60) {
+            #expect(try item.load().data == CubeLUT(text:LUTPack.cubeText(pack:item.url,entry:item.entry)).data, "\(item.entry.id)")
+        }
         let item = try #require(library.filtered("Imported").first)
         #expect(item.entry.creator == "Creator" && item.entry.name == "Test Look — Creator")
         var legacy = PhotoEdits();legacy.ensureAdvanced();legacy.advanced!.lutAsset = "saved.cube";legacy.advanced!.lutName = item.entry.name

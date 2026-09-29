@@ -558,3 +558,19 @@ Automated fixtures are generated and contain no user photographs. The real S9 fi
 
   The build and test suites pass.
 - **Not yet verified by hand on a Mac:** changing the catalog location and relaunching; Clear Cache while a RAW photo is open.
+
+## Presets and LUT library — September 29, 2026
+- **Added:**
+  - A library of 420 free LUT tables (about 250 looks once film strengths are grouped) in one 18.5 MB pack, replacing the 12 loose `.cube` files:
+    - 293 RawTherapee Film Simulation tables (CC BY-SA 4.0), under descriptive names, with −1 / Normal / +1 / +2 strengths grouped per look;
+    - 50 FreshLUTs community looks (CC0), including the 12 shipped before, with the same ids;
+    - 77 OpenStill Originals (CC0) generated from `Resources/LUTs/originals.json`.
+  - 82 presets in 13 categories, including the six earlier presets with identical results; Amount 0–200%; My Presets (save, rename, delete, import, export).
+  - A Presets | LUTs browser: category menu with counts, search, favorites, recent, a strength menu for film looks, and thumbnails rendered only for visible cards.
+- **Kept working:**
+  - Looks already applied to photos (they are copies in the photo's assets).
+  - Saved edits that name one of the original 12 looks.
+  - `.openstillpreset` files saved by earlier versions (Import preset…, and develop presets in Import and Tethered Capture).
+  - Version 1 LUT catalogs and imported `.cube` files.
+- **Tests:** `LUTLibraryTests` (every look decodes and matches its checksum, licenses and credits, the 12 old ids, the neutral look is an identity within 1/255, black-and-white originals stay gray, tampering is refused, version 1 catalogs, search and strengths, preview equals applied result) and `PresetLibraryTests` (bundled presets are valid and their looks exist, the six old presets give the same edits, Amount 0 / 100 / 200%, photo-specific edits are kept, looks are applied as copies, My Presets round trip and old files).
+- **Not included:** previewing a look on the main photo while hovering its card; the card thumbnails show each look on the current photo instead.

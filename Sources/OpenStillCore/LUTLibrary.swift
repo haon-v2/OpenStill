@@ -43,7 +43,7 @@ public struct LUTItem: Equatable {
     public let isBundled: Bool
     public var isPacked: Bool { entry.offset != nil }
     public func load() throws -> CubeLUT {
-        if isPacked { return try CubeLUT(text:LUTPack.cubeText(pack:url,entry:entry)) }
+        if isPacked { return try LUTPack.lut(pack:url,entry:entry) }
         if isBundled {
             let bytes = try Data(contentsOf:url)
             guard SHA256.hash(data:bytes).map({ String(format:"%02x",$0) }).joined() == entry.checksum else { throw LUTError.invalid }
