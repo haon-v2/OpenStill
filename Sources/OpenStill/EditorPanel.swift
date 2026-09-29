@@ -202,6 +202,8 @@ final class EditorPanel: ChromePanel {
     func resizeBrush(key:String,delta:Double) { maskPanels[key]?.resizeBrush(delta) }
 
     func refreshLUTs() { lutBrowser.reload() }
+    var lutItems: [LUTItem] { lutBrowser.allItems }
+    func lutItem(id: String) -> LUTItem? { lutBrowser.item(id: id) }
     func libraryLUT(id:String) -> LUTItem? { lutBrowser.item(id:id) }
     func importedLUT(filename:String) -> LUTItem? { lutBrowser.imported(filename:filename) }
     func updateHistogram(_ value:PhotoHistogram?, sensor:Double?) { histogram.histogram = value; histogram.sensor = sensor }

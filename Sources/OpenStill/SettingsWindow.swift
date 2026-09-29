@@ -4,7 +4,7 @@ import OpenStillCore
 
 /// The sections of Settings, in sidebar order.
 enum SettingsSection: Int, CaseIterable {
-    case general, editing, library, autoImport, shortcuts
+    case general, editing, library, autoImport, shortcuts, assistant
     var title: String {
         switch self {
         case .general: return "General"
@@ -12,6 +12,7 @@ enum SettingsSection: Int, CaseIterable {
         case .library: return "Library & Catalog"
         case .autoImport: return "Auto Import"
         case .shortcuts: return "Shortcuts"
+        case .assistant: return "AI Assistant"
         }
     }
     var symbol: String {
@@ -21,6 +22,7 @@ enum SettingsSection: Int, CaseIterable {
         case .library: return "books.vertical"
         case .autoImport: return "tray.and.arrow.down"
         case .shortcuts: return "keyboard"
+        case .assistant: return "sparkles"
         }
     }
 }
@@ -87,6 +89,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             autoImport.saved = { [weak self] settings in self?.autoImportSaved?(settings) }
             page = autoImport
         case .shortcuts: page = ShortcutSettings()
+        case .assistant: page = AssistantSettings()
         }
         pages[section] = page
         return page

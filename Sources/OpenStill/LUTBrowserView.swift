@@ -73,6 +73,7 @@ final class LUTBrowserView: NSStackView {
         rebuild();updateSelection(edits)
     }
     func item(id:String) -> LUTItem? { library.items.first { $0.entry.id == id } }
+    var allItems:[LUTItem] { library.items }
     func imported(filename:String) -> LUTItem? { library.items.first { !$0.isBundled && $0.url.lastPathComponent == filename } }
     func setActive(_ value:Bool) { active = value;generation.begin();if value { schedule() } }
     func setEnabled(_ value:Bool) { enabled = value;cards.values.forEach { $0.isEnabled = value } }

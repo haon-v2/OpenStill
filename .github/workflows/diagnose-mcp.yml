@@ -1,7 +1,7 @@
-name: Diagnose M20
+name: Diagnose MCP
 on:
   push:
-    branches: [claude/gifted-lovelace-pbg8wv-m20]
+    branches: [claude/gifted-lovelace-pbg8wv-mcp]
 jobs:
   diagnose:
     runs-on: macos-26
@@ -37,13 +37,7 @@ jobs:
               echo "BEGIN $f"; base64 -i $f.jpg | tr -d '\n'; echo; echo "END $f"
             done
           done <<'LIST'
-          settings0|1|develop;settings:0
-          settings1|1|develop;settings:1
-          settings2|1|develop;settings:2
-          settings3|1|develop;settings:3
-          settings4|1|develop;settings:4
-          develop|1|develop
-          library|1|library
-          presets|1|develop;panel:presets
+          assistant|1|develop;settings:5
+          logo|1|library;selectall;action:exportPhoto;action:createLogo
           LIST
           true
