@@ -151,6 +151,18 @@ public enum ModernRenderer {
         }
         return try display(image)
     }
+    /// Runs a tiny image through the common Develop tools once in the background, so Core Image compiles their kernels
+    /// before the first slider drag instead of stalling its first frame.
+    public static func warmUp() {
+        DispatchQueue.global(qos: .utility).async {
+            let image = CIImage(color: CIColor(red: 0.5, green: 0.4, blue: 0.3)).cropped(to: CGRect(x: 0, y: 0, width: 64, height: 64))
+            var edits = PhotoEdits()
+            edits.exposure = 0.1; edits.contrast = 1.1; edits.usesSmartContrast = true; edits.clarity = 0.1; edits.texture = 0.1; edits.dehaze = 0.1
+            edits.vibrance = 0.1; edits.saturation = 1.1; edits.highlightsAmount = -0.1; edits.shadowsAmount = 0.1; edits.whites = 0.1; edits.blacks = -0.1
+            edits.sharpness = 0.2; edits.vignette = 0.1
+            for variant in [PhotoEdits(), edits] { if let out = try? process(image, edits: variant) { _ = try? display(out) } }
+        }
+    }
     public static func display(_ image: CIImage, profile: ExportProfile = .displayP3) throws -> CGImage {
         guard let result = context.createCGImage(image, from: image.extent, format: .RGBAh, colorSpace: profile.colorSpace) else { throw EditError.render }
         return result

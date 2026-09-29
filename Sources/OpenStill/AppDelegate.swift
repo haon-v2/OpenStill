@@ -8,6 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var settings = SettingsWindowController(updates: updates)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        ModernRenderer.warmUp()
         createWindow()
         LayoutDump.runIfRequested(window: window)
         Shortcuts.registerKeys()
