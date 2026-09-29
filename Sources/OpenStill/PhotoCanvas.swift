@@ -114,6 +114,17 @@ final class PhotoCanvas: NSView {
     /// Extended-range render of the same frame, shown by `photoBackdrop` on HDR displays.
     var hdrImage: CGImage? { didSet { needsDisplay = true } }
     let photoBackdrop = PhotoBackdrop()
+    /// The photo is shown by `photoBackdrop`, a sibling behind the canvas. The editor places it itself; every other canvas
+    /// (Compare, Reference, the second display) gets it here, pinned to the canvas.
+    override func viewDidMoveToSuperview() {
+        super.viewDidMoveToSuperview()
+        guard let parent = superview, photoBackdrop.superview == nil else { return }
+        photoBackdrop.translatesAutoresizingMaskIntoConstraints = false
+        parent.addSubview(photoBackdrop, positioned: .below, relativeTo: self)
+        NSLayoutConstraint.activate([photoBackdrop.leadingAnchor.constraint(equalTo: leadingAnchor), photoBackdrop.trailingAnchor.constraint(equalTo: trailingAnchor),
+                                     photoBackdrop.topAnchor.constraint(equalTo: topAnchor), photoBackdrop.bottomAnchor.constraint(equalTo: bottomAnchor)])
+    }
+    override var isHidden { didSet { photoBackdrop.isHidden = isHidden } }
     private(set) var isFit = true
     private var pixelScale: CGFloat = 1
     var native: Bool {
