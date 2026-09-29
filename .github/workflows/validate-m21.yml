@@ -19,16 +19,16 @@ jobs:
           swift build > build.log 2>&1; status=$?
           grep -E "error:" build.log | head -60
           [ $status -eq 0 ] || grep -v "warning:\|^ *|\|^ *\^" build.log | tail -60
-          grep -E "warning:" build.log | grep -E "LUTPack|LUTLibrary|PresetLibrary|LookBrowser|EditingController|EditorPanel|MaskEditingController|ViewerController" | grep -v "init(source:)" | sort -u | head -40
+          grep -E "warning:" build.log | grep -E "LUTPack|LUTLibrary|PresetLibrary|LookBrowser|SkyReplacement|EditingController|EditorPanel|MaskEditingController|ViewerController" | grep -v "init(source:)" | sort -u | head -40
           exit $status
       - name: M21 tests alone
         run: |
           set +e
           export PKG_CONFIG_PATH="$PWD/.build/native/lib/pkgconfig"
-          perl -e 'alarm shift; exec @ARGV' 420 bash scripts/test.sh --filter "LUTLibraryTests|PresetLibraryTests" --no-parallel > m8.log 2>&1
+          perl -e 'alarm shift; exec @ARGV' 420 bash scripts/test.sh --filter "LUTLibraryTests|PresetLibraryTests|SkyReplacementTests" --no-parallel > m8.log 2>&1
           status=$?
           grep -E "⏱|Test .*(started|passed|failed)|✘|recorded an issue|error:" m8.log | tail -40
-          grep -nE "(LUTLibraryTests|PresetLibraryTests).swift:[0-9]+" m8.log | sort -u | head -30
+          grep -nE "(LUTLibraryTests|PresetLibraryTests|SkyReplacementTests).swift:[0-9]+" m8.log | sort -u | head -30
           echo "--- started but not finished ---"
           python3 - <<'PY'
           import re

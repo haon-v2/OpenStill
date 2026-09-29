@@ -6,6 +6,7 @@ saved as a JPEG plate, and described in Resources/Skies/skies.json with its cred
 app uses to relight the rest of the photo to match the new sky.
 
   scripts/build-sky-library.py --mood sunset --out DIR     # download and project one mood's skies
+  scripts/build-sky-library.py --derive DIR/clouds-x.jpg --as storm --out DIR   # grade a storm or moonlit sky from one
   scripts/build-sky-library.py --catalog DIR                # write skies.json from the plates' .json sidecars
 
 Poly Haven (https://polyhaven.com) publishes every asset under CC0; each sky's page and authors are recorded.
@@ -60,6 +61,51 @@ def project(pano, yaw, pitch):
     return (pano[v0, u0] * (1 - fu) * (1 - fv) + pano[v0, u1] * fu * (1 - fv) + pano[v0 + 1, u0] * (1 - fu) * fv + pano[v0 + 1, u1] * fu * fv)
 
 
+LUMA = np.array([0.2126, 0.7152, 0.0722])
+
+
+def grade_night(plate):
+    """Panoramas are exposed for display, which makes night look like dusk: bring it down to night, keep the stars."""
+    lin = srgb_to_linear(plate); k = 0.025 / max(float((lin @ LUMA).mean()), 1e-4)
+    stars = np.clip((lin - 0.35) / 0.65, 0, 1) * 0.55
+    return linear_to_srgb(np.clip(lin * k + stars, 0, 1))
+
+
+def grade_moonlit(plate):
+    """A daytime sky turned to moonlight: dark, blue, with the clouds still lit."""
+    lin = srgb_to_linear(plate); lum = (lin @ LUMA)[..., None]
+    lin = (lum + (lin - lum) * 0.35) * np.array([0.55, 0.75, 1.15]) * 0.09
+    return linear_to_srgb(np.clip(lin, 0, 1))
+
+
+def grade_storm(plate):
+    """A storm graded from a cloudy sky: darker, deeper contrast, a cold cast."""
+    lin = srgb_to_linear(plate) * 0.32
+    lum = (lin @ LUMA)[..., None]
+    lin = np.clip(lum + (lin - lum) * 0.7, 0, 1) * np.array([0.92, 0.98, 1.1])
+    return np.clip(0.5 + (linear_to_srgb(np.clip(lin, 0, 1)) - 0.5) * 1.35, 0, 1)
+
+
+def derive(source, kind, out):
+    """A new sky graded from a built one (its .jpg and .json): --derive FILE.jpg --as storm|moonlit."""
+    record = json.loads(source.with_suffix('.json').read_text())
+    plate = np.asarray(Image.open(source).convert('RGB'), dtype=np.float32) / 255
+    plate, prefix, category = (grade_storm(plate), 'Storm', 'Dramatic') if kind == 'storm' else (grade_moonlit(plate), 'Moonlit', 'Night')
+    key = record['id'].split('-', 2)[-1]
+    name = record['name'].split(' · ')[-1]
+    finish(plate, out, f'{kind}-{key}', f'{prefix} · {name}', category, record['creator'], record['source'], record.get('tags', []))
+
+
+def finish(plate, out, file_key, name, category, creator, source, tags):
+    mean = srgb_to_linear(plate).reshape(-1, 3).mean(0)
+    bottom = srgb_to_linear(plate[-HEIGHT // 8:]).reshape(-1, 3).mean(0)
+    Image.fromarray((plate * 255 + 0.5).astype('uint8')).save(out / f'{file_key}.jpg', quality=84, optimize=True, progressive=True)
+    record = dict(id='polyhaven-' + file_key, name=name, category=category, file=f'{file_key}.jpg', creator=creator, source=source, license='CC0-1.0',
+                  mean=[round(float(c), 5) for c in mean], horizon=[round(float(c), 5) for c in bottom], tags=tags)
+    (out / f'{file_key}.json').write_text(json.dumps(record))
+    print('built', file_key, name, round(float(mean.mean()), 3), (out / f'{file_key}.jpg').stat().st_size)
+
+
 def mood_of(key, info):
     """Each sky belongs to one mood, so no sky appears twice."""
     tags = set(t.lower() for t in info.get('tags', []) + info.get('categories', []))
@@ -110,26 +156,10 @@ def build(mood, out):
         yaw = (np.argmax(smooth) / pw - 0.5) * 2 * math.pi
         plate = np.clip(project(pano, yaw, pitch), 0, 1)
         name = info.get('name', key).replace(' (Pure Sky)', '')
-        if mood == 'night':
-            # Panoramas are exposed for display, which makes night look like dusk: bring it down to night, keep the stars.
-            lin = srgb_to_linear(plate); k = 0.025 / max(float((lin @ np.array([0.2126, 0.7152, 0.0722])).mean()), 1e-4)
-            stars = np.clip((lin - 0.35) / 0.65, 0, 1) * 0.55
-            plate = linear_to_srgb(np.clip(lin * k + stars, 0, 1))
-        if mood == 'dramatic':
-            # A storm graded from an overcast sky: darker, deeper contrast, a cold cast.
-            lin = srgb_to_linear(plate) * 0.32
-            lum = (lin @ np.array([0.2126, 0.7152, 0.0722]))[..., None]
-            lin = np.clip(lum + (lin - lum) * 0.7, 0, 1) * np.array([0.92, 0.98, 1.1])
-            s = linear_to_srgb(np.clip(lin, 0, 1)); plate = np.clip(0.5 + (s - 0.5) * 1.35, 0, 1)
-            name = 'Storm · ' + name
-        mean = srgb_to_linear(plate).reshape(-1, 3).mean(0)
-        bottom = srgb_to_linear(plate[-HEIGHT // 8:]).reshape(-1, 3).mean(0)
-        Image.fromarray((plate * 255 + 0.5).astype('uint8')).save(out / f'{mood}-{key}.jpg', quality=84, optimize=True, progressive=True)
-        record = dict(id=f'polyhaven-{mood}-{key}', name=name, category=category, file=f'{mood}-{key}.jpg', creator=', '.join(info.get('authors', {}).keys()) or 'Poly Haven',
-                      source=f'https://polyhaven.com/a/{key}', license='CC0-1.0', mean=[round(float(c), 5) for c in mean],
-                      horizon=[round(float(c), 5) for c in bottom], tags=sorted(set(info.get('tags', [])))[:8])
-        (out / f'{mood}-{key}.json').write_text(json.dumps(record))
-        print('built', key, name, round(float(mean.mean()), 3), (out / f'{mood}-{key}.jpg').stat().st_size)
+        if mood == 'night': plate = grade_night(plate)
+        if mood == 'dramatic': plate, name = grade_storm(plate), 'Storm · ' + name
+        finish(plate, out, f'{mood}-{key}', name, category, ', '.join(info.get('authors', {}).keys()) or 'Poly Haven',
+               f'https://polyhaven.com/a/{key}', sorted(set(info.get('tags', [])))[:8])
 
 
 def catalog(folder):
@@ -147,7 +177,9 @@ def catalog(folder):
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser(); ap.add_argument('--mood', choices=list(MOODS)); ap.add_argument('--out', type=pathlib.Path); ap.add_argument('--catalog', type=pathlib.Path)
+    ap.add_argument('--derive', type=pathlib.Path); ap.add_argument('--as', dest='kind', choices=['storm', 'moonlit'])
     a = ap.parse_args()
     if a.catalog: catalog(a.catalog)
+    elif a.derive and a.kind and a.out: derive(a.derive, a.kind, a.out)
     elif a.mood and a.out: build(a.mood, a.out)
     else: sys.exit(ap.format_usage())

@@ -38,6 +38,17 @@ enum LayoutDump {
         switch parts[0] {
         case "develop": viewer.showEditor()
         case "panel": viewer.toggleFloatingPanel(arg)
+        case "skymask":
+            // CI has no on-device AI: stand in for its sky selection with the upper part of the frame, softly edged.
+            let size = viewer.editSourceSize(), w = Int(size.width), h = Int(size.height), fraction = Double(arg) ?? 0.47
+            let gradient = CIFilter(name: "CILinearGradient", parameters: ["inputPoint0": CIVector(x: 0, y: CGFloat(Double(h) * (1 - fraction) - Double(h) * 0.01)), "inputPoint1": CIVector(x: 0, y: CGFloat(Double(h) * (1 - fraction) + Double(h) * 0.01)),
+                                                                          "inputColor0": CIColor.black, "inputColor1": CIColor.white])!.outputImage!.cropped(to: CGRect(x: 0, y: 0, width: w, height: h))
+            if let cg = CIContext().createCGImage(gradient, from: gradient.extent), let url = try? EditStorage.newAsset() {
+                try? PhotoEditor.write(cg, to: url)
+                var mask = AdjustmentMask(kind: "object"); mask.asset = url.lastPathComponent; mask.feather = 0
+                var edits = viewer.currentEdits; edits.setMask(mask, for: PhotoEdits.skyMaskKey)
+                viewer.changeEdits(edits, title: "Test sky selection", commit: true)
+            }
         case "size":
             let s = arg.split(separator: "x").compactMap { Double($0) }
             for w in NSApp.windows where w.title == "Presets & LUTs" { w.setContentSize(NSSize(width: s[0], height: s[1])) }

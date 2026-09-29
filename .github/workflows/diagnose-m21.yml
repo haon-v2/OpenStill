@@ -19,6 +19,20 @@ jobs:
           mkdir -p /tmp/photos
           i=0; for f in /System/Library/Desktop\ Pictures/*.heic /Library/Desktop\ Pictures/*.heic; do [ -f "$f" ] || continue; i=$((i+1)); sips -s format jpeg -Z 1600 "$f" --out /tmp/photos/photo$i.jpg >/dev/null 2>&1; [ $i -ge 5 ] && break; done
           ls -la /tmp/photos
+      - name: Landscape photo
+        run: |
+          pip3 install --break-system-packages numpy pillow >/dev/null 2>&1 || pip3 install numpy pillow >/dev/null
+          python3 - <<'PY'
+          import importlib.util, io, math, urllib.request, numpy as np
+          from PIL import Image
+          spec = importlib.util.spec_from_file_location('sky', 'scripts/build-sky-library.py'); sky = importlib.util.module_from_spec(spec); spec.loader.exec_module(sky)
+          url = 'https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/kloofendal_48d_partly_cloudy.jpg'
+          pano = np.asarray(Image.open(io.BytesIO(urllib.request.urlopen(url, timeout=120).read())).convert('RGB').resize((8192, 4096)), dtype=np.float32) / 255
+          sky.WIDTH, sky.HEIGHT, sky.HFOV = 1800, 1200, 70.0
+          view = np.clip(sky.project(pano, 0.0, math.radians(3)), 0, 1)
+          Image.fromarray((view * 255).astype('uint8')).save('/tmp/photos/0-landscape.jpg', quality=90)
+          print('landscape ready')
+          PY
       - name: Run and screenshot
         run: |
           set +e
@@ -37,20 +51,13 @@ jobs:
               echo "BEGIN $f"; base64 -i $f.jpg | tr -d '\n'; echo; echo "END $f"
             done
           done <<'LIST'
+          skies-before|1|develop;panel:presets;size:340x820;looks:mode:2
+          skies-grid|1|develop;skymask;panel:presets;size:340x820;looks:mode:2
+          skies-night|1|develop;skymask;panel:presets;size:340x820;looks:mode:2;looks:category:Night;looks:pick:Moonlit · Kloppenheim 05
+          skies-storm|1|develop;skymask;panel:presets;size:340x820;looks:mode:2;looks:category:Dramatic;looks:pick:Storm · Farm Field
+          skies-sunset|1|develop;skymask;panel:presets;size:340x820;looks:mode:2;looks:category:Sunset & Sunrise;looks:pick:Belfast Sunset
           presets-all|1|develop;panel:presets;size:340x820
-          presets-film|1|develop;panel:presets;size:340x820;looks:mode:0;looks:category:Film
-          presets-applied|1|develop;panel:presets;size:340x820;looks:mode:0;looks:category:Cinematic;looks:pick:Teal & Orange
-          presets-amount|1|develop;panel:presets;size:340x820;looks:mode:0;looks:category:Moody;looks:pick:Dark & Moody;looks:amount:180
-          presets-mine|1|develop;panel:presets;size:340x820;looks:mode:0;looks:save:My Test Look;looks:category:My Presets
-          presets-search|1|develop;panel:presets;size:340x820;looks:mode:0;looks:category:All;looks:search:b&w
-          luts-all|1|develop;panel:presets;size:340x820;looks:mode:1;looks:category:All
-          luts-instant|1|develop;panel:presets;size:340x820;looks:mode:1;looks:category:Film · Instant
           luts-variant|1|develop;panel:presets;size:340x820;looks:mode:1;looks:category:Film · Color;looks:pick:Portrait 400;looks:variant:+2
-          luts-bw|1|develop;panel:presets;size:340x820;looks:mode:1;looks:category:Black & White
-          luts-creative|1|develop;panel:presets;size:340x820;looks:mode:1;looks:category:Creative;looks:favorite:Vaporwave
-          luts-scrolled|1|develop;panel:presets;size:340x820;looks:mode:1;looks:category:All;looks:scroll:3000
-          luts-search|1|develop;panel:presets;size:340x820;looks:mode:1;looks:category:All;looks:search:teal
           narrow|1|develop;panel:presets;size:260x600;looks:mode:1
-          nophoto|0|panel:presets;looks:mode:1
           LIST
           true

@@ -399,7 +399,7 @@ final class LookBrowserView: NSStackView, NSCollectionViewDataSource, NSCollecti
         return item
     }
     func collectionView(_ collectionView: NSCollectionView, layout: NSCollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> NSSize {
-        let width = max(80, floor((gridScroll.contentSize.width - 6) / 2))
+        let width = max(80, floor((gridScroll.contentSize.width - 8) / 2))   // two columns even at the narrowest panel
         return NSSize(width: width, height: 100)
     }
     func collectionView(_ collectionView: NSCollectionView, willDisplay item: NSCollectionViewItem, forRepresentedObjectAt indexPath: IndexPath) {
