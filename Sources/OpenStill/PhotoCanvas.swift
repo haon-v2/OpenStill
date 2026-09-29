@@ -124,7 +124,7 @@ final class PhotoCanvas: NSView {
         NSLayoutConstraint.activate([photoBackdrop.leadingAnchor.constraint(equalTo: leadingAnchor), photoBackdrop.trailingAnchor.constraint(equalTo: trailingAnchor),
                                      photoBackdrop.topAnchor.constraint(equalTo: topAnchor), photoBackdrop.bottomAnchor.constraint(equalTo: bottomAnchor)])
     }
-    override var isHidden { didSet { photoBackdrop.isHidden = isHidden } }
+    override var isHidden: Bool { didSet { photoBackdrop.isHidden = isHidden } }
     private(set) var isFit = true
     private var pixelScale: CGFloat = 1
     var native: Bool {
