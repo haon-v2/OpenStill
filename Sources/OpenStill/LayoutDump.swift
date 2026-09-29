@@ -79,7 +79,8 @@ enum LayoutDump {
         case "action":
             // A menu command: the viewer's own, otherwise whatever the key window's responder chain handles.
             let selector = Selector(arg)
-            if !NSApp.sendAction(selector, to: viewer.responds(to: selector) ? viewer : nil, from: nil) { print("ACTION not handled \(arg)") }
+            if viewer.responds(to: selector) || !viewer.isLibrary { if !NSApp.sendAction(selector, to: viewer.responds(to: selector) ? viewer : nil, from: nil) { print("ACTION not handled \(arg)") } }
+            else { viewer.withLibrary { library in if library.responds(to: selector) { library.perform(selector) } else { print("ACTION not handled \(arg)") } } }
         case "people": viewer.withLibrary { $0.showPeople() }
         case "timeline": viewer.withLibrary { $0.showTimeline() }
         case "settings":

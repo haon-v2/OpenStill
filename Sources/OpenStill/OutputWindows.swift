@@ -22,7 +22,10 @@ class OutputWindow: NSWindowController, NSWindowDelegate {
         status.font = .systemFont(ofSize: 11); status.textColor = .secondaryLabelColor; status.maximumNumberOfLines = 3
         progress.style = .spinning; progress.controlSize = .small; progress.isHidden = true
         buttons.spacing = 8; buttons.insertArrangedSubview(progress, at: 0); buttons.insertArrangedSubview(NSView(), at: 1)
-        let left = NSStackView(views: [form]); left.orientation = .vertical; left.alignment = .leading
+        // The form keeps its natural height; the spacer below takes any extra room instead of stretching the rows apart.
+        form.setContentHuggingPriority(.required, for: .vertical); form.yPlacement = .center
+        let spacer = NSView(); spacer.setContentHuggingPriority(.init(1), for: .vertical)
+        let left = NSStackView(views: [form, spacer]); left.orientation = .vertical; left.alignment = .leading
         let body = NSStackView(views: content.map { [left, $0] } ?? [left]); body.spacing = 18; body.alignment = .top
         let stack = NSStackView(views: [body, status, buttons]); stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 12
         stack.translatesAutoresizingMaskIntoConstraints = false; root.addSubview(stack)
