@@ -1,7 +1,7 @@
-name: Diagnose speed M19
+name: Diagnose M20
 on:
   push:
-    branches: [claude/gifted-lovelace-pbg8wv-m19]
+    branches: [claude/gifted-lovelace-pbg8wv-m20]
 jobs:
   diagnose:
     runs-on: macos-26
@@ -31,14 +31,19 @@ jobs:
             pid=$!
             for s in $(seq 1 60); do sleep 1; kill -0 $pid 2>/dev/null || break; done
             kill $pid 2>/dev/null; wait $pid
-            for f in /tmp/dump-$name-capture.png /tmp/dump-$name-panel-capture.png; do
+            for f in /tmp/dump-$name-capture.png /tmp/dump-$name-other*-capture.png; do
               [ -f $f ] || continue
               sips -Z 1300 -s format jpeg -s formatOptions 62 $f --out $f.jpg >/dev/null
               echo "BEGIN $f"; base64 -i $f.jpg | tr -d '\n'; echo; echo "END $f"
             done
           done <<'LIST'
-          drag|1|develop;drag:Exposure
-          dragcontrast|1|develop;drag:Contrast
-          zoom|1|develop;zoom
+          settings0|1|develop;settings:0
+          settings1|1|develop;settings:1
+          settings2|1|develop;settings:2
+          settings3|1|develop;settings:3
+          settings4|1|develop;settings:4
+          develop|1|develop
+          library|1|library
+          presets|1|develop;panel:presets
           LIST
           true

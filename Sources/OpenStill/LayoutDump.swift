@@ -20,7 +20,7 @@ enum LayoutDump {
         let extra = steps.contains { $0.hasPrefix("keys") || $0.hasPrefix("drag") } ? 7.0 : 0
         DispatchQueue.main.asyncAfter(deadline: .now() + 8 + Double(steps.count) * 1.2 + extra) {
             guard let window, let root = window.contentView else { exit(2) }
-            let panel = NSApp.windows.first { $0 is NSPanel && $0.isVisible }
+            let others = NSApp.windows.filter { $0 !== window && $0.isVisible && $0.frame.width > 120 && $0.frame.height > 80 }
             func visible(_ v: NSView) -> Bool { var x: NSView? = v; while let c = x { if c.isHidden { return false }; x = c.superview }; return true }
             func list(_ v: NSView) {
                 if visible(v), v.frame.width > 0, v is ToolOptionsBar || v is ToolRail || v is StudioStatusBar || v is PhotoTabStrip {
@@ -29,8 +29,7 @@ enum LayoutDump {
                 v.subviews.forEach(list)
             }
             list(root); fflush(stdout)
-            for (suffix, target) in [("", Optional(window)), ("-panel", panel)] {
-                guard let target else { continue }
+            for (suffix, target) in [("", window)] + others.enumerated().map({ ("-other\($0.offset)", $0.element) }) {
                 let capture = Process(); capture.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
                 capture.arguments = ["-x", "-o", "-l", String(target.windowNumber), path + suffix + "-capture.png"]
                 try? capture.run(); capture.waitUntilExit()
@@ -77,6 +76,10 @@ enum LayoutDump {
         case "status": viewer.info.status("Rendering preview…", busy: true)
         case "drag": drag(slider: arg, viewer: viewer, window: window)
         case "zoom": viewer.canvas.native = true
+        case "settings":
+            NSApp.sendAction(Selector(("showSettings")), to: nil, from: nil)
+            if let settings = NSApp.windows.lazy.compactMap({ $0.windowController as? SettingsWindowController }).first,
+               let section = SettingsSection(rawValue: Int(arg) ?? 0) { settings.open(section) }
         default: print("unknown step \(step)")
         }
     }
