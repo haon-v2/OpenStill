@@ -468,3 +468,27 @@ Automated fixtures are generated and contain no user photographs. The real S9 fi
   - README: a table comparing OpenStill's catalog with Lightroom Classic's, with what's still missing (missing-file badges, virtual copies as grid thumbnails, removing deleted photos on Synchronize, Find Missing Folder, collection sets).
 - **Automated tests:** FolderTreeTests (drives first, skipped single-folder chains, counts, offline drives, Finder-style sorting); ImportModeTests (Add leaves files untouched and applies metadata, Move takes photos and sidecars, settings saved before modes default to Copy); ShortcutTests checks a saved EZ Layout choice is ignored.
 - **Not yet verified by hand on a Mac:** Move from an external drive to the startup disk (Trash step); Folders with thousands of folders; Import to This Folder from the Folders menu.
+
+## Studio layout — September 29, 2026
+
+- **Changed:** the window is redesigned after the photo editor Compositor. It replaces the Lightroom-style chrome of 0.0.14 and keeps every editing feature and key.
+  - A toolbar with Library | Develop, **photo tabs** (up to 12, remembered per catalog; a dot marks edits), Fit / 100% / zoom, Presets, History, Share and Export.
+  - A **tool rail**: Adjust, Crop, Remove, Red Eye, Masking, White Balance, Targeted, Before / After and Clipping in Develop; Grid, Loupe, Compare, Survey, Painter, People, Map and Timeline in the Library.
+  - A fixed-height **tool options bar** with only the current tool's settings. When the window is narrow, the last settings step aside and Cancel / Done always stay.
+  - One **right panel** that you can resize (240–420 points). The Library's Folders, Collections and Info are tabs in it.
+  - A **status line** with zoom, size, file, rating and position, the current tool's keys, and OpenStill's messages. These were previously written into a note nobody could see.
+  - **Floating panels** for Presets & LUTs (Shift-P), History / Snapshots / Versions (H), Info and the Navigator. They remember where you put them.
+  - Sliders: drag a slider's name to scrub it, double-click it to reset, or use the arrow keys in its field. Temp, Tint, Vibrance, Saturation and the tone sliders show colored tracks.
+  - New keys: A (Adjust), W (white balance picker), H, Shift-P, K (Painter). F6 / F7 / F8 show the filmstrip, tool rail and right panel.
+  - The Library grid's columns now fill the width instead of leaving a gap.
+- **Removed:** code the new layout no longer used. That covers the standalone Library window, a hidden copy of every Develop control that was refreshed on each edit, the old sidebar layout, and old button and toolbar classes (about 570 lines).
+- **Automated tests:** StudioLayoutTests covers photo tabs (open, switch, close, the 12-tab limit and which tab closes, edits, renames, missing files, per-catalog memory), the panel layout (width limits, toggles, carrying over the old panel choices) and the tool list (symbols, hints, keys). ShortcutTests, FolderTreeTests and ImportModeTests were rerun. The full suite passes: 290 tests.
+- **Verified on macOS 26 CI:** window captures of these screens were reviewed:
+  - the empty window and Develop;
+  - each tool's options bar and the masks list with two masks;
+  - the Library with each tab and Compare;
+  - the filmstrip, Lights Out and Tab hiding the panels;
+  - both floating panels.
+  
+  Real key presses G, D, R, Return, Q, Esc, Shift-W, Return, T, T, Tab, Tab and A each switched to the expected tool or panel.
+- **Not yet verified by hand on a Mac:** dragging the panel edge; scrubbing a slider's name with a trackpad; photo tabs after renaming files in Finder; floating panels across two displays.

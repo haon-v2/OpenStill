@@ -90,7 +90,8 @@ private final class ShootCell:NSCollectionViewItem {
     }
     func sizePreview(){
         if previewHeight==nil{previewHeight=preview.heightAnchor.constraint(equalToConstant:145);previewHeight?.isActive=true}
-        previewHeight?.constant=max(60,ShootCell.cellWidth-65)
+        let width=(collectionView?.collectionViewLayout as? NSCollectionViewFlowLayout)?.itemSize.width ?? ShootCell.cellWidth
+        previewHeight?.constant=max(60,width-65)
     }
     static func color(_ label:ColorLabel)->NSColor {
         switch label{case .red:return .systemRed;case .yellow:return .systemYellow;case .green:return .systemGreen;case .blue:return .systemBlue;case .purple:return .systemPurple;case .none:return .clear}
@@ -813,15 +814,18 @@ final class ReportingLabel: NSTextField {
     override var stringValue: String { didSet { changed?(stringValue) } }
 }
 
-/// Grid layout that fits as many columns of about `ShootCell.cellWidth` as the width allows, then widens them to fill the row,
+/// Grid layout that picks the column count closest to `ShootCell.cellWidth`, then sizes the columns to fill the row,
 /// so the grid never leaves a wide gap between columns.
 private final class FillingFlowLayout: NSCollectionViewFlowLayout {
     override func prepare() {
         if let width = collectionView?.enclosingScrollView?.contentView.bounds.width, width > 0 {
             let available = width - sectionInset.left - sectionInset.right
-            let columns = max(1, floor((available + minimumInteritemSpacing) / (ShootCell.cellWidth + minimumInteritemSpacing)))
+            let columns = max(1, ((available + minimumInteritemSpacing) / (ShootCell.cellWidth + minimumInteritemSpacing)).rounded())
             let side = floor((available - minimumInteritemSpacing * (columns - 1)) / columns)
-            if abs(itemSize.width - side) > 0.5 { itemSize = NSSize(width: side, height: side - 5) }
+            if abs(itemSize.width - side) > 0.5 {
+                itemSize = NSSize(width: side, height: side - 5)
+                for item in collectionView?.visibleItems() ?? [] { (item as? ShootCell)?.sizePreview() }
+            }
         }
         super.prepare()
     }
