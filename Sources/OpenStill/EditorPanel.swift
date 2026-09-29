@@ -259,6 +259,8 @@ final class EditorPanel: GlassChrome {
         let isRaw = raw && record?.active.sourceMode == .raw
         if isRaw != rawSource { rawSource = isRaw; profilePanel.update(states, raw:isRaw, enabled:hasPhoto && !busy) }
     }
+    /// LUT thumbnails render only while the Presets panel is open.
+    func setLUTPreviewsActive(_ active:Bool) { lutBrowser.setActive(active) }
     func setLUTPhoto(_ image:CGImage?,edits:PhotoEdits, source:CIImage? = nil, url:URL? = nil, recipe:RenderRecipe? = nil) { lutBrowser.setPhoto(image,edits:edits, source:source, url:url, recipe:recipe) }
     /// A slider row: the name (drag it sideways to scrub, double-click to reset), the value, and the slider beneath.
     private func slider(_ title: String, path: WritableKeyPath<PhotoEdits, Double>, range: ClosedRange<Double>, in stack: NSStackView) {
@@ -324,7 +326,7 @@ final class EditorPanel: GlassChrome {
         lrCamera.stringValue = metadata == nil ? "" : settings.stringValue
     }
     func update(_ edits: PhotoEdits, document: EditDocument?, enabled: Bool) {
-        states = edits; hasPhoto = enabled
+        states = edits; hasPhoto = enabled; controlsEnabled = nil
         for layer in edits.localAdjustments where maskPanels[layer.maskKey] == nil {
             let panel = makeMaskPanel(layer.maskKey, listed: false); layerPanelStore.addArrangedSubview(panel)
         }
@@ -364,9 +366,14 @@ final class EditorPanel: GlassChrome {
         }
     }
     @objc private func historyClicked(_ sender: NSButton) { chooseHistory?(sender.tag) }
+    private var controlsEnabled: Bool?
     func status(_ text: String, busy: Bool = false) {
-        message.stringValue = text; message.toolTip = text; self.busy = busy
+        message.stringValue = text; message.toolTip = text
         statusChanged?(text, busy)
+        // Controls change only when their enabled state does (a message alone touches nothing else).
+        let enabled = hasPhoto && !busy
+        guard enabled != controlsEnabled || busy != self.busy else { return }
+        self.busy = busy; controlsEnabled = enabled
         lutBrowser.setEnabled(hasPhoto && !busy)
         for panel in maskPanels.values { panel.setEnabled(hasPhoto && !busy) }
         mixer.setEnabled(hasPhoto && !busy)
@@ -412,7 +419,6 @@ extension EditorPanel {
         let column = lrColumns[target] ?? buildLightroom(target)
         column.isHidden = false
         for (slot, view, height) in lrSlots[target] ?? [] { borrow(view, into: slot, height: height) }
-        lutBrowser.setActive(target == .develop)
     }
     /// The Studio tool that's open: Masking shows its masks at the top of the panel; the other tools live in the options bar.
     /// The mask chosen in the Masking list, if any.

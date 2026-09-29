@@ -182,7 +182,7 @@ extension ViewerController {
     @objc func applyAdaptivePreset(_ sender: NSMenuItem) {
         guard AdaptivePresets.all.indices.contains(sender.tag) else { return }
         let preset = AdaptivePresets.all[sender.tag]
-        guard !isLibrary, let original = renderedPhoto?.image, let source = currentSource, !aiPreparing, !localAI.isRunning else { info.status("Open a photo in Develop to apply an adaptive preset."); return }
+        guard !isLibrary, let original = renderedPhoto, let source = currentSource, !aiPreparing, !localAI.isRunning else { info.status("Open a photo in Develop to apply an adaptive preset."); return }
         let edits = currentEdits
         if preset.target == .sky {
             guard LocalAI.ready else { info.status("Sky presets use on-device AI. Choose Set up on-device AI first."); return }

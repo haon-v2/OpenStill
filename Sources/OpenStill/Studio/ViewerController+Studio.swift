@@ -31,7 +31,7 @@ extension ViewerController {
         tabStrip.show(photoTabs)
         info.statusChanged = { [weak self] text, busy in self?.statusBar.show(text, busy: busy) }
         canvas.backdrop = Studio.canvas
-        canvas.viewportChanged = { [weak self] in self?.navigatorView?.needsDisplay = true; self?.updateStudioInfo() }
+        canvas.viewportChanged = { [weak self] in self?.navigatorView?.needsDisplay = true; self?.updateStudioInfo(); self?.viewportSettled() }
         librarySidebar.publish = { [weak self] in self?.withLibrary { $0.openPublish() } }
         info.setLightroom(.develop)
         Shortcuts.workspace = { [weak self] id in self?.handleWorkspaceKey(id) ?? false }
@@ -54,7 +54,7 @@ extension ViewerController {
         let showRail = !studio.railHidden, showPanel = !studio.panelHidden, showOptions = !studio.optionsBarHidden, showFilm = studio.filmstripShown
         rail.isHidden = !showRail; optionsBar.isHidden = !showOptions
         rightPanel.isHidden = !showPanel; resizeEdge.isHidden = !showPanel; shelf.isHidden = !showFilm
-        canvas.isHidden = isLibrary; canvas.hdrBackdrop.isHidden = isLibrary; libraryHost.isHidden = !isLibrary
+        canvas.isHidden = isLibrary; canvas.photoBackdrop.isHidden = isLibrary; libraryHost.isHidden = !isLibrary
         // The right panel: Develop's adjustments, or the Library's Folders · Collections · Info.
         let tab = studio.libraryTab
         libraryTabsBar.isHidden = !isLibrary
@@ -355,10 +355,16 @@ extension ViewerController {
     @objc func toggleNavigatorPanel() { toggleFloatingPanel("navigator") }
     /// Opens or closes one of the floating panels beside the editor.
     func toggleFloatingPanel(_ id: String) {
-        if let panel = studioPanels[id], panel.isVisible { panel.close(); return }
+        if let panel = studioPanels[id], panel.isVisible { panel.close(); if id == "presets" { info.setLUTPreviewsActive(false) }; return }
         let panel = studioPanels[id] ?? makePanel(id)
         studioPanels[id] = panel
         if id == "info" { floatingInfo.show(metadata, rendering: renderedPhoto?.description) }
+        if id == "presets" {
+            // LUT thumbnails render only while this panel is open, from the current edit.
+            panel.closed = { [weak self] in self?.info.setLUTPreviewsActive(false) }
+            if let photo = renderedPhoto { info.setLUTPhoto(photo.preview, edits: currentEdits, source: photo.sourceImage, url: currentSource, recipe: photoRecord?.active.recipe) }
+            info.setLUTPreviewsActive(true)
+        }
         panel.show(beside: view.window)
     }
     private func makePanel(_ id: String) -> StudioPanel {

@@ -187,17 +187,19 @@ extension ViewerController {
         let token = UUID(); histogramToken = token
         guard let image else { info.updateHistogram(nil,sensor:nil); return }
         let source = currentSource, raw = photoRecord?.active.sourceMode == .raw
+        let gate = histogramGate, job = gate.begin()
         histogramQueue.async { [weak self] in
+            guard gate.isCurrent(job) else { return }   // a newer frame's histogram is already on the way
             let histogram = PhotoHistogram.measure(CIImage(cgImage:image))
             let sensor = raw ? source.flatMap { ModernRenderer.sensorClipping($0) } : nil
             DispatchQueue.main.async { guard let self, self.histogramToken == token, self.currentSource == source else { return }; self.info.updateHistogram(histogram,sensor:sensor) }
         }
     }
     func chooseWhiteBalance(at point:CGPoint) {
-        guard let source = currentSource, let record = photoRecord, let original = renderedPhoto?.image else { return }
+        guard let source = currentSource, let record = photoRecord, let original = renderedPhoto else { return }
         finishMaskEditing(); canvas.clearTool()
         let token = editToken, edits = currentEdits
-        let geometry = EditGeometry(size:CGSize(width:original.width,height:original.height),edits:edits)
+        let geometry = EditGeometry(size:original.pixelSize,edits:edits)
         let samplePoint = LensCorrections.sourcePoint(geometry.sourcePoint(point),size:geometry.sourceSize,settings:edits.optics)
         info.status("Sampling neutral color…")
         editQueue.async { [weak self] in

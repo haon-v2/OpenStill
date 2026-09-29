@@ -24,12 +24,17 @@ private final class SourceImageBox {
     init(_ image:CIImage) { self.image = image }
 }
 public enum ModernRenderer {
+    /// Decoded originals, reused across edits and when going back to a photo. The budget scales with the Mac's memory
+    /// (a 40 MP RAW decode is about 320 MB), so a full decode and the photos around it stay cached.
     private static let sourceCache: NSCache<NSString,SourceImageBox> = {
-        let cache = NSCache<NSString,SourceImageBox>(); cache.totalCostLimit = 384*1024*1024; cache.countLimit = 2; return cache
+        let cache = NSCache<NSString,SourceImageBox>()
+        cache.totalCostLimit = Int(max(1 << 30, min(ProcessInfo.processInfo.physicalMemory / 6, 6 << 30))); cache.countLimit = 6; return cache
     }()
+    /// The longest edge the screen ever needs: previews and interactive renders stop here (a 6K display is about 6000 wide,
+    /// but a photo never fills the whole window, so 3200 covers Fit on every Mac display).
+    public static let screenEdge = 3200
     private static let sensorCache = NSCache<NSString,NSNumber>()
     public static func sensorClipping(_ source:URL) -> Double? { sensorCache.object(forKey:(source.path+EditStorage.fingerprint(source)) as NSString)?.doubleValue }
-    public static func clearSourceCache() { sourceCache.removeAllObjects() }
     public static let workingSpace = CGColorSpace(name: CGColorSpace.extendedLinearITUR_2020)!
     public static let context = RenderContexts.make([.workingColorSpace: workingSpace, .workingFormat: CIFormat.RGBAf, .cacheIntermediates: false])
     public static func readImage(_ url: URL) throws -> CIImage {
@@ -38,9 +43,14 @@ public enum ModernRenderer {
         return image
     }
     public static func source(_ url: URL, mode: SourceMode, raw: RawSettings = RawSettings(), halfSize:Bool = false, fast:Bool = false) throws -> CIImage {
-        let rawKey = raw.cacheKey
-        let key = "\(url.standardizedFileURL.path)|\(EditStorage.fingerprint(url))|\(mode.rawValue)|\(rawKey)|\(halfSize)|\(fast)" as NSString
-        if let cached = sourceCache.object(forKey:key) { return cached.image }
+        let base = "\(url.standardizedFileURL.path)|\(EditStorage.fingerprint(url))|\(mode.rawValue)|\(raw.cacheKey)"
+        func key(_ half: Bool, _ quick: Bool) -> NSString { "\(base)|\(half)|\(quick)" as NSString }
+        // A larger decode already in memory serves any smaller or quicker request (it is downscaled later anyway),
+        // so opening a photo and then editing it never decodes the RAW twice.
+        let candidates = halfSize ? [key(true, fast), key(true, !fast), key(false, fast), key(false, !fast)]
+            : fast ? [key(false, true), key(false, false)] : [key(false, false)]
+        for candidate in candidates { if let cached = sourceCache.object(forKey: candidate) { return cached.image } }
+        let key = key(halfSize, fast)
         let image:CIImage
         if let preview = SmartPreviews.stand(in: url) {
             // The original's drive isn't connected: edit its Smart Preview (already decoded, before any edits).
@@ -89,6 +99,15 @@ public enum ModernRenderer {
         let input = try source(url, mode:recipe.sourceMode, raw:recipe.raw,halfSize:maximumDimension.map{$0<=2048} ?? false,fast:maximumDimension != nil)
         if recipe.sourceMode == .raw { edits.temperature = 6500; edits.tint = 0; edits.neutralBalance = NeutralBalance() }
         return try process(input, edits:edits, maximumDimension:maximumDimension, lutOverride:lutOverride, stopBeforeTool:stopBeforeTool)
+    }
+    /// Renders for the screen at no more than `maximum` pixels on the longest edge.
+    public static func screenImage(_ image: CIImage, maximum: Int = screenEdge) throws -> CGImage {
+        var image = image
+        let longest = max(image.extent.width, image.extent.height)
+        if longest > CGFloat(maximum) {
+            image = image.applyingFilter("CILanczosScaleTransform", parameters: [kCIInputScaleKey: CGFloat(maximum) / longest, kCIInputAspectRatioKey: 1])
+        }
+        return try display(image)
     }
     public static func display(_ image: CIImage, profile: ExportProfile = .displayP3) throws -> CGImage {
         guard let result = context.createCGImage(image, from: image.extent, format: .RGBAh, colorSpace: profile.colorSpace) else { throw EditError.render }
@@ -196,6 +215,18 @@ public enum ModernRenderer {
 /// OSF1: magic (4 bytes), little-endian uint32 width/height, then float32 RGBA,
 /// top row first, unassociated alpha, extended sRGB. Model inputs use [0,1] sRGB;
 /// residuals outside that range are retained by the worker rather than quantized.
+/// Reads just the width and height from an OSF1 file's 12-byte header.
+public enum OSFloatHeader {
+    public static func size(of url: URL) -> CGSize? {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        guard let data = try? handle.read(upToCount: 12), data.count == 12, data.prefix(4) == Data("OSF1".utf8) else { return nil }
+        let w = data.withUnsafeBytes { UInt32(littleEndian: $0.loadUnaligned(fromByteOffset: 4, as: UInt32.self)) }
+        let h = data.withUnsafeBytes { UInt32(littleEndian: $0.loadUnaligned(fromByteOffset: 8, as: UInt32.self)) }
+        return w > 0 && h > 0 ? CGSize(width: Int(w), height: Int(h)) : nil
+    }
+}
+
 public enum FloatImageBridge {
     public static func write(_ image: CIImage, to url: URL) throws {
         let w = Int(image.extent.width), h = Int(image.extent.height)

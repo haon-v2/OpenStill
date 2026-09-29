@@ -39,13 +39,16 @@ final class PhotoStore {
             let result = Result { () -> DecodedPhoto in
                 if !thumbnail, let version, version.renderer == .linear2020 {
                     let source = try ModernRenderer.source(url, mode:version.sourceMode, raw:version.raw, fast:true)
-                    return DecodedPhoto(image:try ModernRenderer.display(source), rendering:version.sourceMode == .raw ? .rawDevelopment : (version.sourceMode == .cameraLook ? .cameraPreview : .original), sourceImage:source)
+                    // The screen gets a preview; the full frame is only made if a tool needs every pixel.
+                    return DecodedPhoto(preview:try ModernRenderer.screenImage(source), pixelSize:source.extent.size,
+                                        rendering:version.sourceMode == .raw ? .rawDevelopment : (version.sourceMode == .cameraLook ? .cameraPreview : .original),
+                                        sourceImage:source, full:{ try ModernRenderer.display(source) })
                 }
                 return try PhotoDecoder.render(url, maxPixelSize: thumbnail ? 240 : nil)
             }
             guard operation?.isCancelled == false else { return }
             if case .success(let photo) = result {
-                cache.setObject(ImageBox(photo), forKey: key, cost: photo.image.bytesPerRow * photo.image.height)
+                cache.setObject(ImageBox(photo), forKey: key, cost: photo.preview.bytesPerRow * photo.preview.height)
             }
             DispatchQueue.main.async { completion(result) }
         }

@@ -19,12 +19,16 @@ extension ViewerController {
     }
     func editSourceSize(_ edits: PhotoEdits? = nil) -> CGSize {
         let edits = edits ?? currentEdits
-        if let asset = edits.baseAsset, asset.hasSuffix(".osfloat"), let image = try? ModernRenderer.readImage(EditStorage.asset(asset)) { return image.extent.size }
-        if let asset = edits.baseAsset,
-           let io = CGImageSourceCreateWithURL(EditStorage.asset(asset) as CFURL,nil),
+        guard let asset = edits.baseAsset else { return renderedPhoto?.pixelSize ?? CGSize(width:1,height:1) }
+        if let known = baseSizes[asset] { return known }
+        var size: CGSize?
+        if asset.hasSuffix(".osfloat") { size = OSFloatHeader.size(of:EditStorage.asset(asset)) }
+        else if let io = CGImageSourceCreateWithURL(EditStorage.asset(asset) as CFURL,nil),
            let props = CGImageSourceCopyPropertiesAtIndex(io,0,nil) as? [CFString:Any],
-           let w = props[kCGImagePropertyPixelWidth] as? Int, let h = props[kCGImagePropertyPixelHeight] as? Int { return CGSize(width:w,height:h) }
-        return CGSize(width:renderedPhoto?.image.width ?? 1,height:renderedPhoto?.image.height ?? 1)
+           let w = props[kCGImagePropertyPixelWidth] as? Int, let h = props[kCGImagePropertyPixelHeight] as? Int { size = CGSize(width:w,height:h) }
+        guard let size else { return renderedPhoto?.pixelSize ?? CGSize(width:1,height:1) }
+        baseSizes[asset] = size
+        return size
     }
     func setEditingMask(_ shape:AdjustmentMask,for key:String,in edits:inout PhotoEdits) {
         var root=edits.advanced?.masks[key] ?? AdjustmentMask(kind:"stack")
@@ -142,7 +146,10 @@ extension ViewerController {
         let edits = currentEdits, sourceSize = editSourceSize()
         guard let source=currentSource,var recipe=photoRecord?.active.recipe else{return}
         recipe.edits=edits
-        editQueue.async { [weak self] in
+        let gate = maskOverlayGate, job = gate.begin()
+        maskQueue.async { [weak self] in
+            // A newer overlay request makes this one pointless: skip it rather than render work nobody will see.
+            guard gate.isCurrent(job) else { return }
             let result = try? autoreleasepool { () -> CGImage? in
                 let scale = min(1,1200/max(sourceSize.width,sourceSize.height))
                 let size = CGSize(width:(sourceSize.width*scale).rounded(),height:(sourceSize.height*scale).rounded())
@@ -157,15 +164,15 @@ extension ViewerController {
         }
     }
     func selectMaskObject(at displayed:CGPoint) {
-        guard canvas.tool == .maskObject, let key = activeMaskKey, let original = renderedPhoto?.image, let source = currentSource, !aiPreparing, !localAI.isRunning else { return }
+        guard canvas.tool == .maskObject, let key = activeMaskKey, let original = renderedPhoto, let source = currentSource, !aiPreparing, !localAI.isRunning else { return }
         let edits = currentEdits, geometry = EditGeometry(size:editSourceSize(),edits:currentEdits)
         let selection = maskSession.beginSelection()
         let componentID=info.selectedMaskComponent(key:key)
-        let point = LensCorrections.sourcePoint(geometry.sourcePoint(displayed),size:geometry.sourceSize,settings:edits.optics), token = UUID(); editToken = token; editWork?.cancel(); aiPreparing = true
+        let point = LensCorrections.sourcePoint(geometry.sourcePoint(displayed),size:geometry.sourceSize,settings:edits.optics), token = UUID(); editToken = token; cancelRenders(); aiPreparing = true
         info.status("Selecting the object on this Mac…",busy:true)
         editQueue.async { [weak self] in
             let result = Result { () -> URL in
-                let base = try edits.baseAsset.map { try PhotoDecoder.decode(EditStorage.asset($0)) } ?? original
+                let base = try edits.baseAsset.map { try PhotoDecoder.decode(EditStorage.asset($0)) } ?? original.image
                 let scale = min(1,1600/Double(max(base.width,base.height)))
                 let ci = CIImage(cgImage:base).transformed(by:CGAffineTransform(scaleX:scale,y:scale))
                 guard let small = RenderContexts.utility.createCGImage(ci,from:ci.extent) else { throw EditError.render }
@@ -187,12 +194,12 @@ extension ViewerController {
         }
     }
     func alignHorizon() {
-        guard let original = renderedPhoto?.image, let source = currentSource else { return }
-        let edits = currentEdits, token = UUID(); editToken = token; editWork?.cancel(); aiPreparing = true
+        guard let original = renderedPhoto, let source = currentSource else { return }
+        let edits = currentEdits, token = UUID(); editToken = token; cancelRenders(); aiPreparing = true
         info.status("Looking for the horizon on this Mac…",busy:true)
         editQueue.async { [weak self] in
             let result = Result { () -> Double in
-                let current = try PhotoEditor.render(original,edits:edits)
+                let current = try PhotoEditor.render(original.image,edits:edits)
                 return try VisionEditor.horizon(current)
             }
             DispatchQueue.main.async {

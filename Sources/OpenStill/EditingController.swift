@@ -47,7 +47,7 @@ extension ViewerController {
         info.setLUTPhoto(nil,edits:PhotoEdits())
         localAI.cancel(); aiPreparing = false; maskSession.end(); maskVisible = false; maskToken = UUID()
         info.resetMaskInteractions()
-        editWork?.cancel(); editToken = UUID(); comparing = false; canvas.clearTool();retouchSession.reset();canvas.retouchSource=nil
+        cancelRenders(); editToken = UUID(); comparing = false; canvas.clearTool();retouchSession.reset();canvas.retouchSource=nil
         canvas.beforeImage = nil; canvas.clippingOverlay = nil
         if let old = preparedSource, old != source { previousEdits = currentEdits }
         preparedSource = source
@@ -97,52 +97,113 @@ extension ViewerController {
         }
         catch { info.status("Couldn’t save edit history: \(error.localizedDescription)") }
     }
+    /// Shows the current edits. Renders run one at a time and the newest edits always win: while one renders, later
+    /// changes wait and the next render starts the moment it finishes, so the photo follows a slider as fast as the GPU
+    /// allows. The screen gets the whole frame at the size it is shown (never more than `ModernRenderer.screenEdge`);
+    /// when zoomed in past that, the visible part is rendered sharp on its own once the edit settles.
     func renderEdits(interactive:Bool = false) {
-        guard let original = renderedPhoto?.image, let source = currentSource else { return }
-        canvas.sunPosition = currentEdits.editableSunSettings(sourceSize:editSourceSize()).displayedCenter(geometry:EditGeometry(size:editSourceSize(),edits:currentEdits))
-        info.setLUTPhoto(original,edits:currentEdits, source:renderedPhoto?.sourceImage, url:source, recipe:photoRecord?.active.recipe)
-        editWork?.cancel(); let token = UUID(); editToken = token
-        if comparing { canvas.maskOverlay = nil }
-        else { refreshMaskOverlay() }
+        guard let photo = renderedPhoto, currentSource != nil else { return }
+        if canvas.tool == .sun || !interactive {
+            let sun = currentEdits.editableSunSettings(sourceSize:editSourceSize()).displayedCenter(geometry:EditGeometry(size:editSourceSize(),edits:currentEdits))
+            if canvas.sunPosition != sun { canvas.sunPosition = sun }
+        }
+        editToken = UUID()
         if comparing || currentEdits.isOriginal {
-            canvas.replaceRenderedImage(original); updateHistogram(original); refreshCompareExtras(original, interactive:false)
+            renderQueued = false
+            if comparing { canvas.maskOverlay = nil } else { refreshMaskOverlay() }
+            canvas.replaceRenderedImage(photo.preview, pixelSize:photo.pixelSize); updateHistogram(photo.preview); refreshCompareExtras(photo.preview, interactive:false)
             info.status(comparing ? "Showing original. Click Compare again to return to your edit." : "Edits are saved on this Mac. Originals stay untouched.")
             return
         }
-        let edits = currentEdits
-        let previewLimit:Int?=interactive ? 1600:nil
-        let logicalSize=EditGeometry(size:editSourceSize(),edits:edits).extent.size
-        let linearSource = renderedPhoto?.sourceImage
+        if renderInFlight {
+            queuedInteractive = renderQueued ? queuedInteractive && interactive : interactive
+            renderQueued = true
+            return
+        }
+        startRender(interactive:interactive)
+    }
+    /// Stops showing renders already under way (a new photo, or an AI step taking over).
+    func cancelRenders() { renderGeneration = UUID(); renderQueued = false; renderInFlight = false }
+    private func startRender(interactive:Bool) {
+        guard let photo = renderedPhoto, let source = currentSource else { return }
+        renderInFlight = true
+        let generation = renderGeneration, edits = currentEdits
+        let fullSize = editSourceSize()
+        let logicalSize = EditGeometry(size:fullSize,edits:edits).extent.size
+        let fullEdge = max(fullSize.width, fullSize.height), outputEdge = max(1, max(logicalSize.width, logicalSize.height))
+        // The source limit that gives an output this many pixels on its longest edge (nil: full size).
+        func sourceLimit(_ edge:CGFloat) -> Int? { let limit = edge*fullEdge/outputEdge; return limit >= fullEdge*0.98 ? nil : Int(limit.rounded(.up)) }
+        let screen = CGFloat(ModernRenderer.screenEdge)
+        let baseEdge = min(screen, max(canvas.fitPixels(for:logicalSize), min(canvas.shownPixels, screen)))
+        // Zoomed in past the whole-frame render: once the edit settles, render just the visible part at the zoom's resolution.
+        var detailPlan: (limit:Int?, region:CGRect)?
+        if !interactive, !canvas.isFit, canvas.shownPixels > baseEdge*1.05, let visible = canvas.visibleFraction {
+            let margin = CGFloat(0.08)
+            let region = visible.insetBy(dx:-visible.width*margin, dy:-visible.height*margin).intersection(CGRect(x:0,y:0,width:1,height:1))
+            detailPlan = (sourceLimit(min(canvas.shownPixels, outputEdge)), region)
+        }
+        let linearSource = photo.sourceImage, original = photo
         var recipe = photoRecord?.active.recipe
         recipe?.edits = edits
         if recipe?.sourceMode == .raw { recipe = RenderRecipe(renderer:recipe!.renderer, sourceMode:.raw, raw:recipe!.raw, edits:edits) }
-        info.status("Rendering edit…")
         // HDR edits show in extended range on HDR displays; elsewhere the SDR rendition is shown.
-        let hdrPreview = edits.hdr.enabled && HDRBackdrop.available
+        let hdrPreview = edits.hdr.enabled && PhotoBackdrop.hdrAvailable
         var sdrEdits = edits; sdrEdits.hdrEnabled = false
-        let work = DispatchWorkItem { [weak self] in
-            let result = Result { try autoreleasepool { () -> (CGImage, CGImage?) in
-                func show(_ image: CIImage) throws -> (CGImage, CGImage?) {
-                    guard hdrPreview else { return (try ModernRenderer.display(image), nil) }
-                    return (try ModernRenderer.display(HDRTone.toneMapSDR(image)), try ModernRenderer.displayHDR(image))
+        let baseLimit = sourceLimit(baseEdge)
+        renderQueue.async { [weak self] in
+            let result = Result { try autoreleasepool { () -> (CGImage, CGImage?, (image:CGImage, region:CGRect)?) in
+                func render(_ limit:Int?) throws -> CIImage? {
+                    if let recipe, recipe.renderer == .linear2020 { return try ModernRenderer.render(source:source, recipe:hdrPreview ? recipe:recipe.sdr, maximumDimension:limit) }
+                    if let linearSource { return try ModernRenderer.process(linearSource, edits:hdrPreview ? edits:sdrEdits, maximumDimension:limit) }
+                    return nil
                 }
-                if let recipe, recipe.renderer == .linear2020 { return try show(ModernRenderer.render(source:source, recipe:hdrPreview ? recipe:recipe.sdr,maximumDimension:previewLimit)) }
-                if let linearSource { return try show(ModernRenderer.process(linearSource, edits:hdrPreview ? edits:sdrEdits,maximumDimension:previewLimit)) }
-                return (try PhotoEditor.render(original, edits: edits,previewMaxDimension:previewLimit), nil)
+                guard let base = try render(baseLimit) else {
+                    return (try PhotoEditor.render(original.image, edits:edits, previewMaxDimension:baseLimit), nil, nil)
+                }
+                let shown = hdrPreview ? try ModernRenderer.display(HDRTone.toneMapSDR(base)) : try ModernRenderer.display(base)
+                let hdr = hdrPreview ? try ModernRenderer.displayHDR(base) : nil
+                var detail: (image:CGImage, region:CGRect)?
+                if let plan = detailPlan, !hdrPreview, let image = try render(plan.limit) {
+                    let e = image.extent
+                    let rect = CGRect(x:e.minX+plan.region.minX*e.width, y:e.minY+plan.region.minY*e.height, width:plan.region.width*e.width, height:plan.region.height*e.height).integral.intersection(e)
+                    if rect.width >= 1, rect.height >= 1, let cg = try? ModernRenderer.display(image.cropped(to:rect)) {
+                        detail = (cg, CGRect(x:(rect.minX-e.minX)/e.width, y:(rect.minY-e.minY)/e.height, width:rect.width/e.width, height:rect.height/e.height))
+                    }
+                }
+                return (shown, hdr, detail)
             } }
             DispatchQueue.main.async {
-                guard let self, self.editToken == token, self.currentSource == source else { return }
+                guard let self, self.renderGeneration == generation else { return }
+                self.renderInFlight = false
+                guard self.currentSource == source else { self.renderQueued = false; return }
                 switch result {
-                case .success(let (image, hdr)):
-                    self.canvas.replaceRenderedImage(image,pixelSize:interactive ? logicalSize:nil); self.canvas.hdrImage = hdr; self.updateHistogram(image)
-                    self.refreshCompareExtras(image, interactive:interactive)
-                    self.refreshMaskOverlay()
-                    self.info.status(interactive ? "Interactive preview · Full resolution on release":"Edited · \(image.width) × \(image.height) px · Original preserved")
+                case .success(let (image, hdr, detail)):
+                    self.canvas.replaceRenderedImage(image, pixelSize:logicalSize, detail:detail); self.canvas.hdrImage = hdr
                 case .failure(let error): self.info.status(error.localizedDescription)
                 }
+                if self.renderQueued {
+                    self.renderQueued = false
+                    self.startRender(interactive:self.queuedInteractive)
+                    return
+                }
+                guard case .success(let (image, _, _)) = result else { return }
+                self.updateHistogram(image)
+                self.refreshCompareExtras(image, interactive:interactive)
+                guard !interactive else { return }
+                // The edit has settled: the extras that only matter once it stops changing.
+                self.refreshMaskOverlay()
+                self.info.setLUTPhoto(original.preview, edits:edits, source:original.sourceImage, url:source, recipe:self.photoRecord?.active.recipe)
+                self.info.status("Edited · \(Int(logicalSize.width)) × \(Int(logicalSize.height)) px · Original preserved")
             }
         }
-        editWork = work; editQueue.asyncAfter(deadline: .now() + (canvas.tool == .sun ? 0 : 0.12), execute: work)
+    }
+    /// Re-renders the sharp part after zooming or panning, once the view stops moving.
+    func viewportSettled() {
+        detailWork?.cancel()
+        guard renderedPhoto != nil, !canvas.isFit else { return }
+        let work = DispatchWorkItem { [weak self] in self?.renderEdits() }
+        detailWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: work)
     }
     func restoreHistory() {
         finishMaskEditing()
@@ -176,7 +237,7 @@ extension ViewerController {
         }
         if name == "setupAI" { setupAI(); return }
         if name.hasPrefix("version:") || name.hasPrefix("source:") { versionCommand(name); return }
-        guard let source = currentSource, let original = renderedPhoto?.image, !localAI.isRunning, !aiPreparing else { return }
+        guard let source = currentSource, renderedPhoto != nil, !localAI.isRunning, !aiPreparing else { return }
         if comparing && name != "compare" { comparing = false; renderEdits() }
         if name.hasPrefix("mask:") { maskCommand(name); return }
         if name.hasPrefix("lensBlur:") { lensBlurCommand(name); return }
@@ -246,7 +307,7 @@ extension ViewerController {
         case "blendNormal", "blendScreen", "blendMultiply":
             edits.overlayBlend = name == "blendNormal" ? "CISourceOverCompositing" : (name == "blendScreen" ? "CIScreenBlendMode" : "CIMultiplyBlendMode")
             changeEdits(edits, title: "Layer blend", commit: true)
-        case "export": exportCurrent(source: source, original: original, edits: edits)
+        case "export": exportCurrent(source: source, edits: edits)
         case "horizon": alignHorizon()
         case "importLUT": importLUT()
         case "removeLUT": edits.ensureAdvanced(); edits.advanced!.lutAsset = nil; edits.advanced!.lutName = nil; edits.advanced!.lutID = nil; changeEdits(edits,title:"Remove LUT",commit:true)
@@ -312,7 +373,7 @@ extension ViewerController {
             } catch { self.info.status("Couldn’t read this preset. \(error.localizedDescription)") }
         }
     }
-    private func exportCurrent(source: URL, original: CGImage, edits: PhotoEdits) {
+    private func exportCurrent(source: URL, edits: PhotoEdits) {
         guard var record=photoRecord else{info.status("Open a photo with a saved edit record before exporting.");return}
         var document=record.active.document;document.commit(edits,title:"Export snapshot");record.updateDocument(document)
         let item=ShootItem(url:source,record:record,captured:(try? ShootItem.read(source).captured) ?? Date.distantPast)
@@ -343,7 +404,7 @@ extension ViewerController {
         let rawSettings = photoRecord?.active.raw ?? RawSettings()
         if tool == "rawdenoise" && sourceMode != .raw { info.status("RAW denoise works on photos developed from RAW. Use Remove noise for other photos."); return }
         if tool == "rawdenoise" && edits.baseAsset != nil { info.status("This version already has an AI result. Start from a version without one to denoise the RAW data."); return }
-        aiPreparing = true; editWork?.cancel(); editToken = UUID()
+        aiPreparing = true; cancelRenders(); editToken = UUID()
         let token = editToken
         info.status("Preparing full-resolution photo for on-device AI…", busy: true)
         editQueue.async { [weak self] in
