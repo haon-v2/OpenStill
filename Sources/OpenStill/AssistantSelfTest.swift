@@ -29,11 +29,18 @@ enum AssistantSelfTest {
             ("run_command", ["name": .string("upright"), "argument": .string("auto")]),
             ("run_command", ["name": .string("undo")]),
             ("list_presets", [:]),
+            ("_open_second", [:]),
             ("list_photos", [:]),
         ]
         func next(_ index: Int) {
             guard !steps.isEmpty else { exit(0) }
             let (tool, args) = steps.removeFirst()
+            if tool == "_open_second" {
+                // The catalog lists photos once they've been opened: open the second sample, then come back.
+                viewer.select(1)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 4) { viewer.select(0); DispatchQueue.main.asyncAfter(deadline: .now() + 4) { next(index + 1) } }
+                return
+            }
             viewer.assistant(tool, args) { result in
                 switch result {
                 case .failure(let error): print("STEP \(index) \(tool) ERROR \(error.localizedDescription)")

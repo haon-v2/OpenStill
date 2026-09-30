@@ -41,7 +41,8 @@ public enum AssistantEdits {
         component["selection"] = .object(mask)
         mask["components"] = .object(["?": items(.object(component))])
         advanced["masks"] = .object(["{}": .object(mask)])
-        advanced["colors"] = items(.object(object((try? json(ColorBand())) ?? .null).merging(["lightness": .number(0)]) { a, _ in a }))
+        let band = JSONValue.object(object((try? json(ColorBand())) ?? .null).merging(["lightness": .number(0)]) { a, _ in a })
+        advanced["colors"] = .object(["[]": band, "default": .array(Array(repeating: band, count: 8))])
         advanced["pointColors"] = items((try? json(PointColor(hue: 0, saturation: 0.5, lightness: 0.5))) ?? .null)
         advanced["eyeFixes"] = items((try? json(EyeFix(kind: .redEye, center: CGPoint(x: 0.5, y: 0.5), radiusX: 0.02, radiusY: 0.02))) ?? .null)
         advanced["retouch"] = items((try? json(RetouchStroke(mode: .heal, source: CGPoint(x: 0.4, y: 0.5), destination: CGPoint(x: 0.5, y: 0.5),
@@ -61,7 +62,7 @@ public enum AssistantEdits {
     /// A template's value when the part is missing: containers start empty, "?" parts stay missing.
     static func materialize(_ t: JSONValue) -> JSONValue? {
         guard case .object(let o) = t else { return t }
-        if o["[]"] != nil { return .array([]) }
+        if o["[]"] != nil { return o["default"] ?? .array([]) }
         if o["{}"] != nil { return .object([:]) }
         if o["?"] != nil { return nil }
         return .object(o.compactMapValues(materialize))
@@ -182,7 +183,7 @@ public enum AssistantEdits {
         guard !to.isEmpty else { return }
         for (key, value) in p {
             guard let sub = to[key] else {
-                let known = to.keys.filter { !$0.hasPrefix("[") && $0 != "{}" && $0 != "?" }.sorted().joined(separator: ", ")
+                let known = to.keys.filter { !$0.hasPrefix("[") && $0 != "{}" && $0 != "?" && !(path == "advanced." && hiddenAdvanced.contains($0)) && !(path.isEmpty && hiddenTop.contains($0)) }.sorted().joined(separator: ", ")
                 if path.isEmpty && (key == "advanced" || virtualTop.contains(key)) { continue }
                 throw AssistantError.message("Unknown key “\(path + key)”. Keys here: \(known).")
             }
