@@ -1,7 +1,7 @@
 name: Diagnose WB
 on:
   push:
-    branches: [claude/gifted-lovelace-pbg8wv-wb]
+    branches: [claude/gifted-lovelace-pbg8wv-wb, claude/gifted-lovelace-pbg8wv-wb018]
 jobs:
   diagnose:
     runs-on: macos-26
@@ -41,10 +41,7 @@ jobs:
               echo "BEGIN $f"; base64 -i $f.jpg | tr -d '\n'; echo; echo "END $f"
             done
           done <<'LIST'
-          plain|1|plain
-          mouse|1|mouse
-          legacy|1|legacy
-          p3|p3|plain
-          p3mouse|p3|mouse
+          ticks|1|ticks
+          p3ticks|p3|ticks
           LIST
           true

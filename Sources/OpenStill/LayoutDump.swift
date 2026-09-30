@@ -22,7 +22,7 @@ enum LayoutDump {
                 }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
                     print("WB [\(mode)] photo before \(mean(viewer.canvas.image)) temp=\(viewer.currentEdits.temperature) corrected=\(viewer.currentEdits.usesCorrectedWhiteBalance)"); fflush(stdout)
-                    if mode == "mouse" { mouseDrag(viewer, root, path: path) }
+                    if mode == "ticks" { tickDrag(viewer, root, path: path) }
                     else { step(viewer, root, [("Temp", 9500), ("Temp", 3500), ("Temp", 6500), ("Tint", 80), ("Tint", -80), ("Tint", 0)], path: path) }
                 }
             }
@@ -40,30 +40,31 @@ enum LayoutDump {
             step(viewer, root, Array(moves.dropFirst()), path: path)
         }
     }
-    /// Drags the Temp knob to the right end and back with real mouse events, printing the photo each time.
-    private static func mouseDrag(_ viewer: ViewerController, _ root: NSView, path: String) {
-        guard let slider = find("Temp", in: root), let window = slider.window else { exit(3) }
-        func point(_ fraction: Double) -> NSPoint {
-            let knob = slider.cell.map { ($0 as! NSSliderCell).knobRect(flipped: slider.isFlipped) } ?? .zero
-            let track = slider.bounds.insetBy(dx: knob.width / 2, dy: 0)
-            let x = track.minX + track.width * CGFloat((slider.doubleValue - slider.minValue) / (slider.maxValue - slider.minValue))
-            let target = track.minX + track.width * CGFloat(fraction)
-            return slider.convert(NSPoint(x: fraction < 0 ? x : target, y: slider.bounds.midY), to: nil)
-        }
-        func event(_ type: NSEvent.EventType, _ at: NSPoint) -> NSEvent {
-            NSEvent.mouseEvent(with: type, location: at, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: type == .leftMouseUp ? 0 : 1)!
-        }
-        func drag(to fraction: Double, then: @escaping () -> Void) {
-            let start = point(-1), end = point(fraction)
-            for i in 1...12 { NSApp.postEvent(event(.leftMouseDragged, NSPoint(x: start.x + (end.x - start.x) * CGFloat(i) / 12, y: start.y)), atStart: false) }
-            NSApp.postEvent(event(.leftMouseUp, end), atStart: false)
-            slider.mouseDown(with: event(.leftMouseDown, start))
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                print("WB [mouse] after dragging Temp to \(Int(fraction * 100))% of the track: value=\(Int(slider.doubleValue)) \(mean(viewer.canvas.image)) corrected=\(viewer.currentEdits.usesCorrectedWhiteBalance)"); fflush(stdout)
-                then()
+    /// A drag as the slider reports it: values while the mouse moves (final false), then the release, which repeats
+    /// the last value (final true). Starts from a photo that has never had its white balance changed.
+    private static func tickDrag(_ viewer: ViewerController, _ root: NSView, path: String) {
+        guard let slider = find("Temp", in: root) else { exit(3) }
+        let fresh = PhotoEdits()
+        viewer.currentEdits = fresh; viewer.info.update(fresh, document: viewer.editDocument, enabled: true); viewer.renderEdits()
+        func drag(_ values: [Double], then: @escaping () -> Void) {
+            for (i, v) in values.enumerated() {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1 + Double(i) * 0.1) { slider.doubleValue = v; slider.changed?(v, false) }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5 + Double(values.count) * 0.1) {
+                print("WB [ticks] while dragging to \(Int(values.last!)): \(mean(viewer.canvas.image)) corrected=\(viewer.currentEdits.usesCorrectedWhiteBalance)"); fflush(stdout)
+                slider.changed?(values.last!, true)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                    print("WB [ticks] after release at \(Int(values.last!)): \(mean(viewer.canvas.image)) corrected=\(viewer.currentEdits.usesCorrectedWhiteBalance) saved=\(viewer.editDocument.current.usesCorrectedWhiteBalance)"); fflush(stdout)
+                    then()
+                }
             }
         }
-        drag(to: 0.95) { drag(to: 0.05) { drag(to: 0.535) { step(viewer, root, [], path: path) } } }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            print("WB [ticks] fresh photo: \(mean(viewer.canvas.image)) temp=\(viewer.currentEdits.temperature) corrected=\(viewer.currentEdits.usesCorrectedWhiteBalance)"); fflush(stdout)
+            drag(stride(from: 6700.0, through: 9500, by: 400).map { $0 } + [9500]) {
+                drag(stride(from: 9100.0, through: 3500, by: -400).map { $0 } + [3500]) { step(viewer, root, [], path: path) }
+            }
+        }
     }
     private static func find(_ title: String, in root: NSView) -> ContinuousSlider? {
         var found: ContinuousSlider?
