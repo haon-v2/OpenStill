@@ -191,5 +191,16 @@
             <sparkle:fullReleaseNotesLink>https://github.com/haon-v2/OpenStill/releases/tag/v0.0.17</sparkle:fullReleaseNotesLink>
             <enclosure url="https://github.com/haon-v2/OpenStill/releases/download/v0.0.17/OpenStill-0.0.17.zip" sparkle:edSignature="Lkse43OfVRIaDUwq8UzROcRa3mxhWkwwJzaMheo2ofxkcjTiPMIRlQ46Z8DNXq2La5i9RkCwfbP0GPYGWaJfDw==" length="32768183" type="application/octet-stream"/>
         </item>
+        <item>
+            <title>OpenStill 0.0.18</title>
+            <description><![CDATA[<h3>What’s new in 0.0.18</h3><ul><li>Redesigned Settings with a sidebar (render cache, GPU/HDR, catalog location and backups, Auto Import in one place)</li><li>the whole app is now dark</li><li>fixed spread-out forms and cut-off text</li><li>removed unused code.</li></ul>]]></description>
+            <pubDate>Tue, 29 Sep 2026 18:51:52 GMT</pubDate>
+            <sparkle:version>34</sparkle:version>
+            <sparkle:shortVersionString>0.0.18</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <sparkle:fullReleaseNotesLink>https://github.com/haon-v2/OpenStill/releases/tag/v0.0.18</sparkle:fullReleaseNotesLink>
+            <enclosure url="https://github.com/haon-v2/OpenStill/releases/download/v0.0.18/OpenStill-0.0.18.zip" sparkle:edSignature="G3/ZdPs+e3L9BxAIGfCqyU5nybzyuGQzMRnLHWTjHMPC1mInHF8a3vdWSycwpbO/L3PxC0zHU6qvtY/I2/KwDg==" length="32785089" type="application/octet-stream"/>
+        </item>
     </channel>
 </rss>
