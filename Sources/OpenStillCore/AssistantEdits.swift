@@ -87,7 +87,8 @@ public enum AssistantEdits {
             if o?[key] == nil && value == before { m[key] = nil; continue }
             // A part that was missing and is now changed is kept whole; only parts that already existed are looked into.
             // "advanced" is only a container of sections, so it is always looked into.
-            let inner: JSONValue? = o?[key] ?? (key == "advanced" && o != nil ? .object([:]) : nil)
+            // For an edit with no advanced part yet, its required fields count as already there.
+            let inner: JSONValue? = o?[key] ?? (key == "advanced" && o != nil ? ((try? json(AdvancedEdits())) ?? .object([:])) : nil)
             if case .object = value, let inner { m[key] = unfill(value, filled: before, original: inner) }
         }
         return .object(m)
