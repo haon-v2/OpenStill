@@ -246,12 +246,17 @@ extension ViewerController {
                     .transformed(by: CGAffineTransform(scaleX: area.width / selection.extent.width, y: area.height / selection.extent.height))
                     .transformed(by: CGAffineTransform(translationX: area.minX, y: area.minY))
                     .cropped(to: area)
-                let tinted = CIImage(color: CIColor(red: 1, green: 0.08, blue: 0.08, alpha: 0.5)).cropped(to: area).composited(over: photo)
-                let shown = tinted.applyingFilter("CIBlendWithMask", parameters: [kCIInputBackgroundImageKey: photo, kCIInputMaskImageKey: fitted])
+                let tinted = CIImage(color: CIColor(red: 1, green: 0, blue: 0, alpha: 0.6)).cropped(to: area).composited(over: photo)
+                let overlay = tinted.applyingFilter("CIBlendWithMask", parameters: [kCIInputBackgroundImageKey: photo, kCIInputMaskImageKey: fitted])
+                // Left: the photo with the selection in red. Right: the selection alone, white where the layer applies fully.
+                let gap = max(4, area.width * 0.01)
+                let matte = fitted.transformed(by: CGAffineTransform(translationX: area.width + gap, y: 0))
+                let shown = matte.composited(over: overlay)
+                    .composited(over: CIImage(color: CIColor(red: 0.1, green: 0.1, blue: 0.1)).cropped(to: CGRect(x: area.minX, y: area.minY, width: area.width * 2 + gap, height: area.height)))
                 var facts = extra
                 facts["layer"] = AssistantMasks.describe(layer, mask: mask)
                 facts["selection"] = try AssistantMasks.stats(fitted)
-                facts["how_to_read"] = .string("Red shows where this layer's sliders apply; the photo already includes every layer's edits.")
+                facts["how_to_read"] = .string("Left: the photo (with every layer's edits) and this layer's area in red. Right: the selection alone, white = full effect, black = none.")
                 return try ViewerController.jpegPayload(shown, facts)
             }
             DispatchQueue.main.async { reply(result) }

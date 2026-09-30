@@ -371,7 +371,8 @@ public enum AssistantMasks {
         var mask = AdjustmentMask(kind: kind)
         switch kind {
         case "linear":
-            mask.start = MaskPoint(try point("from", base?.start.point ?? CGPoint(x: 0.5, y: 1))); mask.end = MaskPoint(try point("to", base?.end.point ?? CGPoint(x: 0.5, y: 0.5)))
+            // OpenStill's linear mask has no effect at `start`, rising to full at `end` and beyond.
+            mask.end = MaskPoint(try point("from", base?.end.point ?? CGPoint(x: 0.5, y: 1))); mask.start = MaskPoint(try point("to", base?.start.point ?? CGPoint(x: 0.5, y: 0.5)))
         case "radial":
             let center = try point("center", base?.start.point ?? CGPoint(x: 0.5, y: 0.5))
             var rx = base.map { abs($0.end.x - $0.start.x) } ?? 0.3, ry = base.map { abs($0.end.y - $0.start.y) } ?? 0.3
@@ -434,7 +435,14 @@ public enum AssistantMasks {
         var values: [String: JSONValue] = [:]
         for (name, path) in sliderNames where layer.settings[keyPath: path] != 0 { values[name] = .number(layer.settings[keyPath: path]) }
         let kinds = mask.map { m in m.components.map { $0.map { $0.name } } ?? [m.kind] } ?? []
-        return .object(["id": .string(layer.id.uuidString), "name": .string(layer.name), "selection": .array(kinds.map(JSONValue.string)),
-                        "hidden": .bool(layer.hidden), "inverted": .bool(mask?.inverted ?? false), "values": .object(values)])
+        var result: [String: JSONValue] = ["id": .string(layer.id.uuidString), "name": .string(layer.name), "selection": .array(kinds.map(JSONValue.string)),
+                                           "hidden": .bool(layer.hidden), "inverted": .bool(mask?.inverted ?? false), "values": .object(values)]
+        // Shapes in the same terms as add_mask_layer: fractions from the top-left.
+        func p(_ point: MaskPoint) -> JSONValue { .array([.number((point.x * 1000).rounded() / 1000), .number(((1 - point.y) * 1000).rounded() / 1000)]) }
+        if let mask, mask.components == nil, mask.kind == "linear" { result["shape"] = .object(["from": p(mask.end), "to": p(mask.start), "feather": .number(mask.feather)]) }
+        if let mask, mask.components == nil, mask.kind == "radial" {
+            result["shape"] = .object(["center": p(mask.start), "radius": .array([.number(abs(mask.end.x - mask.start.x)), .number(abs(mask.end.y - mask.start.y))]), "feather": .number(mask.feather)])
+        }
+        return .object(result)
     }
 }

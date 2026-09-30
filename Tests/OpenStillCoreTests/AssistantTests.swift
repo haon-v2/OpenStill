@@ -89,12 +89,15 @@ import Testing
         #expect(abs((moved.end.x - moved.start.x) - 0.2) < 1e-9 && moved.inverted && abs(moved.feather - 0.3) < 1e-9)   // size, invert, feather kept
         base = try AssistantMasks.shape("linear", ["from": .array([.number(0.5), .number(0)]), "to": .array([.number(0.5), .number(0.4)])])
         let longer = try AssistantMasks.shape("linear", ["to": .array([.number(0.5), .number(0.6)])], base: base)
-        #expect(longer.start == base.start && abs(longer.end.y - 0.4) < 1e-9)
+        #expect(abs(base.end.y - 1) < 1e-9 && abs(base.start.y - 0.6) < 1e-9)          // full effect at `from` (the top), none past `to`
+        #expect(longer.end == base.end && abs(longer.start.y - 0.4) < 1e-9)
         var layer = LocalAdjustment(name: "Sky"); layer.settings = try AssistantMasks.settings(["exposure": .number(-1)])
         layer.settings = try AssistantMasks.settings(["saturation": .number(0.4)], onto: layer.settings)   // updates merge
         guard case .object(let d) = AssistantMasks.describe(layer, mask: longer), case .object(let values)? = d["values"] else { Issue.record("no values"); return }
         #expect(values["exposure"]?.double == -1 && values["saturation"]?.double == 0.4 && values["contrast"] == nil)
         #expect(d["id"]?.string == layer.id.uuidString && d["selection"] == .array([.string("linear")]))
+        guard case .object(let shape)? = d["shape"] else { Issue.record("no shape"); return }
+        #expect(shape["from"] == .array([.number(0.5), .number(0)]) && shape["to"] == .array([.number(0.5), .number(0.6)]))
     }
     @Test func photoSearchFiltersAndSorts() {
         var a = CatalogPhoto(id: UUID(), path: "/Photos/Trip/a.jpg"); a.rating = 4; a.camera = "Canon EOS R5"; a.keywords = ["Places>Italy"]; a.captured = Date(timeIntervalSince1970: 1_700_000_000)
