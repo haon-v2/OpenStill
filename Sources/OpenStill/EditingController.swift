@@ -454,6 +454,9 @@ extension ViewerController {
         guard let key = keys[tool] else { return }
         let edits = currentEdits, size = editSourceSize()
         let adjustmentMask = edits.advanced?.masks[key]
+        let isRaw = (photoRecord?.active.sourceMode ?? .original) == .raw
+        // The tool works on the photo in its own geometry, so the crop, rotation and every setting stay live afterwards.
+        let baseEdits = AIBase.inputEdits(edits, raw: isRaw)
         let legacyMask = tool == "erase" && adjustmentMask == nil ? canvas.image.flatMap { canvas.removalMask(width:$0.width,height:$0.height) } : nil
         if tool == "erase", adjustmentMask == nil, legacyMask == nil { info.status("Create an Erase mask over the unwanted object first."); return }
         let renderer = photoRecord?.active.renderer ?? .legacy
@@ -469,15 +472,15 @@ extension ViewerController {
             let prepared = Result { () -> (URL, URL, URL?) in
                 let input = try EditStorage.newAsset(extension:"osfloat"); temporaryFiles.append(input)
                 // RAW denoise works on the decoded sensor data only (white balance and RAW options), so every edit stays adjustable.
-                let recipe = RenderRecipe(renderer:renderer, sourceMode:sourceMode, raw:rawSettings, edits:tool == "rawdenoise" ? RawDenoiseBase.decodeOnly(edits) : edits)
+                let recipe = RenderRecipe(renderer:renderer, sourceMode:sourceMode, raw:rawSettings, edits:tool == "rawdenoise" ? RawDenoiseBase.decodeOnly(edits) : baseEdits)
                 let incoming=try ModernRenderer.render(source:source, recipe:recipe)
                 try FloatImageBridge.write(incoming, to:input)
                 let output = try EditStorage.newAsset(extension:"osfloat")
                 var maskURL: URL?
                 var maskImage = legacyMask
                 if let adjustmentMask {
-                    let geometry = EditGeometry(size:size,edits:edits)
-                    let selection = try adjustmentMask.coverage(geometry:geometry,lens:edits.optics,input:incoming,modern:renderer == .linear2020)
+                    let geometry = EditGeometry(size:size,edits:baseEdits)
+                    let selection = try adjustmentMask.coverage(geometry:geometry,lens:LensSettings(),input:incoming,modern:renderer == .linear2020)
                     guard let cg = RenderContexts.utility.createCGImage(selection,from:geometry.extent) else { throw EditError.render }
                     maskImage = cg
                 }
@@ -522,19 +525,15 @@ extension ViewerController {
                                 try? FileManager.default.removeItem(at:input)
                                 guard var record = self.photoRecord else { return }
                                 record.duplicateVersion(named:"Super resolution 2×")
-                                var next = PhotoEdits(); next.baseAsset = output.lastPathComponent
+                                let next = AIBase.result(edits, output:output.lastPathComponent, background:nil, mask:nil, key:nil, raw:isRaw)
                                 var document = EditDocument(fingerprint:record.active.document.fingerprint); document.commit(next,title:"AI super resolution 2×")
                                 record.updateDocument(document)
                                 self.maskVisible = false; self.canvas.clearTool(); self.saveVersionRecord(record)
                                 self.info.status("Created the version “Super resolution 2×” at twice the size. The previous version is unchanged.")
                                 return
                             }
-                            var next = PhotoEdits(); next.baseAsset = output.lastPathComponent; next.ensureAdvanced()
-                            next.advanced!.aiBackgroundAsset = input.lastPathComponent; next.advanced!.aiFeatureKey = key
-                            if let maskURL {
-                                var mask = AdjustmentMask(kind:"object"); mask.asset = maskURL.lastPathComponent; mask.feather = 0
-                                next.setMask(mask,for:key)
-                            }
+                            let next = AIBase.result(self.currentEdits, output:output.lastPathComponent, background:input.lastPathComponent, mask:maskURL?.lastPathComponent, key:key, raw:isRaw)
+                            if next.advanced?.aiBackgroundAsset == nil { try? FileManager.default.removeItem(at:input) }
                             let names = ["erase":"AI object removal", "denoise":"AI noise removal", "detail":"AI detail restoration"]
                             self.maskVisible = false; self.canvas.clearTool(); self.changeEdits(next,title:names[tool] ?? "AI edit",commit:true); self.select(self.selected, preservingSelection:true)
                         case .failure(let error):

@@ -101,3 +101,35 @@ public struct RawDenoiseBase: Codable, Equatable, Sendable {
         return e
     }
 }
+
+/// The on-device AI tools (erase, noise removal, detail, super resolution) work on the photo itself — its current base in its
+/// own geometry, before crop, rotation, lens corrections and tone — and hand back a new base. The edit stays live on top of it,
+/// so an AI result never bakes in (or zooms to) the crop, and every setting stays adjustable.
+public enum AIBase {
+    /// What the AI tool is given: the current base (earlier AI results included), white-balanced like the decode for RAW photos.
+    public static func inputEdits(_ edits: PhotoEdits, raw: Bool) -> PhotoEdits {
+        var e = raw ? RawDenoiseBase.decodeOnly(edits) : PhotoEdits()
+        e.baseAsset = edits.baseAsset
+        if let a = edits.advanced, a.rawDenoise != nil || a.aiBackgroundAsset != nil {
+            e.ensureAdvanced(); e.advanced!.rawDenoise = a.rawDenoise
+            // An earlier AI result limited to a selection is shown the same way here.
+            if let key = a.aiFeatureKey, let mask = a.masks[key] { e.advanced!.aiBackgroundAsset = a.aiBackgroundAsset; e.advanced!.aiFeatureKey = key; e.setMask(mask, for: key) }
+        }
+        return e
+    }
+    /// The edit after the AI tool: everything as it was, on the new base. `mask` limits the result to a selection
+    /// (blended over `background`, the image the tool was given) under `key`.
+    public static func result(_ edits: PhotoEdits, output: String, background: String?, mask: String?, key: String?, raw: Bool) -> PhotoEdits {
+        var next = edits; next.baseAsset = output; next.ensureAdvanced()
+        // RAW: the new base carries the white balance it was made with; later changes apply on top (as RAW denoise does).
+        if raw && next.advanced!.rawDenoise == nil { next.advanced!.rawDenoise = RawDenoiseBase(temperature: edits.temperature, tint: edits.tint) }
+        next.advanced!.aiBackgroundAsset = nil; next.advanced!.aiFeatureKey = nil
+        if let key, let mask {
+            var selection = AdjustmentMask(kind: "object"); selection.asset = mask; selection.feather = 0
+            next.setMask(selection, for: key)
+            if !raw, let background { next.advanced!.aiBackgroundAsset = background; next.advanced!.aiFeatureKey = key }
+        }
+        return next
+    }
+}
+
