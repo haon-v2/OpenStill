@@ -56,10 +56,12 @@ extension PhotoEdits {
         get { advanced?.contrastModel == "smart" }
         set { ensureAdvanced(); advanced!.contrastModel = newValue ? "smart" : nil }
     }
-    /// Called with the previous edits: a changed Contrast switches this edit to Smart Contrast.
+    /// Called with the previous edits: a changed Contrast switches this edit to Smart Contrast, a changed Temp or Tint to the
+    /// corrected white balance. Once switched, an edit stays switched: the panel can hand over a copy made before the
+    /// switch (for example the final value when a slider is released), which must not quietly switch it back.
     public mutating func adoptSmartContrast(changedFrom old: PhotoEdits) {
-        if contrast != old.contrast && !usesSmartContrast { usesSmartContrast = true }
-        if (temperature != old.temperature || tint != old.tint) && !usesCorrectedWhiteBalance { usesCorrectedWhiteBalance = true }
+        if (contrast != old.contrast || old.usesSmartContrast) && !usesSmartContrast { usesSmartContrast = true }
+        if (temperature != old.temperature || tint != old.tint || old.usesCorrectedWhiteBalance) && !usesCorrectedWhiteBalance { usesCorrectedWhiteBalance = true }
     }
     /// Whether Temperature and Tint on rendered photos go the right way (higher warms, positive Tint adds magenta).
     /// Edits saved before the fix keep their original look until Temperature or Tint is changed. RAW photos were always right.

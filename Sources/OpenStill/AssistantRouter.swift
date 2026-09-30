@@ -5,8 +5,6 @@ import OpenStillCore
 /// Each edit is one undo step, drawn live and saved as usual.
 extension ViewerController {
     typealias AssistantReply = (Result<JSONValue, Error>) -> Void
-    private static let presets = ["Warm light", "Cool shadows", "Vivid", "Soft portrait", "Monochrome"]
-
     func startAssistant() {
         AssistantServer.shared.handler = { [weak self] tool, args, reply in
             guard let self else { reply(.failure(AssistantError.message("OpenStill is closing."))); return }
@@ -49,7 +47,7 @@ extension ViewerController {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { reply(.success(.object(["adjustments": AssistantAdjustments.describe(self.currentEdits)]))) }
             }
         case "apply_preset":
-            guard let name = args["name"]?.string, Self.presets.contains(name) else { fail("Presets: " + Self.presets.joined(separator: ", ") + "."); return }
+            guard let name = args["name"]?.string, info.preset(named: name) != nil else { fail("Unknown preset. Use a preset name from OpenStill’s Presets panel, for example “Vivid”."); return }
             withAssistantPhoto(args, open: true, reply: reply) { _, _ in
                 self.editingCommand("preset:" + name)
                 reply(.success(.object(["adjustments": AssistantAdjustments.describe(self.currentEdits)])))

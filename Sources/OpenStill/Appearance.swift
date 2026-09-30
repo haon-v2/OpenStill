@@ -20,9 +20,9 @@ enum Appearance {
     }
     static func configure(_ window: NSWindow) {
         window.titlebarAppearsTransparent = window.styleMask.contains(.fullSizeContentView)
-        window.backgroundColor = .windowBackgroundColor
-        window.isOpaque = false
-        window.appearance = nil
+        // The whole app is dark (see AppDelegate); secondary windows use the Studio chrome like the main window.
+        window.backgroundColor = Studio.chrome
+        window.isOpaque = true
     }
     /// A secondary window's content: a flat, opaque panel like Lightroom's dialogs (no floating glass).
     static func panel(in window: NSWindow) -> NSView {

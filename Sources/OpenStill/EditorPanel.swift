@@ -48,8 +48,7 @@ final class EditorPanel: ChromePanel {
     /// Snapshots: in the History tab (Luminar) or their own left-panel section (Lightroom).
     private let snapshotStack = EditorStack()
     var retouchSettingsChanged:((RetouchSession)->Void)?
-    private var lutMask: MaskPanel?
-    private let lutBrowser = LUTBrowserView()
+    private let looks = LookBrowserView()
     private var hasPhoto = false
     private var busy = false
     // The Studio arrangement (see the extension at the end of this file).
@@ -132,19 +131,29 @@ final class EditorPanel: ChromePanel {
         for key in ["Layers", "Noise removal", "Detail restoration", "Lens blur", "Develop", "HDR", "Dehaze", "Curves", "Enhance", "Retouch", "Red eye", "Masks", "Erase", "Structure", "Clarity", "Texture", "Color", "Color grading", "Black & white", "Details", "Denoise", "Vignette", "Glow", "Grain", "Sky replacement", "Sunrays"] { let mask = makeMaskPanel(key); mask.done = { [weak self] in self?.command?("finishMask") }; mask.isHidden = true; fullWidth(mask, in: tools) }
         toolsScroll.isHidden = true
         let presets = installScroll(presetScroll)
-        addTitle("LUT LIBRARY", to: presets)
-        help("12 free looks, ready offline. LUTs add to the look already in your JPEG or S9 camera preview.", to: presets)
-        fullWidth(lutBrowser,in:presets)
-        lutBrowser.choose = { [weak self] item in self?.command?("libraryLUT:"+item.entry.id) }
-        slider("LUT intensity",path:\.lutAmount,range:0...1,in:lutBrowser.controls)
-        action("Remove LUT","removeLUT",to:lutBrowser.controls)
-        addMaskControls("LUT",to:lutBrowser.controls)
-        action("Import .cube LUT…","importLUT",to:presets)
-        addTitle("ADJUSTMENT PRESETS",to:presets)
-        help("Starting points for your edit. Presets keep your crop and image layers.",to:presets)
-        for name in ["Natural", "Warm light", "Cool shadows", "Vivid", "Soft portrait", "Monochrome"] { action(name,"preset:"+name,to:presets) }
-        action("Save current as preset…","savePreset",to:presets)
-        action("Load preset…","loadPreset",to:presets)
+        fullWidth(looks,in:presets)
+        looks.chooseLUT = { [weak self] item in self?.command?("libraryLUT:"+item.entry.id) }
+        looks.choosePreset = { [weak self] preset, amount in self?.command?("applyPreset:\(amount):"+preset.id) }
+        looks.command = { [weak self] name in if name.hasPrefix("status:") { self?.status(String(name.dropFirst(7))) } else { self?.command?(name) } }
+        slider("LUT intensity",path:\.lutAmount,range:0...1,in:looks.lutControls)
+        action("Remove LUT","removeLUT",to:looks.lutControls)
+        addMaskControls("LUT",to:looks.lutControls)
+        action("Import .cube LUT…","importLUT",to:looks.lutControls)
+        help("Looks add to the color already in your photo. Film looks: RawTherapee Film Simulation Collection (CC BY-SA 4.0).",to:looks.lutControls)
+        action("Save current as preset…","savePreset",to:looks.presetControls)
+        action("Import preset…","loadPreset",to:looks.presetControls)
+        action("Export current as preset…","exportPreset",to:looks.presetControls)
+        looks.chooseSky = { [weak self] sky in self?.command?("sky:"+sky.entry.id) }
+        slider("Relight scene",path:\.skyRelight,range:0...1,in:looks.skyControls)
+        slider("Horizon",path:\.skyHorizon,range:-1...1,in:looks.skyControls)
+        slider("Sky exposure",path:\.skyExposure,range:-2...2,in:looks.skyControls)
+        slider("Sky defocus",path:\.skyDefocus,range:0...1,in:looks.skyControls)
+        slider("Atmosphere",path:\.skyAtmosphere,range:0...1,in:looks.skyControls)
+        action("Flip sky","skyFlip",to:looks.skyControls)
+        action("Remove sky","removeSky",to:looks.skyControls)
+        action("Use your own sky…","customSky",to:looks.skyControls)
+        addMaskControls(PhotoEdits.skyMaskKey,title:"Refine sky selection…",to:looks.skyControls)
+        help("Skies: Poly Haven (CC0). On-device AI finds the sky; refine it with the mask tools above if it misses an edge.",to:looks.skyControls)
         _ = installScroll(historyScroll, stack: historyStack)
         info.translatesAutoresizingMaskIntoConstraints = false; body.addSubview(info)
         NSLayoutConstraint.activate([info.topAnchor.constraint(equalTo: body.topAnchor), info.bottomAnchor.constraint(equalTo: body.bottomAnchor), info.leadingAnchor.constraint(equalTo: body.leadingAnchor), info.trailingAnchor.constraint(equalTo: body.trailingAnchor)])
@@ -180,9 +189,11 @@ final class EditorPanel: ChromePanel {
         panel.brushChanged = { [weak self] radius,softness,strength in self?.brushChanged?(key,radius,softness,strength) }
         return panel
     }
-    private func addMaskControls(_ key:String,to stack:NSStackView) {
-        let button = NSButton(title:"Mask this LUT…",target:self,action:#selector(toggleLUTMask));button.bezelStyle = .rounded;button.font = .systemFont(ofSize:11);fullWidth(button,in:stack)
-        let panel = makeMaskPanel(key);panel.isHidden = true;fullWidth(panel,in:stack);lutMask = panel
+    /// A button that shows or hides this tool's mask tools under it.
+    private func addMaskControls(_ key:String,title:String = "Mask this LUT…",to stack:NSStackView) {
+        let panel = makeMaskPanel(key);panel.isHidden = true
+        let button = ClosureButton(title:title) { [weak self, weak panel] in self?.command?("finishMask");panel?.isHidden.toggle();panel?.resetInteraction() }
+        button.bezelStyle = .rounded;button.font = .systemFont(ofSize:11);fullWidth(button,in:stack);fullWidth(panel,in:stack)
         panel.done = { [weak panel] in panel?.isHidden = true }
     }
     /// Shows the selected mask layer's mask tools under its sliders.
@@ -194,18 +205,25 @@ final class EditorPanel: ChromePanel {
         if let key, let panel = maskPanels[key] { layerMaskBorrow = lend(panel, into: maskLayers.maskHolder, height: nil); panel.resetInteraction() }
     }
     func selectMaskLayer(_ id: UUID?) { maskLayers.select(id); showLayerMask() }
-    @objc private func toggleLUTMask() { command?("finishMask");lutMask?.isHidden.toggle();lutMask?.resetInteraction() }
     func selectedMaskComponent(key:String)->UUID? { maskPanels[key]?.selectedID }
     func selectMaskComponent(key:String,id:UUID) { maskPanels[key]?.selectComponent(id) }
     func maskInteraction(key:String,kind:String?,subtract:Bool,visible:Bool) { maskPanels[key]?.interaction(kind:kind,subtract:subtract,visible:visible) }
     func resetMaskInteractions() { for panel in maskPanels.values { panel.resetInteraction() } }
     func resizeBrush(key:String,delta:Double) { maskPanels[key]?.resizeBrush(delta) }
 
-    func refreshLUTs() { lutBrowser.reload() }
-    var lutItems: [LUTItem] { lutBrowser.allItems }
-    func lutItem(id: String) -> LUTItem? { lutBrowser.item(id: id) }
-    func libraryLUT(id:String) -> LUTItem? { lutBrowser.item(id:id) }
-    func importedLUT(filename:String) -> LUTItem? { lutBrowser.imported(filename:filename) }
+    func refreshLUTs() { looks.reload() }
+    func libraryLUT(id:String) -> LUTItem? { looks.item(id:id) }
+    var lutItems: [LUTItem] { looks.luts.items }
+    func lutItem(id: String) -> LUTItem? { looks.item(id: id) }
+    func importedLUT(filename:String) -> LUTItem? { looks.imported(filename:filename) }
+    var lutLibrary: LUTLibrary { looks.luts }
+    func preset(id:String) -> PresetRecipe? { looks.preset(id:id) }
+    func preset(named name:String) -> PresetRecipe? { looks.preset(named:name) }
+    func sky(id:String) -> SkyItem? { looks.sky(id:id) }
+    func refreshSkies() { looks.reload(); looks.showSkies() }
+    func showSkies() { looks.showSkies() }
+    /// After saving or importing a preset: list it and show it as applied.
+    func presetSaved(_ name:String) { looks.reload(); looks.showMyPresets(); if let preset = looks.preset(id:"user-"+name) { looks.showApplied(preset) } }
     func updateHistogram(_ value:PhotoHistogram?, sensor:Double?) { histogram.histogram = value; histogram.sensor = sensor }
     func setClippingOverlay(_ on:Bool) { histogram.clippingShown = on }
     func updateVersions(_ record:PhotoRecord?, raw:Bool) {
@@ -213,9 +231,9 @@ final class EditorPanel: ChromePanel {
         let isRaw = raw && record?.active.sourceMode == .raw
         if isRaw != rawSource { rawSource = isRaw; profilePanel.update(states, raw:isRaw, enabled:hasPhoto && !busy) }
     }
-    /// LUT thumbnails render only while the Presets panel is open.
-    func setLUTPreviewsActive(_ active:Bool) { lutBrowser.setActive(active) }
-    func setLUTPhoto(_ image:CGImage?,edits:PhotoEdits, source:CIImage? = nil, url:URL? = nil, recipe:RenderRecipe? = nil) { lutBrowser.setPhoto(image,edits:edits, source:source, url:url, recipe:recipe) }
+    /// Look thumbnails render only while the Presets panel is open.
+    func setLUTPreviewsActive(_ active:Bool) { looks.setActive(active) }
+    func setLUTPhoto(_ image:CGImage?,edits:PhotoEdits, source:CIImage? = nil, url:URL? = nil, recipe:RenderRecipe? = nil) { looks.setPhoto(image,edits:edits, source:source, url:url, recipe:recipe) }
     /// A slider row: the name (drag it sideways to scrub, double-click to reset), the value, and the slider beneath.
     private func slider(_ title: String, path: WritableKeyPath<PhotoEdits, Double>, range: ClosedRange<Double>, in stack: NSStackView) {
         let label = ScrubLabel(title); label.font = .systemFont(ofSize: 12)
@@ -290,7 +308,7 @@ final class EditorPanel: ChromePanel {
         for layer in edits.localAdjustments where maskPanels[layer.maskKey] == nil {
             let panel = makeMaskPanel(layer.maskKey, listed: false); layerPanelStore.addArrangedSubview(panel)
         }
-        lutBrowser.updateSelection(edits);lutBrowser.setEnabled(enabled && !busy)
+        looks.updateSelection(edits);looks.setEnabled(enabled && !busy)
         for (key,panel) in maskPanels { panel.update(edits.advanced?.masks[key],enabled:enabled && !busy) }
         maskLayers.update(edits.localAdjustments, enabled: enabled && !busy); showLayerMask()
         mixer.update(edits.advanced?.colors,enabled:enabled && !busy)
@@ -345,7 +363,7 @@ final class EditorPanel: ChromePanel {
         let enabled = hasPhoto && !busy
         guard force || enabled != controlsEnabled || busy != self.busy else { return }
         self.busy = busy; controlsEnabled = enabled
-        lutBrowser.setEnabled(hasPhoto && !busy)
+        looks.setEnabled(hasPhoto && !busy)
         for panel in maskPanels.values { panel.setEnabled(hasPhoto && !busy) }
         mixer.setEnabled(hasPhoto && !busy)
         cropPresets.setEnabled(hasPhoto && !busy)
@@ -557,7 +575,7 @@ extension EditorPanel {
             slider("Hue", path: \.calibrationBlueHue, range: -1...1, in: s.body); slider("Saturation", path: \.calibrationBlueSaturation, range: -1...1, in: s.body)
         }
         // OpenStill's own tools, after Lightroom's panels.
-        section("Sky Replacement") { s in action("Choose sky & replace…", "ai:sky", to: s.body) }
+        section("Sky Replacement") { s in action("Choose a sky…", "chooseSky", to: s.body); action("Use your own sky…", "customSky", to: s.body) }
         section("Layers") { s in
             slider("Edit strength", path: \.opacity, range: 0...1, in: s.body)
             action("Add image layer…", "addLayer", to: s.body)

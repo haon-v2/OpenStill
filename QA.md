@@ -529,3 +529,49 @@ Automated fixtures are generated and contain no user photographs. The real S9 fi
   - While dragging, in the real window: each frame renders in 11–60 ms.
   - First frame of a drag: 0.29 s for Exposure and 0.40 s for Contrast. Before the kernel warm-up, Contrast's first frame took 1.6 s, and 0.0.15 showed no frames at all until you paused.
 - **Not yet verified by hand on a Mac:** 40 MP RAW files from several cameras; the render cache filling past its limit; a Pro Display XDR in HDR mode.
+
+## Settings, dark windows, every window tested — September 29, 2026
+
+- **Changed:**
+  - Settings is redesigned in the Studio style: always dark, a sidebar of sections (General, Editing & Performance, Library & Catalog, Auto Import, Shortcuts) and grouped rows with a label on the left and the control on the right.
+  - Catalog Settings and Auto Import Settings are now Settings sections instead of separate dialogs, and their menu items open them.
+  - New in Settings: the render cache size with how much it uses and Clear Cache, the GPU and HDR availability, the catalog location with Show / Change…, and Back Up Now.
+  - The whole app is always dark, including Export, Import, Metadata, Book, Print, Slideshow, Web Gallery, Map, People, Timeline, Tethered Capture, the logo designer, alerts and sheets.
+  - The output windows keep their form rows together instead of spreading them over the window.
+- **Fixed:** found while testing every window:
+  - Loupe, Compare, Survey and Reference showed no photo in 0.0.16. This was also released on its own as 0.0.17.
+  - The Settings row notes could be cut off.
+- **Removed:** unused code:
+  - EditorPanel's always-hidden header, and the glass panel code (only the flat color was used);
+  - `LRColors`, merged into the Studio colors;
+  - the separate Catalog Settings dialog and Auto Import window;
+  - `Appearance.glass()` and `line(in:)`, an unused person-count helper, and the Settings tab API.
+- **Verified on macOS 26 CI:** captures of every window and panel were reviewed:
+  - each Settings section;
+  - Library grid, Loupe, Compare and Survey;
+  - People, Timeline, Metadata, Rename, Export, Import;
+  - Map, Book, Slideshow, Print, Web Gallery;
+  - Identity Plate, Reference, Tethered Capture;
+  - Presets, History, Info and Navigator panels;
+  - Crop and Masking;
+  - a 900-point-wide window and the empty window.
+
+  The build and test suites pass.
+- **Not yet verified by hand on a Mac:** changing the catalog location and relaunching; Clear Cache while a RAW photo is open.
+
+## Presets and LUT library — September 29, 2026
+- **Added:**
+  - A library of 420 free LUT tables (about 250 looks once film strengths are grouped) in one 18.5 MB pack, replacing the 12 loose `.cube` files:
+    - 293 RawTherapee Film Simulation tables (CC BY-SA 4.0), under descriptive names, with −1 / Normal / +1 / +2 strengths grouped per look;
+    - 50 FreshLUTs community looks (CC0), including the 12 shipped before, with the same ids;
+    - 77 OpenStill Originals (CC0) generated from `Resources/LUTs/originals.json`.
+  - 82 presets in 13 categories, including the six earlier presets with identical results; Amount 0–200%; My Presets (save, rename, delete, import, export).
+  - A Presets | LUTs browser: category menu with counts, search, favorites, recent, a strength menu for film looks, and thumbnails rendered only for visible cards.
+- **Kept working:**
+  - Looks already applied to photos (they are copies in the photo's assets).
+  - Saved edits that name one of the original 12 looks.
+  - `.openstillpreset` files saved by earlier versions (Import preset…, and develop presets in Import and Tethered Capture).
+  - Version 1 LUT catalogs and imported `.cube` files.
+- **Tests:** `LUTLibraryTests` (every look decodes and matches its checksum, licenses and credits, the 12 old ids, the neutral look is an identity within 1/255, black-and-white originals stay gray, tampering is refused, version 1 catalogs, search and strengths, preview equals applied result) and `PresetLibraryTests` (bundled presets are valid and their looks exist, the six old presets give the same edits, Amount 0 / 100 / 200%, photo-specific edits are kept, looks are applied as copies, My Presets round trip and old files).
+- **Skies (added on request):** 30 CC0 Poly Haven skies in six categories. The on-device sky AI makes the photo's "Sky" mask the first time; the sky is composited live and **Relight scene** carries its brightness and color into the land (dark skies darken it, sunsets warm it). Also Horizon, Sky exposure, Defocus, Atmosphere, Flip, Remove, Your Skies, and Refine sky selection with the mask tools. Presets keep the sky. `SkyReplacementTests` cover the composite through the mask, dark skies darkening and sunsets warming the land, relight 0 leaving it, no mask meaning no sky, sanitizing and saving, presets keeping it, and the library and Your Skies. The old baked "Choose sky & replace…" is replaced; photos edited with it keep their result.
+- **Not included:** previewing a look on the main photo while hovering its card; the card thumbnails show each look on the current photo instead.
