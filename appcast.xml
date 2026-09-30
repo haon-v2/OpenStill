@@ -213,5 +213,16 @@
             <sparkle:fullReleaseNotesLink>https://github.com/haon-v2/OpenStill/releases/tag/v0.0.19</sparkle:fullReleaseNotesLink>
             <enclosure url="https://github.com/haon-v2/OpenStill/releases/download/v0.0.19/OpenStill-0.0.19.zip" sparkle:edSignature="tPvJcj+sTWtIL+8vPv5TBgNTSleR+iHf+SioCJaviUt5X4fR4LUPuJeiaWXUohr0dtz/+P3lSn0Q5QGgYOwcCA==" length="51950619" type="application/octet-stream"/>
         </item>
+        <item>
+            <title>OpenStill 0.0.20</title>
+            <description><![CDATA[<h3>What’s new in 0.0.20</h3><ul><li>AI Assistant: let Claude and other MCP apps edit your photos (Settings → AI Assistant, off by default)</li><li>AI-found LUTs appear under Found by AI with their license</li></ul>]]></description>
+            <pubDate>Wed, 30 Sep 2026 05:44:15 GMT</pubDate>
+            <sparkle:version>36</sparkle:version>
+            <sparkle:shortVersionString>0.0.20</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <sparkle:fullReleaseNotesLink>https://github.com/haon-v2/OpenStill/releases/tag/v0.0.20</sparkle:fullReleaseNotesLink>
+            <enclosure url="https://github.com/haon-v2/OpenStill/releases/download/v0.0.20/OpenStill-0.0.20.zip" sparkle:edSignature="nYkD7FAWupHOo6Vcs8GTnbNMiKCfpVhlfNuJ27wBGN6JqNUaU0cznTIgPaNq2Zqt2o5LG3TwJ2PsmLNvFNduDA==" length="52141680" type="application/octet-stream"/>
+        </item>
     </channel>
 </rss>
