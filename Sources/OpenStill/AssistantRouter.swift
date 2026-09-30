@@ -34,7 +34,9 @@ extension ViewerController {
         case "open_photo":
             withAssistantPhoto(args, open: true, reply: reply) { record, url in reply(.success(.object(self.assistantFacts(record.id, url: url)))) }
         case "preview":
-            withAssistantPhoto(args, open: false, reply: reply) { record, url in self.assistantPreview(record, url: url, size: args["size"]?.int, reply: reply) }
+            withAssistantPhoto(args, open: false, reply: reply) { record, url in
+                self.assistantPreview(record, url: url, size: args["size"]?.int, compare: args["compare"]?.bool == true, reply: reply)
+            }
         case "set_adjustments":
             guard let values = args["values"]?.object else { fail("Give “values”, e.g. {\"exposure\": 0.3, \"contrast\": 1.1}."); return }
             editAssistantPhoto(args, reply: reply) { edits in
@@ -72,6 +74,27 @@ extension ViewerController {
             }
         case "add_mask_layer":
             addAssistantMaskLayer(args, reply: reply)
+        case "list_mask_layers":
+            withAssistantPhoto(args, open: true, reply: reply) { _, _ in
+                let edits = self.currentEdits
+                reply(.success(.object(["layers": .array(edits.localAdjustments.map { AssistantMasks.describe($0, mask: edits.advanced?.masks[$0.maskKey]) })])))
+            }
+        case "preview_mask":
+            withAssistantPhoto(args, open: true, reply: reply) { _, _ in
+                do { self.assistantMaskView(try self.assistantLayer(args).id, size: args["size"]?.int, reply: reply) } catch { reply(.failure(error)) }
+            }
+        case "update_mask_layer":
+            updateAssistantMaskLayer(args, reply: reply)
+        case "delete_mask_layer":
+            withAssistantPhoto(args, open: true, reply: reply) { _, _ in
+                do {
+                    let layer = try self.assistantLayer(args)
+                    self.maskLayerCommand("maskLayer:delete:" + layer.id.uuidString)
+                    let edits = self.currentEdits
+                    reply(.success(.object(["deleted": .string(layer.name),
+                                            "layers": .array(edits.localAdjustments.map { AssistantMasks.describe($0, mask: edits.advanced?.masks[$0.maskKey]) })])))
+                } catch { reply(.failure(error)) }
+            }
         case "rate", "flag", "label", "add_keywords":
             markAssistantPhotos(tool, args, reply: reply)
         case "export":
@@ -143,26 +166,97 @@ extension ViewerController {
             } catch { reply(.failure(error)) }
         }
     }
-    private func assistantPreview(_ record: PhotoRecord, url: URL, size: Int?, reply: @escaping AssistantReply) {
+    private func assistantPreviewEdge(_ size: Int?) -> Int {
         let limit = Assistant.previewSize(UserDefaults.standard.object(forKey: Assistant.previewKey) as? Int)
-        let edge = min(limit, max(256, size ?? limit))
+        return min(limit, max(256, size ?? min(limit, 1024)))
+    }
+    /// The image as a JPEG for the AI app, with any extra facts beside it.
+    private static func jpegPayload(_ image: CIImage, _ extra: [String: JSONValue] = [:]) throws -> JSONValue {
+        guard let cg = ModernRenderer.context.createCGImage(image, from: image.extent.integral, format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!),
+              let jpeg = NSBitmapImageRep(cgImage: cg).representation(using: .jpeg, properties: [.compressionFactor: 0.82]) else {
+            throw AssistantError.message("The preview couldn’t be rendered.")
+        }
+        return .object(extra.merging(["mime": .string("image/jpeg"), "data": .string(jpeg.base64EncodedString()),
+                                      "width": .number(Double(cg.width)), "height": .number(Double(cg.height))]) { _, new in new })
+    }
+    /// The photo with its edits; with `compare`, the unedited photo on the left and the edited one on the right.
+    private func assistantPreview(_ record: PhotoRecord, url: URL, size: Int?, compare: Bool, reply: @escaping AssistantReply) {
+        let edge = assistantPreviewEdge(size)
         var recipe = record.active.recipe
         if url == currentSource { recipe.edits = currentEdits }
+        var before = recipe; before.edits = PhotoEdits()
         DispatchQueue.global(qos: .userInitiated).async {
             let result = Result<JSONValue, Error> {
-                let image = try ModernRenderer.render(source: url, recipe: recipe.sdr, maximumDimension: edge)
-                guard let cg = ModernRenderer.context.createCGImage(image, from: image.extent, format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!),
-                      let jpeg = NSBitmapImageRep(cgImage: cg).representation(using: .jpeg, properties: [.compressionFactor: 0.82]) else {
-                    throw AssistantError.message("The preview couldn’t be rendered.")
+                let after = try ModernRenderer.render(source: url, recipe: recipe.sdr, maximumDimension: edge)
+                guard compare else { return try ViewerController.jpegPayload(after) }
+                let original = try ModernRenderer.render(source: url, recipe: before.sdr, maximumDimension: edge)
+                // Same height side by side with a small gap, then fitted to the size limit.
+                let height = min(original.extent.height, after.extent.height)
+                func fit(_ image: CIImage) -> CIImage {
+                    let s = height / image.extent.height
+                    let scaled = image.transformed(by: CGAffineTransform(scaleX: s, y: s))
+                    return scaled.transformed(by: CGAffineTransform(translationX: -scaled.extent.minX, y: -scaled.extent.minY))
                 }
-                return .object(["mime": .string("image/jpeg"), "data": .string(jpeg.base64EncodedString()),
-                                "width": .number(Double(cg.width)), "height": .number(Double(cg.height))])
+                let left = fit(original), right = fit(after), gap = max(4, height * 0.01)
+                let joined = right.transformed(by: CGAffineTransform(translationX: left.extent.width + gap, y: 0))
+                    .composited(over: left)
+                    .composited(over: CIImage(color: CIColor(red: 0.1, green: 0.1, blue: 0.1)).cropped(to: CGRect(x: 0, y: 0, width: left.extent.width + gap + right.extent.width, height: height)))
+                let s = min(1, Double(edge) / max(joined.extent.width, joined.extent.height))
+                let final = joined.applyingFilter("CILanczosScaleTransform", parameters: [kCIInputScaleKey: s, kCIInputAspectRatioKey: 1])
+                return try ViewerController.jpegPayload(final, ["layout": .string("Left: before (no edits). Right: after (current edits).")])
             }
             DispatchQueue.main.async { reply(result) }
         }
     }
 
     // MARK: Masks
+    /// A mask layer of the open photo, by id (or by its exact name).
+    private func assistantLayer(_ args: [String: JSONValue]) throws -> LocalAdjustment {
+        guard let key = args["layer_id"]?.string else { throw AssistantError.message("Pass layer_id (from list_mask_layers or add_mask_layer).") }
+        let layers = currentEdits.localAdjustments
+        guard let layer = layers.first(where: { $0.id.uuidString.caseInsensitiveCompare(key) == .orderedSame }) ?? layers.first(where: { $0.name == key }) else {
+            throw AssistantError.message("No mask layer “\(key)” on this photo. Call list_mask_layers to see them.")
+        }
+        return layer
+    }
+    /// The photo with a layer's selection tinted red (as OpenStill shows masks with O), and where the selection lies.
+    func assistantMaskView(_ id: UUID, size: Int?, extra: [String: JSONValue] = [:], reply: @escaping AssistantReply) {
+        let edits = currentEdits
+        guard let layer = edits.localAdjustments.first(where: { $0.id == id }), let source = currentSource, var recipe = photoRecord?.active.recipe else {
+            reply(.failure(AssistantError.message("That mask layer is gone."))); return
+        }
+        guard let mask = edits.advanced?.masks[layer.maskKey] else {
+            var result = extra; result["layer"] = AssistantMasks.describe(layer, mask: nil)
+            result["selection"] = .object(["coverage": .number(0), "summary": .string("This layer has no selection yet, so it changes nothing.")])
+            reply(.success(.object(result))); return
+        }
+        recipe.edits = edits
+        let edge = assistantPreviewEdge(size), sourceSize = editSourceSize()
+        DispatchQueue.global(qos: .userInitiated).async {
+            let result = Result<JSONValue, Error> {
+                let photo = try ModernRenderer.render(source: source, recipe: recipe.sdr, maximumDimension: edge)
+                // The selection is found exactly as for the mask overlay in the app.
+                let scale = min(1, Double(edge) / max(sourceSize.width, sourceSize.height))
+                let geometry = EditGeometry(size: CGSize(width: (sourceSize.width * scale).rounded(), height: (sourceSize.height * scale).rounded()), edits: edits)
+                let input = try ModernRenderer.render(source: source, recipe: recipe, maximumDimension: edge, stopBeforeTool: "Details")
+                let selection = try mask.coverage(geometry: geometry, lens: edits.optics, input: input, modern: recipe.renderer == .linear2020)
+                let area = photo.extent
+                let fitted = selection
+                    .transformed(by: CGAffineTransform(translationX: -selection.extent.minX, y: -selection.extent.minY))
+                    .transformed(by: CGAffineTransform(scaleX: area.width / selection.extent.width, y: area.height / selection.extent.height))
+                    .transformed(by: CGAffineTransform(translationX: area.minX, y: area.minY))
+                    .cropped(to: area)
+                let tinted = CIImage(color: CIColor(red: 1, green: 0.08, blue: 0.08, alpha: 0.5)).cropped(to: area).composited(over: photo)
+                let shown = tinted.applyingFilter("CIBlendWithMask", parameters: [kCIInputBackgroundImageKey: photo, kCIInputMaskImageKey: fitted])
+                var facts = extra
+                facts["layer"] = AssistantMasks.describe(layer, mask: mask)
+                facts["selection"] = try AssistantMasks.stats(fitted)
+                facts["how_to_read"] = .string("Red shows where this layer's sliders apply; the photo already includes every layer's edits.")
+                return try ViewerController.jpegPayload(shown, facts)
+            }
+            DispatchQueue.main.async { reply(result) }
+        }
+    }
     private func addAssistantMaskLayer(_ args: [String: JSONValue], reply: @escaping AssistantReply) {
         guard let kind = args["kind"]?.string, AssistantMasks.kinds.contains(kind) else {
             reply(.failure(AssistantError.message("kind is one of: " + AssistantMasks.kinds.joined(separator: ", ") + "."))); return
@@ -170,6 +264,10 @@ extension ViewerController {
         let settings: LocalSettings
         do { settings = try AssistantMasks.settings(args["values"]?.object ?? [:]) } catch { reply(.failure(error)); return }
         withAssistantPhoto(args, open: true, reply: reply) { _, _ in
+            if kind == "sky" && !LocalAI.ready {
+                reply(.failure(AssistantError.message("Selecting the sky needs OpenStill's on-device AI, which isn't set up. Ask the person to choose Set up on-device AI in OpenStill (a one-time download of about 450 MB), or use a linear mask from the top of the photo instead.")))
+                return
+            }
             let before = Set(self.currentEdits.localAdjustments.map(\.id))
             if let aiKind = AssistantMasks.aiKinds[kind] {
                 // The same on-device selection as New Mask → Subject / Sky / Background / People.
@@ -185,12 +283,59 @@ extension ViewerController {
             guard let layer = self.currentEdits.localAdjustments.first(where: { !before.contains($0.id) }) else {
                 reply(.failure(AssistantError.message("The mask couldn’t be added."))); return
             }
-            var edits = self.currentEdits
-            edits.updateLocalAdjustment(layer.id) { l in l.settings = settings; if let name = args["name"]?.string { l.name = name } }
-            self.changeEdits(edits, title: "AI · " + layer.name, commit: true)
-            self.info.selectMaskLayer(layer.id)
-            reply(.success(.object(["layer": .string(layer.name), "id": .string(layer.id.uuidString), "adjustments": AssistantAdjustments.describe(self.currentEdits),
-                                    "note": .string(AssistantMasks.aiKinds[kind] != nil ? "The AI selection is computed on this Mac and may take a few seconds to appear." : "")])))
+            let finish = {
+                var edits = self.currentEdits
+                edits.updateLocalAdjustment(layer.id) { l in l.settings = settings; if let name = args["name"]?.string { l.name = name } }
+                self.changeEdits(edits, title: "AI · " + layer.name, commit: true)
+                self.info.selectMaskLayer(layer.id)
+                self.assistantMaskView(layer.id, size: args["size"]?.int,
+                                       extra: ["added": .string("Layer added. Check the red area; change it with update_mask_layer or remove it with delete_mask_layer.")], reply: reply)
+            }
+            guard AssistantMasks.aiKinds[kind] != nil else { finish(); return }
+            self.waitForAssistantSelection(layer.id, started: Date()) { found in
+                if found { finish(); return }
+                let reason = self.info.lastStatus.hasPrefix("Selecting") ? "" : " " + self.info.lastStatus
+                if self.currentEdits.localAdjustments.contains(where: { $0.id == layer.id }) {
+                    var edits = self.currentEdits; edits.removeLocalAdjustment(layer.id)
+                    self.changeEdits(edits, title: "AI · Remove empty mask", commit: true)
+                }
+                reply(.failure(AssistantError.message("No \(kind) was found, so no layer was added." + reason + " Try a linear or radial mask instead.")))
+            }
+        }
+    }
+    /// Waits for an on-device AI selection to land in a new layer (true), or to finish without one (false).
+    private func waitForAssistantSelection(_ id: UUID, started: Date, _ done: @escaping (Bool) -> Void) {
+        guard let layer = currentEdits.localAdjustments.first(where: { $0.id == id }) else { done(false); return }
+        if let components = currentEdits.advanced?.masks[layer.maskKey]?.components, !components.isEmpty { done(true); return }
+        let elapsed = Date().timeIntervalSince(started)
+        if elapsed > 90 || (elapsed > 1 && !aiPreparing && !localAI.isRunning) { done(false); return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in self?.waitForAssistantSelection(id, started: started, done) }
+    }
+    private func updateAssistantMaskLayer(_ args: [String: JSONValue], reply: @escaping AssistantReply) {
+        withAssistantPhoto(args, open: true, reply: reply) { _, _ in
+            do {
+                let layer = try self.assistantLayer(args)
+                var edits = self.currentEdits
+                let settings = try AssistantMasks.settings(args["values"]?.object ?? [:], onto: layer.settings)
+                edits.updateLocalAdjustment(layer.id) { l in
+                    l.settings = settings
+                    if let name = args["name"]?.string { l.name = name }
+                    if let hidden = args["hidden"]?.bool { l.hidden = hidden }
+                }
+                if var mask = edits.advanced?.masks[layer.maskKey] {
+                    if AssistantMasks.shapeKeys.contains(where: { args[$0] != nil }) || (args["feather"] != nil && mask.components == nil) {
+                        guard mask.components == nil, mask.kind == "linear" || mask.kind == "radial" else {
+                            throw AssistantError.message("Only linear and radial layers can be moved or resized. For an AI selection, use invert, or delete it and add a linear or radial layer.")
+                        }
+                        mask = try AssistantMasks.shape(mask.kind, args, base: mask)
+                    } else if let invert = args["invert"]?.bool {
+                        mask.inverted = invert
+                    }
+                    edits.setMask(mask, for: layer.maskKey)
+                }
+                self.changeEdits(edits, title: "AI · " + layer.name, commit: true)
+                self.assistantMaskView(layer.id, size: args["size"]?.int, reply: reply)
+            } catch { reply(.failure(error)) }
         }
     }
 

@@ -354,7 +354,10 @@ final class EditorPanel: ChromePanel {
     @objc private func historyClicked(_ sender: NSButton) { chooseHistory?(sender.tag) }
     private var controlsEnabled: Bool?
     private var historySignature = ""
+    /// The latest status message, so the AI assistant can pass on why an AI selection failed.
+    private(set) var lastStatus = ""
     func status(_ text: String, busy: Bool = false) {
+        lastStatus = text
         statusChanged?(text, busy)
         setBusy(busy)
     }
