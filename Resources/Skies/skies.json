@@ -1,0 +1,672 @@
+{
+ "version": 1,
+ "skies": [
+  {
+   "id": "polyhaven-blue-autumn_field_puresky",
+   "name": "Autumn Field",
+   "category": "Blue Sky",
+   "file": "blue-autumn_field_puresky.jpg",
+   "creator": "Jarod Guest, Sergej Majboroda",
+   "source": "https://polyhaven.com/a/autumn_field_puresky",
+   "license": "CC0-1.0",
+   "mean": [
+    0.1533,
+    0.33201,
+    0.57415
+   ],
+   "horizon": [
+    0.40718,
+    0.62731,
+    0.78725
+   ],
+   "tags": [
+    "pure skies"
+   ]
+  },
+  {
+   "id": "polyhaven-clouds-kloofendal_43d_clear_puresky",
+   "name": "Kloofendal 43d Clear",
+   "category": "Blue Sky",
+   "file": "clouds-kloofendal_43d_clear_puresky.jpg",
+   "creator": "Greg Zaal",
+   "source": "https://polyhaven.com/a/kloofendal_43d_clear_puresky",
+   "license": "CC0-1.0",
+   "mean": [
+    0.12709,
+    0.22383,
+    0.40507
+   ],
+   "horizon": [
+    0.29873,
+    0.4235,
+    0.57311
+   ],
+   "tags": [
+    "pure skies"
+   ]
+  },
+  {
+   "id": "polyhaven-blue-qwantani_puresky",
+   "name": "Qwantani",
+   "category": "Blue Sky",
+   "file": "blue-qwantani_puresky.jpg",
+   "creator": "Greg Zaal, Jarod Guest",
+   "source": "https://polyhaven.com/a/qwantani_puresky",
+   "license": "CC0-1.0",
+   "mean": [
+    0.39265,
+    0.5513,
+    0.82786
+   ],
+   "horizon": [
+    0.64535,
+    0.79384,
+    0.95557
+   ],
+   "tags": [
+    "pure skies"
+   ]
+  },
+  {
+   "id": "polyhaven-blue-syferfontein_18d_clear_puresky",
+   "name": "Syferfontein 18d Clear",
+   "category": "Blue Sky",
+   "file": "blue-syferfontein_18d_clear_puresky.jpg",
+   "creator": "Greg Zaal, Jarod Guest",
+   "source": "https://polyhaven.com/a/syferfontein_18d_clear_puresky",
+   "license": "CC0-1.0",
+   "mean": [
+    0.40177,
+    0.55872,
+    0.75946
+   ],
+   "horizon": [
+    0.70024,
+    0.80659,
+    0.83811
+   ],
+   "tags": [
+    "pure skies"
+   ]
+  },
+  {
+   "id": "polyhaven-clouds-aristea_wreck_puresky",
+   "name": "Aristea Wreck",
+   "category": "Clouds",
+   "file": "clouds-aristea_wreck_puresky.jpg",
+   "creator": "Greg Zaal, Jarod Guest",
+   "source": "https://polyhaven.com/a/aristea_wreck_puresky",
+   "license": "CC0-1.0",
+   "mean": [
+    0.46344,
+    0.48079,
+    0.52047
+   ],
+   "horizon": [
+    0.3511,
+    0.37862,
+    0.41113
+   ],
+   "tags": [
+    "pure skies"
+   ]
+  },
+  {
+   "id": "polyhaven-clouds-farm_field_puresky",
+   "name": "Farm Field",
+   "category": "Clouds",
+   "file": "clouds-farm_field_puresky.jpg",
+   "creator": "Dimitrios Savva, Jarod Guest",
+   "source": "https://polyhaven.com/a/farm_field_puresky",
+   "license": "CC0-1.0",
+   "mean": [
+    0.34542,
+    0.35158,
+    0.36671
+   ],
+   "horizon": [
+    0.20768,
+    0.21929,
+    0.22641
+   ],
+   "tags": [
+    "pure skies"
+   ]
+  },
+  {
+   "id": "polyhaven-clouds-kloofendal_38d_partly_cloudy_puresky",
+   "name": "Kloofendal 38d Partly Cloudy",
+   "category": "Clouds",
+   "file": "clouds-kloofendal_38d_partly_cloudy_puresky.jpg",
+   "creator": "Greg Zaal, Jarod Guest",
+   "source": "https://polyhaven.com/a/kloofendal_38d_partly_cloudy_puresky",
+   "license": "CC0-1.0",
+   "mean": [
+    0.20784,
+    0.25029,
+    0.33258
+   ],
+   "horizon": [
+    0.35582,
+    0.37048,
+    0.39606
+   ],
+   "tags": [
+    "pure skies"
+   ]
+  },
+  {
+   "id": "polyhaven-clouds-kloofendal_48d_partly_cloudy_puresky",
+   "name": "Kloofendal 48d Partly Cloudy",
+   "category": "Clouds",
+   "file": "clouds-kloofendal_48d_partly_cloudy_puresky.jpg",
+   "creator": "Greg Zaal, Jarod Guest",
+   "source": "https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky",
+   "license": "CC0-1.0",
+   "mean": [
+    0.32835,
+    0.42317,
+    0.62026
+   ],
+   "horizon": [
+    0.47529,
+    0.52761,
+    0.62315
+   ],
+   "tags": [
+    "pure skies"
+   ]
+  },
+  {
+   "id": "polyhaven-clouds-kloppenheim_05_puresky",
+   "name": "Kloppenheim 05",
+   "category": "Clouds",
+   "file": "clouds-kloppenheim_05_puresky.jpg",
+   "creator": "Greg Zaal, Jarod Guest",
+   "source": "https://polyhaven.com/a/kloppenheim_05_puresky",
+   "license": "CC0-1.0",
+   "mean": [
+    0.2158,
+    0.2856,
+    0.43781
+   ],
+   "horizon": [
+    0.32536,
+    0.36044,
+    0.44679
+   ],
+   "tags": [
+    "pure skies"
+   ]
+  },
+  {
+   "id": "polyhaven-clouds-rustig_koppie_puresky",
+   "name": "Rustig Koppie",
+   "category": "Clouds",
+   "file": "clouds-rustig_koppie_puresky.jpg",
+   "creator": "Greg Zaal, Jarod Guest",
+   "source": "https://polyhaven.com/a/rustig_koppie_puresky",
+   "license": "CC0-1.0",
+   "mean": [
+    0.41494,
+    0.57101,
+    0.82212
+   ],
+   "horizon": [
+    0.70693,
+    0.82821,
+    0.93526
+   ],
+   "tags": [
+    "pure skies"
+   ]
+  },
+  {
+   "id": "polyhaven-clouds-sunflowers_puresky",
+   "name": "Sunflowers",
+   "category": "Clouds",
+   "file": "clouds-sunflowers_puresky.jpg",
+   "creator": "Jarod Guest, Sergej Majboroda",
+   "source": "https://polyhaven.com/a/sunflowers_puresky",
+   "license": "CC0-1.0",
+   "mean": [
+    0.50961,
+    0.53546,
+    0.5078
+   ],
+   "horizon": [
+    0.48785,
+    0.49525,
+    0.43137
+   ],
+   "tags": [
+    "pure skies"
+   ]
+  },
+  {
+   "id": "polyhaven-sunset-belfast_sunset_puresky",
+   "name": "Belfast Sunset",
+   "category": "Sunset & Sunrise",
+   "file": "sunset-belfast_sunset_puresky.jpg",
+   "creator": "Greg Zaal, Dimitrios Savva, Jarod Guest",
+   "source": "https://polyhaven.com/a/belfast_sunset_puresky",
+   "license": "CC0-1.0",
+   "mean": [
+    0.49952,
+    0.45724,
+    0.52583
+   ],
+   "horizon": [
+    0.85236,
+    0.70652,
+    0.51845
+   ],
+   "tags": [
+    "pure skies"
+   ]
+  },
+  {
+   "id": "polyhaven-sunset-citrus_orchard_puresky",
+   "name": "Citrus Orchard",
+   "category": "Sunset & Sunrise",
+   "file": "sunset-citrus_orchard_puresky.jpg",
+   "creator": "Dimitrios Savva, Jarod Guest",
+   "source": "https://polyhaven.com/a/citrus_orchard_puresky",
+   "license": "CC0-1.0",
+   "mean": [
+    0.36985,
+    0.38905,
+    0.42044
+   ],
+   "horizon": [
+    0.32736,
+    0.31292,
+    0.3153
+   ],
+   "tags": [
+    "pure skies"
+   ]
+  },
+  {
+   "id": "polyhaven-sunset-citrus_orchard_road_puresky",
+   "name": "Citrus Orchard Road",
+   "category": "Sunset & Sunrise",
+   "file": "sunset-citrus_orchard_road_puresky.jpg",
+   "creator": "Dimitrios Savva, Jarod Guest",
+   "source": "https://polyhaven.com/a/citrus_orchard_road_puresky",
+   "license": "CC0-1.0",
+   "mean": [
+    0.43613,
+    0.4322,
+    0.45857
+   ],
+   "horizon": [
+    0.28353,
+    0.27677,
+    0.3112
+   ],
+   "tags": [
+    "pure skies"
+   ]
+  },
+  {
+   "id": "polyhaven-sunset-evening_road_01_puresky",
+   "name": "Evening Road 01",
+   "category": "Sunset & Sunrise",
+   "file": "sunset-evening_road_01_puresky.jpg",
+   "creator": "Jarod Guest, Sergej Majboroda",
+   "source": "https://polyhaven.com/a/evening_road_01_puresky",
+   "license": "CC0-1.0",
+   "mean": [
+    0.48726,
+    0.50935,
+    0.49449
+   ],
+   "horizon": [
+    0.39336,
+    0.40846,
+    0.37538
+   ],
+   "tags": [
+    "pure skies"
+   ]
+  },
+  {
+   "id": "polyhaven-sunset-industrial_sunset_puresky",
+   "name": "Industrial Sunset",
+   "category": "Sunset & Sunrise",
+   "file": "sunset-industrial_sunset_puresky.jpg",
+   "creator": "Jarod Guest, Sergej Majboroda",
+   "source": "https://polyhaven.com/a/industrial_sunset_puresky",
+   "license": "CC0-1.0",
+   "mean": [
+    0.35636,
+    0.38457,
+    0.43929
+   ],
+   "horizon": [
+    0.45759,
+    0.4017,
+    0.35801
+   ],
+   "tags": [
+    "pure skies"
+   ]
+  },
+  {
+   "id": "polyhaven-sunset-industrial_sunset_02_puresky",
+   "name": "Industrial Sunset 02",
+   "category": "Sunset & Sunrise",
+   "file": "sunset-industrial_sunset_02_puresky.jpg",
+   "creator": "Jarod Guest, Sergej Majboroda",
+   "source": "https://polyhaven.com/a/industrial_sunset_02_puresky",
+   "license": "CC0-1.0",
+   "mean": [
+    0.42592,
+    0.49892,
+    0.57803
+   ],
+   "horizon": [
+    0.59749,
+    0.46586,
+    0.3776
+   ],
+   "tags": [
+    "pure skies"
+   ]
+  },
+  {
+   "id": "polyhaven-sunset-kloppenheim_06_puresky",
+   "name": "Kloppenheim 06",
+   "category": "Sunset & Sunrise",
+   "file": "sunset-kloppenheim_06_puresky.jpg",
+   "creator": "Greg Zaal, Jarod Guest",
+   "source": "https://polyhaven.com/a/kloppenheim_06_puresky",
+   "license": "CC0-1.0",
+   "mean": [
+    0.43962,
+    0.48061,
+    0.52871
+   ],
+   "horizon": [
+    0.53231,
+    0.45058,
+    0.3548
+   ],
+   "tags": [
+    "pure skies"
+   ]
+  },
+  {
+   "id": "polyhaven-sunset-qwantani_dusk_2_puresky",
+   "name": "Qwantani Dusk 2",
+   "category": "Sunset & Sunrise",
+   "file": "sunset-qwantani_dusk_2_puresky.jpg",
+   "creator": "Greg Zaal, Jarod Guest",
+   "source": "https://polyhaven.com/a/qwantani_dusk_2_puresky",
+   "license": "CC0-1.0",
+   "mean": [
+    0.61584,
+    0.50909,
+    0.61143
+   ],
+   "horizon": [
+    0.65443,
+    0.43358,
+    0.42608
+   ],
+   "tags": [
+    "pure skies"
+   ]
+  },
+  {
+   "id": "polyhaven-storm-farm_field_puresky",
+   "name": "Storm · Farm Field",
+   "category": "Dramatic",
+   "file": "storm-farm_field_puresky.jpg",
+   "creator": "Dimitrios Savva, Jarod Guest",
+   "source": "https://polyhaven.com/a/farm_field_puresky",
+   "license": "CC0-1.0",
+   "mean": [
+    0.07785,
+    0.08665,
+    0.10661
+   ],
+   "horizon": [
+    0.03698,
+    0.04273,
+    0.05206
+   ],
+   "tags": [
+    "pure skies"
+   ]
+  },
+  {
+   "id": "polyhaven-storm-overcast_soil_puresky",
+   "name": "Storm · Overcast Soil",
+   "category": "Dramatic",
+   "file": "storm-overcast_soil_puresky.jpg",
+   "creator": "Jarod Guest, Sergej Majboroda",
+   "source": "https://polyhaven.com/a/overcast_soil_puresky",
+   "license": "CC0-1.0",
+   "mean": [
+    0.08838,
+    0.09563,
+    0.11064
+   ],
+   "horizon": [
+    0.05005,
+    0.04852,
+    0.04963
+   ],
+   "tags": [
+    "pure skies"
+   ]
+  },
+  {
+   "id": "polyhaven-dramatic-snow_field_puresky",
+   "name": "Storm · Snow Field",
+   "category": "Dramatic",
+   "file": "dramatic-snow_field_puresky.jpg",
+   "creator": "Jarod Guest, Sergej Majboroda",
+   "source": "https://polyhaven.com/a/snow_field_puresky",
+   "license": "CC0-1.0",
+   "mean": [
+    0.11907,
+    0.12618,
+    0.1354
+   ],
+   "horizon": [
+    0.08968,
+    0.09391,
+    0.09941
+   ],
+   "tags": [
+    "pure skies"
+   ]
+  },
+  {
+   "id": "polyhaven-dramatic-snow_field_2_puresky",
+   "name": "Storm · Snow Field 2",
+   "category": "Dramatic",
+   "file": "dramatic-snow_field_2_puresky.jpg",
+   "creator": "Jarod Guest, Sergej Majboroda",
+   "source": "https://polyhaven.com/a/snow_field_2_puresky",
+   "license": "CC0-1.0",
+   "mean": [
+    0.10531,
+    0.11348,
+    0.13013
+   ],
+   "horizon": [
+    0.11659,
+    0.13098,
+    0.14794
+   ],
+   "tags": [
+    "pure skies"
+   ]
+  },
+  {
+   "id": "polyhaven-overcast-kloofendal_overcast_puresky",
+   "name": "Kloofendal Overcast",
+   "category": "Overcast",
+   "file": "overcast-kloofendal_overcast_puresky.jpg",
+   "creator": "Greg Zaal",
+   "source": "https://polyhaven.com/a/kloofendal_overcast_puresky",
+   "license": "CC0-1.0",
+   "mean": [
+    0.44234,
+    0.45736,
+    0.49793
+   ],
+   "horizon": [
+    0.24738,
+    0.27034,
+    0.31081
+   ],
+   "tags": [
+    "pure skies"
+   ]
+  },
+  {
+   "id": "polyhaven-overcast-mud_road_puresky",
+   "name": "Mud Road",
+   "category": "Overcast",
+   "file": "overcast-mud_road_puresky.jpg",
+   "creator": "Sergey Rudavin, Jarod Guest",
+   "source": "https://polyhaven.com/a/mud_road_puresky",
+   "license": "CC0-1.0",
+   "mean": [
+    0.56325,
+    0.57098,
+    0.61899
+   ],
+   "horizon": [
+    0.33979,
+    0.339,
+    0.36505
+   ],
+   "tags": [
+    "pure skies"
+   ]
+  },
+  {
+   "id": "polyhaven-overcast-overcast_soil_puresky",
+   "name": "Overcast Soil",
+   "category": "Overcast",
+   "file": "overcast-overcast_soil_puresky.jpg",
+   "creator": "Jarod Guest, Sergej Majboroda",
+   "source": "https://polyhaven.com/a/overcast_soil_puresky",
+   "license": "CC0-1.0",
+   "mean": [
+    0.38401,
+    0.37782,
+    0.37039
+   ],
+   "horizon": [
+    0.27191,
+    0.24384,
+    0.21193
+   ],
+   "tags": [
+    "pure skies"
+   ]
+  },
+  {
+   "id": "polyhaven-night-kloppenheim_02",
+   "name": "Kloppenheim 02",
+   "category": "Night",
+   "file": "night-kloppenheim_02.jpg",
+   "creator": "Greg Zaal",
+   "source": "https://polyhaven.com/a/kloppenheim_02",
+   "license": "CC0-1.0",
+   "mean": [
+    0.02619,
+    0.04919,
+    0.12268
+   ],
+   "horizon": [
+    0.08068,
+    0.16202,
+    0.31585
+   ],
+   "tags": [
+    "dark",
+    "galaxy",
+    "moon",
+    "stars"
+   ]
+  },
+  {
+   "id": "polyhaven-night-moonless_golf",
+   "name": "Moonless Golf",
+   "category": "Night",
+   "file": "night-moonless_golf.jpg",
+   "creator": "Greg Zaal",
+   "source": "https://polyhaven.com/a/moonless_golf",
+   "license": "CC0-1.0",
+   "mean": [
+    0.07416,
+    0.05395,
+    0.04174
+   ],
+   "horizon": [
+    0.31214,
+    0.21645,
+    0.15292
+   ],
+   "tags": [
+    "field",
+    "golf",
+    "grass",
+    "milky way",
+    "stars"
+   ]
+  },
+  {
+   "id": "polyhaven-moonlit-aristea_wreck_puresky",
+   "name": "Moonlit · Aristea Wreck",
+   "category": "Night",
+   "file": "moonlit-aristea_wreck_puresky.jpg",
+   "creator": "Greg Zaal, Jarod Guest",
+   "source": "https://polyhaven.com/a/aristea_wreck_puresky",
+   "license": "CC0-1.0",
+   "mean": [
+    0.02348,
+    0.03242,
+    0.05117
+   ],
+   "horizon": [
+    0.01816,
+    0.0254,
+    0.04014
+   ],
+   "tags": [
+    "pure skies"
+   ]
+  },
+  {
+   "id": "polyhaven-moonlit-kloppenheim_05_puresky",
+   "name": "Moonlit · Kloppenheim 05",
+   "category": "Night",
+   "file": "moonlit-kloppenheim_05_puresky.jpg",
+   "creator": "Greg Zaal, Jarod Guest",
+   "source": "https://polyhaven.com/a/kloppenheim_05_puresky",
+   "license": "CC0-1.0",
+   "mean": [
+    0.0128,
+    0.0191,
+    0.03484
+   ],
+   "horizon": [
+    0.0172,
+    0.02427,
+    0.04037
+   ],
+   "tags": [
+    "pure skies"
+   ]
+  }
+ ]
+}

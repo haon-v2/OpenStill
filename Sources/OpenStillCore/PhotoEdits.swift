@@ -75,6 +75,7 @@ public struct PhotoEdits: Codable, Equatable {
             if let colors = e.advanced!.pointColors { e.pointColors = colors }
             if let fixes = e.advanced!.eyeFixes { e.eyeFixes = fixes }
             if let layers = e.advanced!.localAdjustments { e.localAdjustments = layers }
+            if let sky = e.advanced!.sky { e.advanced!.sky = sky.sanitized }
             e.monochrome = clamp(e.monochrome,0,1); e.blacks = clamp(e.blacks,-1,1); e.whites = clamp(e.whites,-1,1)
             if let v = e.advanced!.toneHighlights { e.advanced!.toneHighlights = clamp(v,-1,1) }; if let v = e.advanced!.toneShadows { e.advanced!.toneShadows = clamp(v,-1,1) }
             e.straighten = clamp(e.straighten,-20,20); e.lutAmount = clamp(e.lutAmount,0,1); e.sunLength = clamp(e.sunLength,0,1)
@@ -300,6 +301,18 @@ public enum PhotoEditor {
             else { image = image.applyingFilter("CISharpenLuminance",parameters:[kCIInputSharpnessKey:e.sharpness]) }
         }
         image = try masked(before,image,"Details"); before = image
+        if stopBeforeTool == "Sky" { return image }
+        if let sky = e.advanced?.sky, let mask = e.advanced?.masks[PhotoEdits.skyMaskKey] {
+            // The land relit to match the new sky, and the sky itself through the on-device AI selection.
+            // Browser previews point at the library file itself; applied skies are copies in the photo's assets.
+            let plateURL = sky.asset.hasPrefix("/") ? URL(fileURLWithPath:sky.asset) : EditStorage.asset(sky.asset)
+            let plateImage = modern ? try ModernRenderer.readImage(plateURL) : CIImage(cgImage:try PhotoDecoder.decode(plateURL, maxPixelSize:previewMaxDimension))
+            let plate = SkyReplacement.plate(plateImage, extent:originalExtent, settings:sky)
+            let land = SkyReplacement.relight(image, extent:originalExtent, settings:sky)
+            let selection = try mask.coverage(geometry:geometry,lens:e.optics,input:image,modern:modern)
+            image = plate.applyingFilter("CIBlendWithMask",parameters:[kCIInputBackgroundImageKey:land,kCIInputMaskImageKey:selection]).cropped(to:originalExtent)
+            before = image
+        }
         if stopBeforeTool == "Glow" { return image }
         if e.glow.amount > 0 {
             if modern {

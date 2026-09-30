@@ -32,6 +32,10 @@ public struct CubeLUT {
         guard n >= 2, values.count == n*n*n*4, (0..<3).allSatisfy({ high[$0]>low[$0] }) else { throw LUTError.invalid }
         dimension = n; data = values.withUnsafeBytes { Data($0) }; minimum = low; maximum = high
     }
+    /// A 0…1 table from RGBA values, red index fastest.
+    init(dimension: Int, rgba: [Float]) {
+        self.dimension = dimension; data = rgba.withUnsafeBytes { Data($0) }; minimum = [0,0,0]; maximum = [1,1,1]
+    }
     public func apply(_ image: CIImage) -> CIImage {
         var normalized = image
         if minimum != [0,0,0] || maximum != [1,1,1] {

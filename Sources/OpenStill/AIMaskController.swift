@@ -86,7 +86,11 @@ extension ViewerController {
 
     /// Runs a mask-producing tool of the local AI worker on the base image and adds the result as a component.
     private func runWorkerMask(_ tool: String, title: String, key: String) {
-        guard LocalAI.ready else { info.status("Sky selection uses on-device AI. Choose Set up on-device AI first."); return }
+        workerMask(tool, title: title) { [weak self] mask in self?.addMaskComponent(mask, title: title, key: key); self?.info.status("\(title) selected.") }
+    }
+    /// Runs an on-device AI selection (for example "skymask") on the current photo; `done` gets it as a mask component.
+    func workerMask(_ tool: String, title: String, done: @escaping (AdjustmentMask) -> Void) {
+        guard LocalAI.ready else { info.status("\(title) selection uses on-device AI. Choose Set up on-device AI first (a one-time download of about 450 MB)."); return }
         guard let original = renderedPhoto, let source = currentSource else { return }
         let edits = currentEdits
         do {
@@ -99,7 +103,7 @@ extension ViewerController {
                 switch result {
                 case .success:
                     var mask = AdjustmentMask(kind: "object"); mask.asset = output.lastPathComponent; mask.feather = 0.03
-                    self.addMaskComponent(mask, title: title, key: key); self.info.status("\(title) selected.")
+                    done(mask)
                 case .failure(let error): try? FileManager.default.removeItem(at: output); self.info.status(error.localizedDescription)
                 }
             }

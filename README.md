@@ -437,7 +437,7 @@ The Lightroom-desktop-inspired workspace has a slim local-library rail on the le
 - Crop: draw a rectangle and Apply crop; rotate, flip, or reset. **Crop preset** offers Freeform, Original proportions, Square, and separate **Horizontal** and **Vertical** groups: photo ratios (3:2, 4:3, 5:4, 16:9, 21:9 and their vertical versions) and common resolutions (720p, Full HD, QHD, 4K UHD, 1080 × 1350 portrait posts, 1080 × 1920 stories/reels). **Swap horizontal ↔ vertical** turns the chosen preset 90°. While cropping, the frame and the panel show the crop's aspect ratio and pixel size (for example `16:9 · 3840 × 2160`); with a resolution preset, the panel warns when the crop is smaller than that resolution. Straighten manually (−20° to +20°), choose **Auto straighten from lines** to level the photo from its long straight edges, or choose **AI align horizon** for local Apple Vision detection. Straightening automatically fills the frame without empty corners. If no confident tilted horizon is found, the photo stays unchanged. Escape ends a drawing tool.
 - Layers: one image overlay with opacity and normal/screen/multiply blending; edit-strength control blends tonal adjustments with their input.
 - Sunrays: Amount, Overall Look, Sunrays Length, Penetration, Sun Radius, Sun Glow Radius/Amount, Number of Sunrays, Randomize, and separate Sun/Sunrays Warmth controls, following [Luminar Neo’s documented layout](https://support.skylum.com/editing-tools/landscape-tools/sunrays). OpenStill uses its own local algorithm, not pixel-matched Skylum processing. Click **Place Sun Center**, then click or repeatedly drag inside or outside the photo; Escape finishes. Placement adds workspace margins, and arrow keys nudge the center (Shift for larger steps). Amount starts at zero. The final light blend uses the tool’s independent mask. Old saved Sunrays effects retain the legacy renderer until this tool is adjusted. New centers follow source geometry through crop, rotation, flip, and straightening; each drag is one undo step.
-- Presets: six starting looks, save/load `.openstillpreset` files, and a categorized 3D `.cube` LUT library with photo previews, intensity, and its own mask. Saved portable presets include tonal/color settings, but exclude masks, LUT asset references, geometry, and AI/image assets; loading preserves those from the current photo.
+- Presets and LUTs: 82 presets with an Amount, My Presets, and a library of 249 free LUT looks with photo previews, search, favorites, intensity and its own mask (see **Looks: presets and LUTs** below).
 - Edits: undo, redo, click a previous history step, compare with the original, or reset. A new change after undo replaces the redo branch.
 
 ### Masks
@@ -467,30 +467,54 @@ Masks belong to their individual tool. Switching tools ends the active brush/sel
 
 Masks, strokes, and history persist between launches. Coordinates stay attached to the source through crop/rotate/flip/straighten. Edits made before running an AI tool become its input; the latest AI result's blend mask remains editable, and undo restores earlier settings and masks. Erase cannot remove a new object merely by expanding the result's blend mask: select the new region and run removal again.
 
-### Free LUT library
+### Looks: presets and LUTs
 
-**Presets → LUT Library** includes 12 free CC0 looks in every installation, ready offline:
+Open **Presets & LUTs** (P) and switch between **Presets** and **LUTs**. Every look is free, bundled and works offline.
 
-| Category | Included looks |
+- **249 LUT looks** (420 tables counting the push/pull versions of film looks), from three free sources:
+  - **Film simulations** (293 tables): the RawTherapee Film Simulation Collection by Pat David, Pavlov Dmitry and Michael Ezra, CC BY-SA 4.0. OpenStill shows descriptive names ("Portrait 400", "Vivid Slide 50", "Instant Classic"); the original file names are listed in `Resources/Licenses/LUTs/PROVENANCE.md`. Film looks come in strengths such as −1, Normal, +1 and +2: pick one under the look's description.
+  - **FreshLUTs community looks** (50): CC0, from OpenShot's pinned collection, with each creator credited.
+  - **OpenStill Originals** (77): CC0, generated from the readable recipes in `Resources/LUTs/originals.json`: film and cross-process, cinematic grades, black and white with color filters and toners, duotones, infrared, seasons, night and utility looks (warmer, cooler, lift shadows, protect highlights, a gentle S-curve and a neutral identity).
+- **82 presets** in 13 categories, including the six OpenStill always had with the same results. Many pair a look with Develop settings (grain, vignette, tone). Presets reset tone and color, then apply their own settings; your crop, masks, retouching, geometry and AI results stay.
+- **Amount** (0–200%) changes the preset you just applied: 0% is your edit before it, 100% the preset as made, above 100% exaggerates it.
+- **My Presets:** **Save current as preset…** stores your tone, color and effects (not crop, masks or retouching) in `~/Library/Application Support/OpenStill/Presets`. Right-click one to rename, delete or show it in Finder. **Import preset…** adds a `.openstillpreset` file (including ones saved by earlier versions) and **Export current as preset…** writes one to share.
+- **Finding looks:** a category menu with counts, search (name, category, tags, creator), **★ Favorites** (right-click a look) and **Recent**.
+- Thumbnails show each look on the current photo and render only for the cards you can see, only while the panel is open.
+
+| LUT category | Looks |
 | --- | --- |
-| Portraits | Vintage 400 Film, Romantic Cinema, Golden Years Film |
-| Cityscape & Street | City Neon Cinema, City Night Film, Night Glow |
-| Automotive | Cool Cinema, Teal Punch, Noir Era |
-| Nature & Landscape | Emerald Film, Woodland Drama, Tropical Teal |
+| Film · Color | 28 |
+| Film · Slide | 22 |
+| Film · Instant | 19 |
+| Film · Black & White | 33 |
+| Cinematic | 29 |
+| Moody | 15 |
+| Vintage & Faded | 20 |
+| Portrait | 6 |
+| Landscape & Nature | 10 |
+| Seasons | 6 |
+| City & Night | 10 |
+| Vibrant | 7 |
+| Creative | 18 |
+| Black & White | 16 |
+| Utility | 10 |
 
-Choose a category, then click a photo preview to apply a look at 70% intensity. The intensity slider, LUT mask, Remove LUT, and Undo remain available. Preview cards use the current photo and its other adjustments, including the LUT mask; browsing them does not add history steps. New looks preview at 70%; the selected look previews at its current intensity. Thumbnails use reduced resolution; inspect the main canvas at 100% for fine detail. All processing is local.
+Click a LUT to apply it at 70%. The intensity slider, LUT mask, Remove LUT and Undo work as before. Applied looks are copied into the photo's edit assets, so saved edits never change when the library does. Looks add to the color already recorded in a JPEG or camera preview; lower the intensity if that look is already strong. Categories are suggestions, not subject detection.
 
-Categories are OpenStill recommendations, not automatic subject detection or exclusive uses. These are stylized, display-referred creative looks, not LOG conversions or sensor-RAW development. They add to the appearance already recorded in a JPEG or S9 embedded preview and cannot remove a baked-in LUT. Lower the intensity if the recorded camera look is already strong.
+### Skies: replace the sky and relight the photo
 
-Files are pinned to OpenShot revision `9004af74b02c67e507190e9950b5fc690fb0a900`. `Resources/LUTs/catalog.json` records creator-page CC0 verification, source links, and SHA-256 digests. License and provenance records are in `Resources/Licenses/LUTs`. The optional maintainer script `scripts/fetch-luts.py` re-downloads this pinned collection and verifies creator-page license notices; the app makes no download requests. Credits: [OpenShot LUT authors](https://github.com/OpenShot/openshot-qt/blob/9004af74b02c67e507190e9950b5fc690fb0a900/src/colors/AUTHORS.md).
+Open **Presets & LUTs** (P) and choose **Skies**, or **Develop › Sky Replacement › Choose a sky…**. There are 30 free skies in six categories: Blue Sky, Clouds, Sunset & Sunrise, Dramatic, Overcast and Night.
 
-**Imported** preserves existing files in `~/Library/Application Support/OpenStill/LUTLibrary`. BONBOA, Neagh, and Kitaura by Ross McConaghy remain local imports on this Mac and are not bundled or relicensed. Use **Import .cube LUT…** to add compatible 3D LUTs (2–65 points per dimension). Applied LUTs are copied into the edit asset store so saved edits survive library updates.
+- **The sky is found for you.** The first time you choose a sky, the on-device sky AI selects this photo's sky and keeps the selection as the **Sky** mask. It's a one-time setup of about 450 MB, and it runs on this Mac. **Refine sky selection…** opens the usual mask tools (brush, gradients, color and luminance ranges) for edges it missed. Once the photo has a selection, each sky card previews that sky on your photo.
+- **The photo follows the sky**, as in Luminar's Sky AI. **Relight scene** carries the new sky's brightness and color into the rest of the photo: a dark storm or a night sky darkens and cools the land, and a sunset warms it. Each kind of sky starts at a sensible strength; at 0 only the sky changes.
+- **More controls:** **Horizon** moves the sky up or down, and there are **Sky exposure**, **Sky defocus** and **Atmosphere** (a haze of the sky's horizon color over the land). **Flip sky** mirrors the sky and **Remove sky** takes it out again.
+- **Your own skies:** **Use your own sky…** adds a sky photo to **Your Skies**. It's measured once, so relighting works with it too.
+- **It stays editable.** The sky is applied live, not baked in: change any setting later, or undo it. The sky image is copied into the photo's edit assets, so saved edits don't change if the library does.
+- **Credits:** every sky is from [Poly Haven](https://polyhaven.com), CC0. Authors and pages are listed in `Resources/Licenses/Skies/PROVENANCE.md`; `scripts/build-sky-library.py` rebuilds the library.
 
-Local Lumix import sources: [BONBOA](https://www.rossandhisjpegs.com/lumix/bonboa), [Neagh](https://www.rossandhisjpegs.com/lumix/neagh), [Kitaura](https://www.rossandhisjpegs.com/lumix/kitaura).
+**Imported** keeps your own `.cube` files in `~/Library/Application Support/OpenStill/LUTLibrary`. Use **Import .cube LUT…** to add 3D LUTs (2–65 points per dimension).
 
-History saves automatically in `~/Library/Application Support/OpenStill/PhotoRecords`, with ten rotating recovery snapshots. Existing `Edits` histories migrate without changing legacy rendering. Stable IDs, file bookmarks and full-content fingerprints relink moved originals; filename alone never transfers edits. Existing versions and imported LUT assets remain available. The filmstrip displays originals; the Shoot grid displays saved edits.
-
-**Export** writes a separate JPEG, PNG, TIFF or HEIF with compatible recorded camera/lens metadata. An export cannot overwrite its source, including through a symbolic link. Export offers JPEG, HEIF or 8/16-bit PNG/TIFF with sRGB, Display P3, Adobe RGB or ProPhoto RGB profiles. **Dynamic range** adds HDR output: **HDR (PQ)** and **HDR (HLG)** write 10-bit Rec. 2100 HEIF; **SDR + HDR gain map** writes a JPEG or HEIF that looks normal on SDR screens and brighter on HDR screens (needs macOS 15). AVIF export is not offered yet. New edits use floating-point extended-linear Rec.2020 processing; display output is color managed. LUTs are interpreted in sRGB. Legacy versions keep their earlier renderer until explicitly upgraded or a new feature requires an upgraded copy. Proprietary maker notes are not copied into newly rendered exports because their offsets and processing data may no longer be valid.
+The library is one compact file, `Resources/LUTs/Library.lutpack` (about 18 MB), described by `catalog.json`. Maintainers rebuild it with `scripts/build-lut-pack.py`, which reads the pinned FreshLUTs files, the Film Simulation Hald CLUT images and `originals.json`; the app itself never downloads looks. Film simulations are stored at 8-bit precision, the precision of their source images. Licenses: `Resources/Licenses/LUTs/` (CC0-1.0, CC BY-SA 4.0 and the provenance list).
 
 ## Photographer workflow
 

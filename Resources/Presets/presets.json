@@ -1,0 +1,1111 @@
+{
+ "version": 1,
+ "presets": [
+  {
+   "id": "natural",
+   "name": "Natural",
+   "category": "Natural & Clean",
+   "description": "Resets tone and color to a clean, neutral starting point.",
+   "adjustments": {}
+  },
+  {
+   "id": "warm-light",
+   "name": "Warm light",
+   "category": "Natural & Clean",
+   "description": "A touch of warmth and gentle vibrance.",
+   "adjustments": {
+    "temperature": 7800,
+    "vibrance": 0.15,
+    "contrast": 1.05
+   }
+  },
+  {
+   "id": "cool-shadows",
+   "name": "Cool shadows",
+   "category": "Natural & Clean",
+   "description": "Cooler color with lifted shadows.",
+   "adjustments": {
+    "temperature": 5200,
+    "shadows": 0.2,
+    "contrast": 1.05
+   }
+  },
+  {
+   "id": "vivid",
+   "name": "Vivid",
+   "category": "Vibrant & Travel",
+   "description": "Richer color and a little more punch.",
+   "adjustments": {
+    "vibrance": 0.35,
+    "saturation": 1.12,
+    "contrast": 1.12,
+    "clarity": 0.15
+   }
+  },
+  {
+   "id": "soft-portrait",
+   "name": "Soft portrait",
+   "category": "Portrait",
+   "description": "Lower contrast, open shadows and warm skin.",
+   "adjustments": {
+    "contrast": 0.9,
+    "shadows": 0.2,
+    "saturation": 0.95,
+    "temperature": 6900
+   }
+  },
+  {
+   "id": "monochrome",
+   "name": "Monochrome",
+   "category": "Black & White",
+   "description": "Straight black and white with extra contrast.",
+   "adjustments": {
+    "monochrome": 1,
+    "contrast": 1.2
+   }
+  },
+  {
+   "id": "clean-crisp",
+   "name": "Clean & Crisp",
+   "category": "Natural & Clean",
+   "description": "Balanced contrast, clear midtones and fine detail.",
+   "adjustments": {
+    "contrast": 1.08,
+    "clarity": 0.12,
+    "texture": 0.1,
+    "vibrance": 0.1,
+    "whites": 0.1,
+    "blacks": -0.05,
+    "sharpness": 0.4
+   }
+  },
+  {
+   "id": "recover-highlights",
+   "name": "Recover Highlights",
+   "category": "Natural & Clean",
+   "description": "Brings back bright skies and lifts shadows for high-contrast scenes.",
+   "adjustments": {
+    "highlights": -0.6,
+    "shadows": 0.35,
+    "whites": -0.1,
+    "contrast": 1.02
+   }
+  },
+  {
+   "id": "gentle-pop",
+   "name": "Gentle Pop",
+   "category": "Natural & Clean",
+   "description": "A subtle lift in color and depth for everyday photos.",
+   "adjustments": {
+    "vibrance": 0.2,
+    "clarity": 0.08,
+    "contrast": 1.05,
+    "dehaze": 0.05
+   }
+  },
+  {
+   "id": "neutral-matte",
+   "name": "Neutral Matte",
+   "category": "Natural & Clean",
+   "description": "Soft blacks and restrained color.",
+   "adjustments": {
+    "contrast": 0.95,
+    "saturation": 0.9,
+    "curveShadows": 0.3,
+    "blacks": 0.1
+   }
+  },
+  {
+   "id": "warm-skin",
+   "name": "Warm Skin",
+   "category": "Portrait",
+   "description": "Warm, glowing skin with soft contrast.",
+   "adjustments": {
+    "temperature": 7000,
+    "contrast": 0.95,
+    "texture": -0.15,
+    "clarity": -0.05
+   },
+   "lut": {
+    "id": "openstill-warm-skin",
+    "amount": 0.5
+   }
+  },
+  {
+   "id": "porcelain",
+   "name": "Porcelain",
+   "category": "Portrait",
+   "description": "Bright, cool and airy skin tones.",
+   "adjustments": {
+    "exposure": 0.15,
+    "temperature": 6200,
+    "saturation": 0.9,
+    "texture": -0.2,
+    "highlights": -0.2
+   },
+   "lut": {
+    "id": "openstill-porcelain",
+    "amount": 0.5
+   }
+  },
+  {
+   "id": "golden-hour-portrait",
+   "name": "Golden Hour Portrait",
+   "category": "Portrait",
+   "description": "Sun-warmed skin and golden highlights.",
+   "adjustments": {
+    "temperature": 7600,
+    "shadows": 0.2,
+    "vibrance": 0.1
+   },
+   "lut": {
+    "id": "openstill-golden-hour-skin",
+    "amount": 0.6
+   }
+  },
+  {
+   "id": "soft-matte-portrait",
+   "name": "Soft Matte Portrait",
+   "category": "Portrait",
+   "description": "Lifted blacks and gentle color for a calm portrait.",
+   "adjustments": {
+    "contrast": 0.92,
+    "texture": -0.1
+   },
+   "lut": {
+    "id": "openstill-soft-matte-portrait",
+    "amount": 0.7
+   }
+  },
+  {
+   "id": "editorial-portrait",
+   "name": "Editorial Portrait",
+   "category": "Portrait",
+   "description": "Cool, clean magazine color with crisp contrast.",
+   "adjustments": {
+    "contrast": 1.1,
+    "clarity": 0.1,
+    "saturation": 0.92
+   },
+   "lut": {
+    "id": "openstill-editorial-cool",
+    "amount": 0.6
+   }
+  },
+  {
+   "id": "portrait-400-film",
+   "name": "Portrait 400 Film",
+   "category": "Portrait",
+   "description": "The warm, forgiving portrait negative with fine grain.",
+   "adjustments": {
+    "grain": 0.15,
+    "grainSize": 0.2
+   },
+   "lut": {
+    "id": "film-portrait-400",
+    "amount": 0.8
+   }
+  },
+  {
+   "id": "pastel-wedding",
+   "name": "Pastel Wedding",
+   "category": "Portrait",
+   "description": "Airy pastel color with soft greens.",
+   "adjustments": {
+    "exposure": 0.2,
+    "contrast": 0.92,
+    "highlights": -0.2
+   },
+   "lut": {
+    "id": "film-pastel-400",
+    "amount": 0.8
+   }
+  },
+  {
+   "id": "vivid-landscape",
+   "name": "Vivid Landscape",
+   "category": "Landscape",
+   "description": "Deep skies, rich greens and clarity.",
+   "adjustments": {
+    "vibrance": 0.3,
+    "clarity": 0.2,
+    "dehaze": 0.15,
+    "highlights": -0.4,
+    "shadows": 0.2
+   },
+   "hsl": {
+    "Blue": [
+     0,
+     0.15,
+     -0.15
+    ],
+    "Green": [
+     0.05,
+     0.1,
+     0
+    ]
+   }
+  },
+  {
+   "id": "lush-greens",
+   "name": "Lush Greens",
+   "category": "Landscape",
+   "description": "Greener foliage for forests and gardens.",
+   "adjustments": {
+    "vibrance": 0.15,
+    "clarity": 0.1
+   },
+   "lut": {
+    "id": "openstill-vivid-greens",
+    "amount": 0.6
+   }
+  },
+  {
+   "id": "golden-hour",
+   "name": "Golden Hour",
+   "category": "Landscape",
+   "description": "Warm, low sun with long glowing light.",
+   "adjustments": {
+    "temperature": 7400,
+    "highlights": -0.3,
+    "vibrance": 0.15
+   },
+   "lut": {
+    "id": "openstill-golden-hour",
+    "amount": 0.6
+   }
+  },
+  {
+   "id": "blue-hour",
+   "name": "Blue Hour",
+   "category": "Landscape",
+   "description": "Cool dusk color with luminous skies.",
+   "adjustments": {
+    "temperature": 5600,
+    "shadows": 0.15
+   },
+   "lut": {
+    "id": "openstill-blue-hour",
+    "amount": 0.6
+   }
+  },
+  {
+   "id": "autumn-colors",
+   "name": "Autumn Colors",
+   "category": "Landscape",
+   "description": "Richer oranges and reds for fall.",
+   "adjustments": {
+    "vibrance": 0.15
+   },
+   "lut": {
+    "id": "openstill-autumn",
+    "amount": 0.7
+   }
+  },
+  {
+   "id": "misty-morning",
+   "name": "Misty Morning",
+   "category": "Landscape",
+   "description": "Soft haze and muted color for quiet mornings.",
+   "adjustments": {
+    "dehaze": -0.15,
+    "contrast": 0.9
+   },
+   "lut": {
+    "id": "openstill-misty-forest",
+    "amount": 0.7
+   }
+  },
+  {
+   "id": "ocean-blues",
+   "name": "Ocean Blues",
+   "category": "Landscape",
+   "description": "Clear turquoise water and cool skies.",
+   "adjustments": {
+    "dehaze": 0.1,
+    "clarity": 0.1
+   },
+   "lut": {
+    "id": "openstill-ocean",
+    "amount": 0.7
+   }
+  },
+  {
+   "id": "vivid-slide-landscape",
+   "name": "Vivid Slide Landscape",
+   "category": "Landscape",
+   "description": "Intense slide-film saturation and contrast.",
+   "adjustments": {
+    "highlights": -0.3
+   },
+   "lut": {
+    "id": "film-vivid-slide-50",
+    "amount": 0.8
+   }
+  },
+  {
+   "id": "gritty-street",
+   "name": "Gritty Street",
+   "category": "Street",
+   "description": "High clarity, cool shadows and desaturated color.",
+   "adjustments": {
+    "clarity": 0.35,
+    "contrast": 1.15,
+    "saturation": 0.8,
+    "texture": 0.2,
+    "grain": 0.2
+   },
+   "grading": {
+    "shadows": {
+     "hue": 210,
+     "saturation": 0.15
+    }
+   }
+  },
+  {
+   "id": "everyday-snapshot",
+   "name": "Everyday Snapshot",
+   "category": "Street",
+   "description": "Honest drugstore-film color with a little grain.",
+   "adjustments": {
+    "grain": 0.2
+   },
+   "lut": {
+    "id": "film-everyday-400",
+    "amount": 0.85
+   }
+  },
+  {
+   "id": "urban-steel",
+   "name": "Urban Steel",
+   "category": "Street",
+   "description": "Cool steel tones for architecture and concrete.",
+   "adjustments": {
+    "clarity": 0.2,
+    "contrast": 1.1
+   },
+   "lut": {
+    "id": "openstill-cool-steel",
+    "amount": 0.7
+   }
+  },
+  {
+   "id": "documentary",
+   "name": "Documentary",
+   "category": "Street",
+   "description": "Muted, contrasty color for honest storytelling.",
+   "adjustments": {
+    "saturation": 0.8,
+    "contrast": 1.12,
+    "clarity": 0.15,
+    "vignette": -0.2
+   }
+  },
+  {
+   "id": "street-b-w-400",
+   "name": "Street B&W 400",
+   "category": "Street",
+   "description": "The gritty street classic in black and white.",
+   "adjustments": {
+    "grain": 0.3,
+    "contrast": 1.05
+   },
+   "lut": {
+    "id": "film-gritty-b-w-400",
+    "amount": 1.0
+   }
+  },
+  {
+   "id": "warm-negative",
+   "name": "Warm Negative",
+   "category": "Film",
+   "description": "Warm, soft film color with gentle grain.",
+   "adjustments": {
+    "grain": 0.2,
+    "grainSize": 0.3
+   },
+   "lut": {
+    "id": "openstill-warm-negative",
+    "amount": 0.8
+   }
+  },
+  {
+   "id": "cool-slide",
+   "name": "Cool Slide",
+   "category": "Film",
+   "description": "Cool, crisp slide film.",
+   "adjustments": {
+    "grain": 0.1
+   },
+   "lut": {
+    "id": "openstill-cool-slide",
+    "amount": 0.8
+   }
+  },
+  {
+   "id": "expired-film",
+   "name": "Expired Film",
+   "category": "Film",
+   "description": "Faded, shifted color and heavy grain.",
+   "adjustments": {
+    "grain": 0.4,
+    "grainRoughness": 0.7,
+    "vignette": -0.2
+   },
+   "lut": {
+    "id": "openstill-expired-film",
+    "amount": 0.85
+   }
+  },
+  {
+   "id": "heritage-slide",
+   "name": "Heritage Slide",
+   "category": "Film",
+   "description": "Deep reds and dense shadows of mid-century slides.",
+   "adjustments": {
+    "grain": 0.15
+   },
+   "lut": {
+    "id": "film-heritage-slide-64",
+    "amount": 0.85
+   }
+  },
+  {
+   "id": "instant-classic",
+   "name": "Instant Classic",
+   "category": "Film",
+   "description": "Classic instant-film color with a soft vignette.",
+   "adjustments": {
+    "vignette": -0.25,
+    "grain": 0.15
+   },
+   "lut": {
+    "id": "film-instant-classic",
+    "amount": 0.9
+   }
+  },
+  {
+   "id": "cross-processed",
+   "name": "Cross Processed",
+   "category": "Film",
+   "description": "Shifted colors and hard contrast from mismatched chemistry.",
+   "adjustments": {
+    "grain": 0.2
+   },
+   "lut": {
+    "id": "openstill-cross-process-green",
+    "amount": 0.8
+   }
+  },
+  {
+   "id": "nineties-drugstore",
+   "name": "Nineties Drugstore",
+   "category": "Film",
+   "description": "Cool greens and flash-lit color of a 90s snapshot.",
+   "adjustments": {
+    "grain": 0.25
+   },
+   "lut": {
+    "id": "openstill-nineties-drugstore",
+    "amount": 0.85
+   }
+  },
+  {
+   "id": "b-w-high-contrast",
+   "name": "B&W High Contrast",
+   "category": "Black & White",
+   "description": "Bold blacks and bright whites.",
+   "adjustments": {
+    "monochrome": 1,
+    "contrast": 1.35,
+    "clarity": 0.2,
+    "whites": 0.15,
+    "blacks": -0.2
+   }
+  },
+  {
+   "id": "b-w-soft",
+   "name": "B&W Soft",
+   "category": "Black & White",
+   "description": "Gentle, silvery black and white.",
+   "adjustments": {
+    "monochrome": 1,
+    "contrast": 0.9,
+    "shadows": 0.2,
+    "highlights": -0.2
+   }
+  },
+  {
+   "id": "b-w-red-filter",
+   "name": "B&W Red Filter",
+   "category": "Black & White",
+   "description": "Dark skies and bright skin, like a red lens filter.",
+   "adjustments": {
+    "monochrome": 1,
+    "contrast": 1.15
+   },
+   "grayMix": [
+    0.5,
+    0.35,
+    0.2,
+    -0.2,
+    -0.4,
+    -0.6,
+    -0.3,
+    0.1
+   ]
+  },
+  {
+   "id": "b-w-green-filter",
+   "name": "B&W Green Filter",
+   "category": "Black & White",
+   "description": "Lighter foliage and deeper skin tones.",
+   "adjustments": {
+    "monochrome": 1,
+    "contrast": 1.1
+   },
+   "grayMix": [
+    -0.3,
+    -0.1,
+    0.2,
+    0.5,
+    0.3,
+    -0.2,
+    -0.2,
+    -0.2
+   ]
+  },
+  {
+   "id": "selenium-toned",
+   "name": "Selenium Toned",
+   "category": "Black & White",
+   "description": "Cool, deep-purple toned print.",
+   "adjustments": {
+    "contrast": 1.1
+   },
+   "lut": {
+    "id": "openstill-selenium",
+    "amount": 1.0
+   }
+  },
+  {
+   "id": "sepia-print",
+   "name": "Sepia Print",
+   "category": "Black & White",
+   "description": "Warm brown toned print.",
+   "adjustments": {
+    "contrast": 1.05,
+    "vignette": -0.15
+   },
+   "lut": {
+    "id": "openstill-sepia",
+    "amount": 1.0
+   }
+  },
+  {
+   "id": "fine-grain-b-w",
+   "name": "Fine Grain B&W",
+   "category": "Black & White",
+   "description": "Very fine grain and smooth tones.",
+   "adjustments": {
+    "grain": 0.1,
+    "grainSize": 0.1
+   },
+   "lut": {
+    "id": "film-fine-b-w-100",
+    "amount": 1.0
+   }
+  },
+  {
+   "id": "infrared-glow",
+   "name": "Infrared Glow",
+   "category": "Black & White",
+   "description": "White foliage and black skies of infrared film.",
+   "adjustments": {
+    "grain": 0.2
+   },
+   "lut": {
+    "id": "openstill-infrared-glow",
+    "amount": 1.0
+   }
+  },
+  {
+   "id": "teal-orange",
+   "name": "Teal & Orange",
+   "category": "Cinematic",
+   "description": "The blockbuster look: warm skin, teal shadows.",
+   "adjustments": {
+    "contrast": 1.08
+   },
+   "lut": {
+    "id": "openstill-teal-orange-subtle",
+    "amount": 0.8
+   }
+  },
+  {
+   "id": "teal-orange-strong",
+   "name": "Teal & Orange Strong",
+   "category": "Cinematic",
+   "description": "An unmistakable teal-and-orange grade.",
+   "adjustments": {
+    "contrast": 1.12,
+    "clarity": 0.1
+   },
+   "lut": {
+    "id": "openstill-teal-orange-strong",
+    "amount": 0.8
+   }
+  },
+  {
+   "id": "bleach-bypass",
+   "name": "Bleach Bypass",
+   "category": "Cinematic",
+   "description": "Silvery desaturated color with hard contrast.",
+   "adjustments": {
+    "clarity": 0.15
+   },
+   "lut": {
+    "id": "openstill-bleach-bypass-soft",
+    "amount": 0.9
+   }
+  },
+  {
+   "id": "blockbuster-gold",
+   "name": "Blockbuster Gold",
+   "category": "Cinematic",
+   "description": "Golden highlights and deep shadows.",
+   "adjustments": {
+    "contrast": 1.05
+   },
+   "lut": {
+    "id": "openstill-blockbuster-gold",
+    "amount": 0.8
+   }
+  },
+  {
+   "id": "indie-muted",
+   "name": "Indie Muted",
+   "category": "Cinematic",
+   "description": "Quiet, desaturated independent-film color.",
+   "adjustments": {
+    "contrast": 0.95
+   },
+   "lut": {
+    "id": "openstill-indie-muted",
+    "amount": 0.8
+   }
+  },
+  {
+   "id": "day-for-night",
+   "name": "Day for Night",
+   "category": "Cinematic",
+   "description": "Turns a sunny scene into moonlit night.",
+   "adjustments": {
+    "exposure": -0.6
+   },
+   "lut": {
+    "id": "openstill-day-for-night",
+    "amount": 1.0
+   }
+  },
+  {
+   "id": "anamorphic-cool",
+   "name": "Anamorphic Cool",
+   "category": "Cinematic",
+   "description": "Cool cinema color with a wide-screen vignette.",
+   "adjustments": {
+    "vignette": -0.3,
+    "contrast": 1.08
+   },
+   "lut": {
+    "id": "freshluts-218",
+    "amount": 0.8
+   }
+  },
+  {
+   "id": "dark-moody",
+   "name": "Dark & Moody",
+   "category": "Moody",
+   "description": "Deep shadows, muted color and warm highlights.",
+   "adjustments": {
+    "exposure": -0.3,
+    "contrast": 1.15,
+    "saturation": 0.8,
+    "highlights": -0.3,
+    "vignette": -0.3
+   },
+   "grading": {
+    "shadows": {
+     "hue": 200,
+     "saturation": 0.2
+    },
+    "highlights": {
+     "hue": 40,
+     "saturation": 0.15
+    }
+   }
+  },
+  {
+   "id": "neo-noir",
+   "name": "Neo-Noir",
+   "category": "Moody",
+   "description": "Hard shadows and cold neon light.",
+   "adjustments": {
+    "contrast": 1.1
+   },
+   "lut": {
+    "id": "openstill-neo-noir",
+    "amount": 0.85
+   }
+  },
+  {
+   "id": "stormy",
+   "name": "Stormy",
+   "category": "Moody",
+   "description": "Heavy skies and cold, desaturated color.",
+   "adjustments": {
+    "dehaze": 0.3,
+    "clarity": 0.25,
+    "saturation": 0.7,
+    "temperature": 5600,
+    "highlights": -0.4
+   }
+  },
+  {
+   "id": "candlelight",
+   "name": "Candlelight",
+   "category": "Moody",
+   "description": "Warm, low light for intimate interiors.",
+   "adjustments": {
+    "exposure": -0.1
+   },
+   "lut": {
+    "id": "film-candlelight",
+    "amount": 0.8
+   }
+  },
+  {
+   "id": "faded-blues",
+   "name": "Faded Blues",
+   "category": "Moody",
+   "description": "Soft blue melancholy.",
+   "adjustments": {
+    "contrast": 0.95
+   },
+   "lut": {
+    "id": "film-drop-blues",
+    "amount": 0.8
+   }
+  },
+  {
+   "id": "bright-airy",
+   "name": "Bright & Airy",
+   "category": "Bright & Airy",
+   "description": "Light, clean and soft — for lifestyle and food.",
+   "adjustments": {
+    "exposure": 0.35,
+    "contrast": 0.9,
+    "highlights": -0.3,
+    "shadows": 0.4,
+    "saturation": 0.9,
+    "temperature": 6700,
+    "whites": 0.1
+   }
+  },
+  {
+   "id": "pastel-dream",
+   "name": "Pastel Dream",
+   "category": "Bright & Airy",
+   "description": "Soft pastel color with lifted blacks.",
+   "adjustments": {
+    "exposure": 0.2
+   },
+   "lut": {
+    "id": "openstill-pastel",
+    "amount": 0.8
+   }
+  },
+  {
+   "id": "dreamy-haze",
+   "name": "Dreamy Haze",
+   "category": "Bright & Airy",
+   "description": "A soft glowing haze.",
+   "adjustments": {
+    "clarity": -0.15,
+    "dehaze": -0.1
+   },
+   "lut": {
+    "id": "openstill-dreamy-haze",
+    "amount": 0.8
+   }
+  },
+  {
+   "id": "spring-light",
+   "name": "Spring Light",
+   "category": "Bright & Airy",
+   "description": "Fresh greens and soft pinks.",
+   "adjustments": {
+    "exposure": 0.15
+   },
+   "lut": {
+    "id": "openstill-spring",
+    "amount": 0.7
+   }
+  },
+  {
+   "id": "tropical",
+   "name": "Tropical",
+   "category": "Vibrant & Travel",
+   "description": "Turquoise water and warm sand.",
+   "adjustments": {
+    "vibrance": 0.25
+   },
+   "lut": {
+    "id": "openstill-summer",
+    "amount": 0.7
+   }
+  },
+  {
+   "id": "desert-heat",
+   "name": "Desert Heat",
+   "category": "Vibrant & Travel",
+   "description": "Hot oranges and bleached skies.",
+   "adjustments": {
+    "dehaze": 0.1
+   },
+   "lut": {
+    "id": "openstill-desert-heat",
+    "amount": 0.75
+   }
+  },
+  {
+   "id": "travel-punch",
+   "name": "Travel Punch",
+   "category": "Vibrant & Travel",
+   "description": "Bold, saturated color with crisp detail.",
+   "adjustments": {
+    "vibrance": 0.4,
+    "saturation": 1.1,
+    "clarity": 0.2,
+    "dehaze": 0.1,
+    "contrast": 1.1,
+    "sharpness": 0.5
+   }
+  },
+  {
+   "id": "fine-grain-vivid",
+   "name": "Fine Grain Vivid",
+   "category": "Vibrant & Travel",
+   "description": "Very clean, saturated film color.",
+   "adjustments": {},
+   "lut": {
+    "id": "film-fine-grain-vivid-100",
+    "amount": 0.85
+   }
+  },
+  {
+   "id": "city-lights",
+   "name": "City Lights",
+   "category": "Night",
+   "description": "Clean night color with controlled highlights.",
+   "adjustments": {
+    "highlights": -0.5,
+    "shadows": 0.2,
+    "clarity": 0.1,
+    "temperature": 5800
+   }
+  },
+  {
+   "id": "neon-night",
+   "name": "Neon Night",
+   "category": "Night",
+   "description": "Magenta and teal neon glow.",
+   "adjustments": {
+    "contrast": 1.1
+   },
+   "lut": {
+    "id": "openstill-neon-night",
+    "amount": 0.8
+   }
+  },
+  {
+   "id": "tungsten-night",
+   "name": "Tungsten Night",
+   "category": "Night",
+   "description": "Cool street light and warm windows.",
+   "adjustments": {},
+   "lut": {
+    "id": "openstill-tungsten-night",
+    "amount": 0.8
+   }
+  },
+  {
+   "id": "sodium-street",
+   "name": "Sodium Street",
+   "category": "Night",
+   "description": "Orange sodium-vapor street light.",
+   "adjustments": {},
+   "lut": {
+    "id": "openstill-sodium-street",
+    "amount": 0.8
+   }
+  },
+  {
+   "id": "night-glow",
+   "name": "Night Glow",
+   "category": "Night",
+   "description": "Cool shadows and a dramatic night-time mood.",
+   "adjustments": {},
+   "lut": {
+    "id": "freshluts-357",
+    "amount": 0.8
+   }
+  },
+  {
+   "id": "seventies-warm",
+   "name": "Seventies Warm",
+   "category": "Vintage",
+   "description": "Warm, faded 70s print color.",
+   "adjustments": {
+    "grain": 0.25
+   },
+   "lut": {
+    "id": "openstill-seventies-warm",
+    "amount": 0.85
+   }
+  },
+  {
+   "id": "faded-print",
+   "name": "Faded Print",
+   "category": "Vintage",
+   "description": "A print left in the sun: soft, faded, warm.",
+   "adjustments": {
+    "grain": 0.2,
+    "vignette": -0.15
+   },
+   "lut": {
+    "id": "openstill-faded-print",
+    "amount": 0.85
+   }
+  },
+  {
+   "id": "lomo",
+   "name": "Lomo",
+   "category": "Vintage",
+   "description": "Saturated color and heavy vignette of a toy camera.",
+   "adjustments": {
+    "vignette": -0.5,
+    "grain": 0.2
+   },
+   "lut": {
+    "id": "openstill-lomo",
+    "amount": 0.8
+   }
+  },
+  {
+   "id": "vintage-400",
+   "name": "Vintage 400",
+   "category": "Vintage",
+   "description": "Warm film color with a nostalgic mood.",
+   "adjustments": {
+    "grain": 0.2
+   },
+   "lut": {
+    "id": "freshluts-1660",
+    "amount": 0.8
+   }
+  },
+  {
+   "id": "western-dust",
+   "name": "Western Dust",
+   "category": "Vintage",
+   "description": "Dusty warm tones of the old west.",
+   "adjustments": {
+    "grain": 0.25
+   },
+   "lut": {
+    "id": "openstill-western-dust",
+    "amount": 0.85
+   }
+  },
+  {
+   "id": "duotone-pink-teal",
+   "name": "Duotone Pink & Teal",
+   "category": "Creative",
+   "description": "Two-color print in pink and teal.",
+   "adjustments": {},
+   "lut": {
+    "id": "openstill-duotone-pink-teal",
+    "amount": 1.0
+   }
+  },
+  {
+   "id": "duotone-purple-gold",
+   "name": "Duotone Purple & Gold",
+   "category": "Creative",
+   "description": "Two-color print in purple and gold.",
+   "adjustments": {},
+   "lut": {
+    "id": "openstill-duotone-purple-gold",
+    "amount": 1.0
+   }
+  },
+  {
+   "id": "vaporwave",
+   "name": "Vaporwave",
+   "category": "Creative",
+   "description": "Pink and cyan retro-digital color.",
+   "adjustments": {},
+   "lut": {
+    "id": "openstill-vaporwave",
+    "amount": 0.9
+   }
+  },
+  {
+   "id": "infrared-color",
+   "name": "Infrared Color",
+   "category": "Creative",
+   "description": "False-color infrared: pink foliage, blue skies.",
+   "adjustments": {},
+   "lut": {
+    "id": "openstill-infrared-false-color",
+    "amount": 1.0
+   }
+  },
+  {
+   "id": "redscale",
+   "name": "Redscale",
+   "category": "Creative",
+   "description": "Fiery orange and red, like film exposed through its back.",
+   "adjustments": {
+    "grain": 0.25
+   },
+   "lut": {
+    "id": "film-redscale",
+    "amount": 0.9
+   }
+  },
+  {
+   "id": "pop-art",
+   "name": "Pop Art",
+   "category": "Creative",
+   "description": "Flat, saturated poster color.",
+   "adjustments": {},
+   "lut": {
+    "id": "openstill-pop-art",
+    "amount": 0.9
+   }
+  },
+  {
+   "id": "soft-solarize",
+   "name": "Soft Solarize",
+   "category": "Creative",
+   "description": "A gentle darkroom solarization.",
+   "adjustments": {},
+   "lut": {
+    "id": "openstill-soft-solarize",
+    "amount": 0.8
+   }
+  }
+ ]
+}
