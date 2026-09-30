@@ -158,5 +158,16 @@ import Testing
         #expect(!other.usesCorrectedWhiteBalance)
         #expect(QuickDevelop.apply(.whiteBalance(.shade), to: PhotoEdits()).usesCorrectedWhiteBalance)
         #expect(try JSONDecoder().decode(PhotoEdits.self, from: JSONEncoder().encode(warm)).usesCorrectedWhiteBalance)
+        // Releasing a slider hands over the panel's copy, which was made before the switch and repeats the last value:
+        // the edit must stay switched, or the photo flips back to the reversed rendering on release.
+        var released = PhotoEdits(); released.temperature = 7600
+        #expect(!released.usesCorrectedWhiteBalance)
+        released.adoptSmartContrast(changedFrom: warm)
+        #expect(released.usesCorrectedWhiteBalance)
+        let r = try render(released); #expect(r[0] > r[2] + 0.02)
+        var contrast = PhotoEdits(); contrast.contrast = 1.3
+        var smart = contrast; smart.usesSmartContrast = true
+        contrast.adoptSmartContrast(changedFrom: smart)
+        #expect(contrast.usesSmartContrast)
     }
 }
