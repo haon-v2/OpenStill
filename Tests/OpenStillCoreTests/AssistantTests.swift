@@ -162,6 +162,32 @@ import Testing
         #expect(MCPInstall.isConnectedToClaudeDesktop(try MCPInstall.addingServer(to: nil, command: "/x")))
         #expect(throws: (any Error).self) { try MCPInstall.addingServer(to: Data("{broken".utf8), command: "/x") }
     }
+    @Test func mcpInstallTakesTheProgramNotItsFolder() throws {
+        // The release zip is made with `ditto -c -k --keepParent openstill-mcp`: a folder named like the program, holding it.
+        let temp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: temp) }
+        let parent = temp.appendingPathComponent("openstill-mcp"), mcp = temp.appendingPathComponent("MCP")
+        try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
+        try Data("#!/bin/sh\necho 1.2.0\n".utf8).write(to: parent.appendingPathComponent("openstill-mcp"))
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: parent.appendingPathComponent("openstill-mcp").path)
+        try Data("MIT".utf8).write(to: parent.appendingPathComponent("LICENSE"))
+        let zip = temp.appendingPathComponent("mcp.zip")
+        let ditto = Process(); ditto.executableURL = URL(fileURLWithPath: "/usr/bin/ditto"); ditto.arguments = ["-c", "-k", "--keepParent", parent.path, zip.path]
+        try ditto.run(); ditto.waitUntilExit()
+        // A folder left by 0.0.20 is replaced by the program.
+        try FileManager.default.createDirectory(at: mcp.appendingPathComponent("openstill-mcp"), withIntermediateDirectories: true)
+        #expect(!MCPInstall.isProgram(mcp.appendingPathComponent("openstill-mcp")))
+        try MCPInstall.install(archive: Data(contentsOf: zip), version: "1.2.0", into: mcp)
+        #expect(MCPInstall.isProgram(mcp.appendingPathComponent("openstill-mcp")))
+        #expect(try String(contentsOf: mcp.appendingPathComponent("VERSION"), encoding: .utf8) == "1.2.0\n")
+        // A program that doesn't start isn't installed.
+        try Data("#!/bin/sh\nexit 3\n".utf8).write(to: parent.appendingPathComponent("openstill-mcp"))
+        try FileManager.default.removeItem(at: zip)
+        let again = Process(); again.executableURL = URL(fileURLWithPath: "/usr/bin/ditto"); again.arguments = ["-c", "-k", "--keepParent", parent.path, zip.path]
+        try again.run(); again.waitUntilExit()
+        #expect(throws: (any Error).self) { try MCPInstall.install(archive: Data(contentsOf: zip), version: "1.3.0", into: mcp) }
+        #expect(MCPInstall.isProgram(mcp.appendingPathComponent("openstill-mcp")))
+    }
     private func SHA256Hex(_ data: Data) -> String {
         let task = Process(), pipe = Pipe(), input = Pipe()
         task.executableURL = URL(fileURLWithPath: "/usr/bin/shasum"); task.arguments = ["-a", "256"]; task.standardOutput = pipe; task.standardInput = input

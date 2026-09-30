@@ -8,8 +8,13 @@ public enum MCPInstall {
     public static var executable: URL { Assistant.mcpFolder.appendingPathComponent(executableName) }
     public static var versionFile: URL { Assistant.mcpFolder.appendingPathComponent("VERSION") }
     public static var installedVersion: String? {
-        guard FileManager.default.isExecutableFile(atPath: executable.path) else { return nil }
+        guard isProgram(executable) else { return nil }
         return (try? String(contentsOf: versionFile, encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "installed"
+    }
+    /// An executable regular file; a folder with the same name (which 0.0.20 installed by mistake) doesn't count.
+    public static func isProgram(_ url: URL) -> Bool {
+        let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+        return values?.isRegularFile == true && values?.isSymbolicLink != true && FileManager.default.isExecutableFile(atPath: url.path)
     }
     public static var latestReleaseAPI: URL { URL(string: "https://api.github.com/repos/\(Assistant.repository)/releases/latest")! }
 
@@ -49,8 +54,9 @@ public enum MCPInstall {
         guard let expected = sums[name] else { throw AssistantError.message("The checksum list doesn’t include \(name).") }
         guard expected == digest else { throw AssistantError.message("The download didn’t match its checksum, so it wasn’t installed.") }
     }
-    /// Unpacks a verified archive and installs the MCP program with its version.
-    public static func install(archive data: Data, version: String) throws {
+    /// Unpacks a verified archive and installs the MCP program with its version, then checks that it runs.
+    /// The release zip holds a folder named like the program, so only a regular file of that name is taken.
+    public static func install(archive data: Data, version: String, into folder: URL = Assistant.mcpFolder) throws {
         let temp = FileManager.default.temporaryDirectory.appendingPathComponent("OpenStill-MCP-" + UUID().uuidString)
         try FileManager.default.createDirectory(at: temp, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: temp) }
@@ -61,16 +67,34 @@ public enum MCPInstall {
         guard task.terminationStatus == 0 else { throw AssistantError.message("The OpenStill MCP download couldn’t be unpacked.") }
         let found = FileManager.default.enumerator(at: out, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey])?
             .compactMap { $0 as? URL }
-            .first { $0.lastPathComponent == executableName && (try? $0.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) != true }
+            .first { url in
+                let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+                return url.lastPathComponent == executableName && values?.isRegularFile == true && values?.isSymbolicLink != true
+            }
         guard let program = found else { throw AssistantError.message("The download doesn’t contain the OpenStill MCP program.") }
-        try FileManager.default.createDirectory(at: Assistant.mcpFolder, withIntermediateDirectories: true)
-        let staged = Assistant.mcpFolder.appendingPathComponent(executableName + ".new")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let staged = folder.appendingPathComponent(executableName + ".new"), target = folder.appendingPathComponent(executableName)
         try? FileManager.default.removeItem(at: staged)
         try FileManager.default.copyItem(at: program, to: staged)
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: staged.path)
-        if FileManager.default.fileExists(atPath: executable.path) { _ = try FileManager.default.replaceItemAt(executable, withItemAt: staged) }
-        else { try FileManager.default.moveItem(at: staged, to: executable) }
-        try Data((version + "\n").utf8).write(to: versionFile, options: .atomic)
+        guard runs(staged) else {
+            try? FileManager.default.removeItem(at: staged)
+            throw AssistantError.message("The downloaded OpenStill MCP didn’t start on this Mac, so it wasn’t installed.")
+        }
+        // Replaces an older program, or the folder 0.0.20 left in its place.
+        if FileManager.default.fileExists(atPath: target.path) { try FileManager.default.removeItem(at: target) }
+        try FileManager.default.moveItem(at: staged, to: target)
+        try Data((version + "\n").utf8).write(to: folder.appendingPathComponent("VERSION"), options: .atomic)
+    }
+    /// Runs `program --version` and waits up to 10 seconds for it to succeed.
+    static func runs(_ program: URL) -> Bool {
+        let task = Process(); task.executableURL = program; task.arguments = ["--version"]
+        task.standardOutput = FileHandle.nullDevice; task.standardError = FileHandle.nullDevice
+        guard (try? task.run()) != nil else { return false }
+        let deadline = Date().addingTimeInterval(10)
+        while task.isRunning && Date() < deadline { Thread.sleep(forTimeInterval: 0.05) }
+        if task.isRunning { task.terminate(); return false }
+        return task.terminationStatus == 0
     }
     public static func uninstall() throws {
         if FileManager.default.fileExists(atPath: Assistant.mcpFolder.path) { try FileManager.default.removeItem(at: Assistant.mcpFolder) }
