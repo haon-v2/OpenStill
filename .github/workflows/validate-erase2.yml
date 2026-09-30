@@ -24,7 +24,7 @@ jobs:
           import json,sys
           items=json.load(sys.stdin)
           raws=[i for i in items if i['name'].lower().rsplit('.',1)[-1] in ('nef','cr2','dng','arw','orf','raf','rw2')]
-          raws.sort(key=lambda i:i['size'])
+          raws.sort(key=lambda i:(not i['name'].upper().endswith('.NEF'), i['size']))
           print('\n'.join(i['download_url']+' '+i['name']+' '+str(i['size']) for i in raws))" > raws.txt
           cat raws.txt
           url=$(head -1 raws.txt | cut -d' ' -f1); name=$(head -1 raws.txt | cut -d' ' -f2)
@@ -33,11 +33,11 @@ jobs:
       - name: Erase through the real pipeline
         run: |
           set +e
-          env OPENSTILL_AI_STUB=1 OPENSTILL_ERASE_SELFTEST=/tmp/erase dist/OpenStill.app/Contents/MacOS/OpenStill /tmp/photos > erase.log 2>&1 &
+          env OPENSTILL_AI_STUB=1 OPENSTILL_ERASE_SELFTEST=/tmp/erase dist/OpenStill.app/Contents/MacOS/OpenStill /tmp/photos/* > erase.log 2>&1 &
           pid=$!
           for s in $(seq 1 600); do sleep 1; kill -0 $pid 2>/dev/null || break; done
           kill $pid 2>/dev/null; wait $pid
-          grep -E "^(PHOTO|BEFORE|AFTER|RENDER)" erase.log || tail -60 erase.log
+          grep -E "^(URLS|PHOTO|BEFORE|AFTER|RENDER|DONE)" erase.log; echo "--- log tail"; tail -30 erase.log
           for f in /tmp/erase-*.jpg; do
             [ -f "$f" ] || continue
             sips -Z 700 -s format jpeg -s formatOptions 60 "$f" --out "$f.small.jpg" >/dev/null

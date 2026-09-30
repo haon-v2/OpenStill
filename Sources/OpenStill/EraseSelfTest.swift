@@ -6,7 +6,6 @@ import OpenStillCore
 enum EraseSelfTest {
     static func runIfRequested(_ viewer: ViewerController) {
         guard let prefix = ProcessInfo.processInfo.environment["OPENSTILL_ERASE_SELFTEST"] else { return }
-        let count = viewer.urls.count
         func render(_ tag: String) -> String {
             guard let url = viewer.currentSource, var recipe = viewer.photoRecord?.active.recipe else { return "no photo" }
             recipe.edits = viewer.currentEdits
@@ -19,7 +18,7 @@ enum EraseSelfTest {
             } catch { return "error \(error.localizedDescription)" }
         }
         func step(_ index: Int) {
-            guard index < count else { exit(0) }
+            guard index < viewer.urls.count else { print("DONE \(viewer.urls.count) photos"); fflush(stdout); exit(0) }
             viewer.showEditor(); viewer.select(index)
             waitOpen(viewer, 120) {
                 let name = viewer.currentSource?.lastPathComponent ?? "?"
@@ -48,7 +47,11 @@ enum EraseSelfTest {
                 }
             }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { step(0) }
+        func start(_ tries: Int) {
+            if !viewer.urls.isEmpty || tries == 0 { print("URLS \(viewer.urls.map(\.lastPathComponent))"); fflush(stdout); step(0); return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { start(tries - 1) }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { start(120) }
     }
     static func waitOpen(_ viewer: ViewerController, _ tries: Int, _ done: @escaping () -> Void) {
         if viewer.renderedPhoto != nil && viewer.photoRecord != nil || tries == 0 { DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: done); return }
