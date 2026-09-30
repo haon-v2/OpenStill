@@ -57,8 +57,16 @@ import Testing
 
     @Test func masksFromCoordinatesAndLayerSliders() throws {
         let linear = try AssistantMasks.shape("linear", ["from": .array([.number(0.5), .number(0)]), "to": .array([.number(0.5), .number(0.4)])])
-        // Top-left coordinates become Core Image's bottom-left ones.
-        #expect(linear.kind == "linear" && linear.start.y == 1 && abs(linear.end.y - 0.6) < 1e-9)
+        // Top-left coordinates become Core Image's bottom-left ones; the gradient is black at `start`, white at `end`,
+        // so the fully affected `from` point is the end.
+        #expect(linear.kind == "linear" && linear.end.y == 1 && abs(linear.start.y - 0.6) < 1e-9)
+        let coverage = try linear.image(size: CGSize(width: 10, height: 100))
+        func at(_ y: Double) -> Double {
+            var px = [UInt8](repeating: 0, count: 4)
+            CIContext().render(coverage, toBitmap: &px, rowBytes: 4, bounds: CGRect(x: 5, y: y, width: 1, height: 1), format: .RGBA8, colorSpace: nil)
+            return Double(px[0]) / 255
+        }
+        #expect(at(98) > 0.9 && at(20) < 0.1)   // full at the top of the photo, none below the fade
         let radial = try AssistantMasks.shape("radial", ["center": .array([.number(0.25), .number(0.25)]), "radius": .number(0.2), "invert": .bool(true)])
         #expect(radial.kind == "radial" && abs(radial.start.y - 0.75) < 1e-9 && abs(radial.end.x - 0.45) < 1e-9 && radial.inverted)
         #expect(throws: (any Error).self) { try AssistantMasks.shape("radial", ["center": .string("middle")]) }
