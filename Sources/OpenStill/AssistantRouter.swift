@@ -79,7 +79,7 @@ extension ViewerController {
         case "list_luts":
             let items = info.lutItems.filter { item in args["category"]?.string.map { item.entry.category == $0 } ?? true }
             reply(.success(.object(["luts": .array(items.map { item in
-                .object(["id": .string(item.entry.id), "name": .string(item.entry.name), "category": .string(item.entry.category),
+                .object(["id": .string(item.entry.id), "name": .string(item.entry.displayName), "category": .string(item.entry.category),
                          "creator": .string(item.entry.creator), "license": .string(item.entry.license)])
             })])))
         case "apply_lut":
@@ -88,8 +88,8 @@ extension ViewerController {
                 do {
                     var edits = try item.applying(to: self.currentEdits)
                     if let amount = args["amount"]?.double, amount.isFinite { edits.lutAmount = min(1, max(0, amount)) }
-                    self.changeEdits(edits, title: "AI · LUT " + item.entry.name, commit: true)
-                    reply(.success(.object(["applied": .string(item.entry.name), "amount": .number(edits.lutAmount)])))
+                    self.changeEdits(edits, title: "AI · LUT " + item.entry.displayName, commit: true)
+                    reply(.success(.object(["applied": .string(item.entry.displayName), "amount": .number(edits.lutAmount)])))
                 } catch { reply(.failure(error)) }
             }
         case "import_lut":

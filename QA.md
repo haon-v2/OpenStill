@@ -440,7 +440,6 @@ Automated fixtures are generated and contain no user photographs. The real S9 fi
   - The watermark logo designer has three separate modes: **Design your own** (manual, no AI), **Generate with AI** (a multi-line prompt, the optional local model, **Edit in Design your own**) and **Import**.
   - The identity plate can use a saved logo (**Use Saved Logo**).
 - **Automated tests (LogoPromptTests):** the prompt reaches the model as data and is limited to 500 characters; the instructions keep the exact name and tagline in OpenStill's hands; bad model output is refused.
-- **Paused:** the AI assistant (OpenStill MCP) work is kept on its own branch until its repository exists.
 - **Not yet verified by hand on a Mac:** generating with a prompt using the local model; Use Saved Logo on the identity plate.
 
 ## Tone sliders, G / D keys, right-click menu, import locations, faster RAF — September 28, 2026
@@ -575,3 +574,10 @@ Automated fixtures are generated and contain no user photographs. The real S9 fi
 - **Tests:** `LUTLibraryTests` (every look decodes and matches its checksum, licenses and credits, the 12 old ids, the neutral look is an identity within 1/255, black-and-white originals stay gray, tampering is refused, version 1 catalogs, search and strengths, preview equals applied result) and `PresetLibraryTests` (bundled presets are valid and their looks exist, the six old presets give the same edits, Amount 0 / 100 / 200%, photo-specific edits are kept, looks are applied as copies, My Presets round trip and old files).
 - **Skies (added on request):** 30 CC0 Poly Haven skies in six categories. The on-device sky AI makes the photo's "Sky" mask the first time; the sky is composited live and **Relight scene** carries its brightness and color into the land (dark skies darken it, sunsets warm it). Also Horizon, Sky exposure, Defocus, Atmosphere, Flip, Remove, Your Skies, and Refine sky selection with the mask tools. Presets keep the sky. `SkyReplacementTests` cover the composite through the mask, dark skies darkening and sunsets warming the land, relight 0 leaving it, no mask meaning no sky, sanitizing and saving, presets keeping it, and the library and Your Skies. The old baked "Choose sky & replace…" is replaced; photos edited with it keep their result.
 - **Not included:** previewing a look on the main photo while hovering its card; the card thumbnails show each look on the current photo instead.
+
+## AI assistants (OpenStill MCP) — September 30, 2026
+- **Added:** Settings → **AI Assistant**: install, update and uninstall OpenStill MCP (checksum-verified download), connect Claude Desktop (with a backup of its settings) or copy the Claude Code command, **Allow AI assistants to edit** (off by default), the largest preview size, and Recent AI actions.
+- **How it stays in sync:** the MCP talks to OpenStill over an owner-only local socket; OpenStill makes every change through the same path as its sliders, so AI edits appear live, are one undo step each, and are saved like any edit.
+- **Works with this release's libraries:** `list_luts` / `apply_lut` cover the whole LUT pack by display name; `apply_preset` accepts any preset name from the Presets panel; LUTs the AI imports appear under **Found by AI** with their license.
+- **Automated tests (AssistantTests):** message framing and the protocol version check; slider values sanitized (NaN, out of range); `import_lut` refuses non-https links, missing licenses, oversized files, zip path tricks and bad `.cube` files; provenance is recorded; the Claude Desktop settings edit keeps other entries.
+- **Not yet verified by hand on a Mac:** a full session from Claude Desktop (install, connect, edit, undo).

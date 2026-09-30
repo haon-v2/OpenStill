@@ -541,6 +541,19 @@ Generate with AI uses the optional **Download local model · 639 MB**, which ins
 
 Export placement offers nine anchors, percentage width, margin and opacity with a live preview. Watermarks belong to export presets and never enter editing masks or original files.
 
+## AI assistants (MCP)
+OpenStill can let an AI app such as Claude Desktop or Claude Code edit your photos. It is optional and off until you turn it on.
+
+1. **Settings → AI Assistant → Install OpenStill MCP.** A small program is downloaded from [github.com/haon-v2/OpenStill-MCP](https://github.com/haon-v2/OpenStill-MCP), checked against its published checksums and kept in `~/Library/Application Support/OpenStill/MCP`. Update and Uninstall are in the same place.
+2. **Connect an AI app.** *Claude Desktop* adds OpenStill to Claude's settings (a backup is kept; restart Claude afterwards). *Claude Code* copies a `claude mcp add` command to paste in Terminal. Other MCP apps can run the program from the MCP folder.
+3. **Turn on "Allow AI assistants to edit".** OpenStill only listens while this is on. If OpenStill isn't open, the AI app starts it in the background.
+
+**What the AI can do:** find photos (folder, rating, flag, label, keyword, camera, date, text), look at a preview, move Develop sliders, auto tone, apply presets, crop, reset and undo, add masked adjustments (linear, radial, or on-device AI subject, sky, background and people selections), rate, flag, label and keyword, export, and list, apply or import LUTs. A LUT the AI finds on the web is downloaded over https only, checked, and kept only when its free license is stated; it appears under **Found by AI** with its source and license.
+
+**Your edits stay safe:** only OpenStill writes edits, so every AI change shows up live, is one normal undo step, and never clashes with your own. Settings lists the recent AI actions.
+
+**Privacy:** previews the AI looks at (up to the size set in Settings) go to your AI app's provider. Originals never leave your Mac, and masks, skies and other image AI stay on-device. When the AI app supports it, the logo designer can use it instead of the local model.
+
 ## On-device AI (optional)
 
 Optional AI for sky and subject masks, object removal, noise reduction, detail and depth. Nothing is set up until you ask, it downloads about 450 MB once, and it runs only on this Mac: photos are never uploaded.
