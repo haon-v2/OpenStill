@@ -85,7 +85,10 @@ public enum AssistantEdits {
         for (key, value) in m {
             guard let before = f[key] else { continue }
             if o?[key] == nil && value == before { m[key] = nil; continue }
-            if case .object = value { m[key] = unfill(value, filled: before, original: o?[key]) }
+            // A part that was missing and is now changed is kept whole; only parts that already existed are looked into.
+            // "advanced" is only a container of sections, so it is always looked into.
+            let inner: JSONValue? = o?[key] ?? (key == "advanced" && o != nil ? .object([:]) : nil)
+            if case .object = value, let inner { m[key] = unfill(value, filled: before, original: inner) }
         }
         return .object(m)
     }
