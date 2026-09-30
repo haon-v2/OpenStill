@@ -1,4 +1,5 @@
 import Foundation
+import CoreImage
 import CoreGraphics
 import Testing
 @testable import OpenStillCore
@@ -56,8 +57,16 @@ import Testing
 
     @Test func masksFromCoordinatesAndLayerSliders() throws {
         let linear = try AssistantMasks.shape("linear", ["from": .array([.number(0.5), .number(0)]), "to": .array([.number(0.5), .number(0.4)])])
-        // Top-left coordinates become Core Image's bottom-left ones.
-        #expect(linear.kind == "linear" && linear.start.y == 1 && abs(linear.end.y - 0.6) < 1e-9)
+        // Top-left coordinates become Core Image's bottom-left ones; the gradient is black at `start`, white at `end`,
+        // so the fully affected `from` point is the end.
+        #expect(linear.kind == "linear" && linear.end.y == 1 && abs(linear.start.y - 0.6) < 1e-9)
+        let coverage = try linear.image(size: CGSize(width: 10, height: 100))
+        func at(_ y: Double) -> Double {
+            var px = [UInt8](repeating: 0, count: 4)
+            CIContext().render(coverage, toBitmap: &px, rowBytes: 4, bounds: CGRect(x: 5, y: y, width: 1, height: 1), format: .RGBA8, colorSpace: nil)
+            return Double(px[0]) / 255
+        }
+        #expect(at(98) > 0.9 && at(20) < 0.1)   // full at the top of the photo, none below the fade
         let radial = try AssistantMasks.shape("radial", ["center": .array([.number(0.25), .number(0.25)]), "radius": .number(0.2), "invert": .bool(true)])
         #expect(radial.kind == "radial" && abs(radial.start.y - 0.75) < 1e-9 && abs(radial.end.x - 0.45) < 1e-9 && radial.inverted)
         #expect(throws: (any Error).self) { try AssistantMasks.shape("radial", ["center": .string("middle")]) }
@@ -69,6 +78,35 @@ import Testing
         #expect(try edits.advanced?.masks[layer.maskKey]?.image(size: CGSize(width: 32, height: 32)).extent.width == 32)
     }
 
+    @Test func maskStatsSayWhereTheSelectionIs() throws {
+        // Top half selected (Core Image's origin is bottom-left, so the top half is y 32…64).
+        let top = CIImage(color: .white).cropped(to: CGRect(x: 0, y: 32, width: 64, height: 32))
+            .composited(over: CIImage(color: .black).cropped(to: CGRect(x: 0, y: 0, width: 64, height: 64)))
+        guard case .object(let o) = try AssistantMasks.stats(top), case .object(let box)? = o["bounds"] else { Issue.record("no bounds"); return }
+        #expect(abs((o["coverage"]?.double ?? 0) - 0.5) < 0.02)
+        #expect((box["y"]?.double ?? 1) < 0.02 && abs((box["height"]?.double ?? 0) - 0.5) < 0.03 && abs((box["width"]?.double ?? 0) - 1) < 0.02)
+        #expect(o["summary"]?.string?.contains("50%") == true)
+        // Nothing selected says so plainly.
+        guard case .object(let empty) = try AssistantMasks.stats(CIImage(color: .black).cropped(to: CGRect(x: 0, y: 0, width: 32, height: 32))) else { return }
+        #expect(empty["bounds"] == nil && empty["summary"]?.string?.contains("nothing") == true)
+    }
+    @Test func masksCanBeReshapedAndDescribed() throws {
+        var base = try AssistantMasks.shape("radial", ["center": .array([.number(0.5), .number(0.5)]), "radius": .number(0.2), "invert": .bool(true), "feather": .number(0.3)])
+        let moved = try AssistantMasks.shape("radial", ["center": .array([.number(0.25), .number(0.25)])], base: base)
+        #expect(abs(moved.start.x - 0.25) < 1e-9 && abs(moved.start.y - 0.75) < 1e-9)                // measured from the top-left
+        #expect(abs((moved.end.x - moved.start.x) - 0.2) < 1e-9 && moved.inverted && abs(moved.feather - 0.3) < 1e-9)   // size, invert, feather kept
+        base = try AssistantMasks.shape("linear", ["from": .array([.number(0.5), .number(0)]), "to": .array([.number(0.5), .number(0.4)])])
+        let longer = try AssistantMasks.shape("linear", ["to": .array([.number(0.5), .number(0.6)])], base: base)
+        #expect(abs(base.end.y - 1) < 1e-9 && abs(base.start.y - 0.6) < 1e-9)          // full effect at `from` (the top), none past `to`
+        #expect(longer.end == base.end && abs(longer.start.y - 0.4) < 1e-9)
+        var layer = LocalAdjustment(name: "Sky"); layer.settings = try AssistantMasks.settings(["exposure": .number(-1)])
+        layer.settings = try AssistantMasks.settings(["saturation": .number(0.4)], onto: layer.settings)   // updates merge
+        guard case .object(let d) = AssistantMasks.describe(layer, mask: longer), case .object(let values)? = d["values"] else { Issue.record("no values"); return }
+        #expect(values["exposure"]?.double == -1 && values["saturation"]?.double == 0.4 && values["contrast"] == nil)
+        #expect(d["id"]?.string == layer.id.uuidString && d["selection"] == .array([.string("linear")]))
+        guard case .object(let shape)? = d["shape"] else { Issue.record("no shape"); return }
+        #expect(shape["from"] == .array([.number(0.5), .number(0)]) && shape["to"] == .array([.number(0.5), .number(0.6)]))
+    }
     @Test func photoSearchFiltersAndSorts() {
         var a = CatalogPhoto(id: UUID(), path: "/Photos/Trip/a.jpg"); a.rating = 4; a.camera = "Canon EOS R5"; a.keywords = ["Places>Italy"]; a.captured = Date(timeIntervalSince1970: 1_700_000_000)
         var b = CatalogPhoto(id: UUID(), path: "/Photos/Trip/b.jpg"); b.rating = 2; b.flag = .pick; b.captured = Date(timeIntervalSince1970: 1_700_100_000)

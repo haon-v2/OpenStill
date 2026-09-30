@@ -581,3 +581,10 @@ Automated fixtures are generated and contain no user photographs. The real S9 fi
 - **Works with this release's libraries:** `list_luts` / `apply_lut` cover the whole LUT pack by display name; `apply_preset` accepts any preset name from the Presets panel; LUTs the AI imports appear under **Found by AI** with their license.
 - **Automated tests (AssistantTests):** message framing and the protocol version check; slider values sanitized (NaN, out of range); `import_lut` refuses non-https links, missing licenses, oversized files, zip path tricks and bad `.cube` files; provenance is recorded; the Claude Desktop settings edit keeps other entries.
 - **Not yet verified by hand on a Mac:** a full session from Claude Desktop (install, connect, edit, undo).
+
+## AI assistant masking — September 30, 2026
+- **Fixed:** linear masks added by the AI were reversed (asking for the top selected the bottom). AI selections (subject, sky, background, people) are now waited for; when nothing is found, no empty layer is left and the reason is given.
+- **Added for the AI:** every mask answer shows the photo with the layer's area in red beside the selection alone, with coverage and bounds; `list_mask_layers`, `preview_mask`, `update_mask_layer` (sliders, name, hidden, invert, move/resize), `delete_mask_layer`; `preview` with `compare` (before | after).
+- **Checked on CI in the built app** (sample photo): radial added in the center, moved to the top-left; linear from the top selects the top 20–40%; invert; subject with nothing to find adds nothing; sky without on-device AI explains the setup; delete; before/after. The images were reviewed.
+- **Tests (AssistantTests):** selection stats (coverage, bounds, empty), reshaping keeps size/feather/invert, slider updates merge, layer descriptions with shapes, the linear gradient's direction.
+- **Not yet verified by hand:** a session from Claude Desktop with OpenStill MCP 1.1.0; subject and sky selections on real photos.

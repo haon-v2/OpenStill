@@ -1,5 +1,7 @@
 import Foundation
 import CryptoKit
+import CoreGraphics
+import CoreImage
 
 /// Any JSON value: tool arguments and results passed between OpenStill and the OpenStill MCP.
 public enum JSONValue: Codable, Equatable, Sendable {
@@ -357,7 +359,8 @@ public enum AssistantMasks {
     }
     /// A linear or radial mask from coordinates measured from the photo's top-left corner (0…1).
     /// Linear: `from` is fully affected, fading to nothing at `to`. Radial: `center` and `radius` (fractions of width and height).
-    public static func shape(_ kind: String, _ args: [String: JSONValue]) throws -> AdjustmentMask {
+    /// With `base`, unspecified points, size, feather and invert keep that mask's values.
+    public static func shape(_ kind: String, _ args: [String: JSONValue], base: AdjustmentMask? = nil) throws -> AdjustmentMask {
         func point(_ key: String, _ fallback: CGPoint) throws -> CGPoint {
             guard let value = args[key] else { return fallback }
             guard let list = value.array, list.count == 2, let x = list[0].double, let y = list[1].double, x.isFinite, y.isFinite else {
@@ -368,10 +371,11 @@ public enum AssistantMasks {
         var mask = AdjustmentMask(kind: kind)
         switch kind {
         case "linear":
-            mask.start = MaskPoint(try point("from", CGPoint(x: 0.5, y: 1))); mask.end = MaskPoint(try point("to", CGPoint(x: 0.5, y: 0.5)))
+            // OpenStill's linear mask has no effect at `start`, rising to full at `end` and beyond.
+            mask.end = MaskPoint(try point("from", base?.end.point ?? CGPoint(x: 0.5, y: 1))); mask.start = MaskPoint(try point("to", base?.start.point ?? CGPoint(x: 0.5, y: 0.5)))
         case "radial":
-            let center = try point("center", CGPoint(x: 0.5, y: 0.5))
-            var rx = 0.3, ry = 0.3
+            let center = try point("center", base?.start.point ?? CGPoint(x: 0.5, y: 0.5))
+            var rx = base.map { abs($0.end.x - $0.start.x) } ?? 0.3, ry = base.map { abs($0.end.y - $0.start.y) } ?? 0.3
             if let radius = args["radius"] {
                 if let r = radius.double { rx = r; ry = r }
                 else if let list = radius.array, list.count == 2, let a = list[0].double, let b = list[1].double { rx = a; ry = b }
@@ -382,8 +386,63 @@ public enum AssistantMasks {
             mask.feather = 0.5
         default: throw AssistantError.message("Shapes are “linear” or “radial”.")
         }
+        if let base { mask.feather = base.feather; mask.inverted = base.inverted }
         if let feather = args["feather"]?.double, feather.isFinite { mask.feather = min(1, max(0, feather)) }
-        mask.inverted = args["invert"]?.bool ?? false
+        mask.inverted = args["invert"]?.bool ?? base?.inverted ?? false
         return mask
+    }
+    public static let shapeKeys = ["from", "to", "center", "radius"]
+
+    /// Where a mask selects: the share of the photo it covers and the box around its main area
+    /// (x, y from the top-left, as fractions), from a grayscale selection image (white = selected).
+    public static func stats(_ selection: CGImage) -> JSONValue {
+        let width = selection.width, height = selection.height
+        let space = CGColorSpaceCreateDeviceGray()
+        guard width > 0, height > 0,
+              let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width, space: space, bitmapInfo: CGImageAlphaInfo.none.rawValue),
+              let data = context.data else { return .object(["coverage": .number(0)]) }
+        context.draw(selection, in: CGRect(x: 0, y: 0, width: width, height: height))
+        let pixels = data.bindMemory(to: UInt8.self, capacity: width * height)
+        var sum = 0, minX = width, minY = height, maxX = -1, maxY = -1
+        for row in 0..<height {
+            for column in 0..<width {
+                let value = Int(pixels[row * width + column]); sum += value
+                if value >= 128 { minX = min(minX, column); maxX = max(maxX, column); minY = min(minY, row); maxY = max(maxY, row) }
+            }
+        }
+        func r(_ v: Double) -> JSONValue { .number((v * 1000).rounded() / 1000) }
+        let coverage = Double(sum) / Double(255 * width * height)
+        var result: [String: JSONValue] = ["coverage": r(coverage)]
+        if maxX >= 0 {
+            // A bitmap context's first row in memory is the image's top row.
+            let x = Double(minX) / Double(width), w = Double(maxX - minX + 1) / Double(width)
+            let y = Double(minY) / Double(height), h = Double(maxY - minY + 1) / Double(height)
+            result["bounds"] = .object(["x": r(x), "y": r(y), "width": r(w), "height": r(h)])
+            result["summary"] = .string("Selects \(Int((coverage * 100).rounded()))% of the photo, within x \(pct(x))–\(pct(x + w)) and y \(pct(y))–\(pct(y + h)) from the top-left.")
+        } else {
+            result["summary"] = .string(coverage < 0.005 ? "Selects nothing: this layer changes no part of the photo." : "Selects only faintly (\(Int((coverage * 100).rounded()))%), nowhere fully.")
+        }
+        return .object(result)
+    }
+    /// The same, from a selection as Core Image renders it (measured at up to 256 pixels).
+    public static func stats(_ selection: CIImage) throws -> JSONValue {
+        let extent = selection.extent, scale = min(1, 256 / max(extent.width, extent.height, 1))
+        return stats(try AIMasks.grayscale(selection, size: CGSize(width: max(1, (extent.width * scale).rounded()), height: max(1, (extent.height * scale).rounded()))))
+    }
+    private static func pct(_ v: Double) -> String { "\(Int((min(1, max(0, v)) * 100).rounded()))%" }
+    /// A layer as the AI sees it: id, name, what kind of selection, whether it's hidden or inverted, and its non-zero sliders.
+    public static func describe(_ layer: LocalAdjustment, mask: AdjustmentMask?) -> JSONValue {
+        var values: [String: JSONValue] = [:]
+        for (name, path) in sliderNames where layer.settings[keyPath: path] != 0 { values[name] = .number(layer.settings[keyPath: path]) }
+        let kinds = mask.map { m in m.components.map { $0.map { $0.name } } ?? [m.kind] } ?? []
+        var result: [String: JSONValue] = ["id": .string(layer.id.uuidString), "name": .string(layer.name), "selection": .array(kinds.map(JSONValue.string)),
+                                           "hidden": .bool(layer.hidden), "inverted": .bool(mask?.inverted ?? false), "values": .object(values)]
+        // Shapes in the same terms as add_mask_layer: fractions from the top-left.
+        func p(_ point: MaskPoint) -> JSONValue { .array([.number((point.x * 1000).rounded() / 1000), .number(((1 - point.y) * 1000).rounded() / 1000)]) }
+        if let mask, mask.components == nil, mask.kind == "linear" { result["shape"] = .object(["from": p(mask.end), "to": p(mask.start), "feather": .number(mask.feather)]) }
+        if let mask, mask.components == nil, mask.kind == "radial" {
+            result["shape"] = .object(["center": p(mask.start), "radius": .array([.number(abs(mask.end.x - mask.start.x)), .number(abs(mask.end.y - mask.start.y))]), "feather": .number(mask.feather)])
+        }
+        return .object(result)
     }
 }
