@@ -14,6 +14,13 @@ jobs:
         run: bash scripts/build-native.sh > native.log 2>&1 || { tail -80 native.log; exit 1; }
       - name: App bundle
         run: bash scripts/build-app.sh > app.log 2>&1 || { grep -E "error:" app.log | head -40; tail -40 app.log; exit 1; }
+      - name: Build and AI tests
+        run: |
+          set +e
+          export PKG_CONFIG_PATH="$PWD/.build/native/lib/pkgconfig"
+          perl -e 'alarm shift; exec @ARGV' 600 bash scripts/test.sh --filter "AIBaseTests|SkyReplacementTests|AssistantEditTests" --no-parallel > t.log 2>&1; status=$?
+          grep -A3 -E "recorded an issue" t.log | cut -c1-1500 | head -40; grep -E "error:|Test run with" t.log | head -20
+          exit $status
       - name: Sample photos
         run: |
           set +e

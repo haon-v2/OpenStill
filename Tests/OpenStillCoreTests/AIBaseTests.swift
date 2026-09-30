@@ -61,6 +61,34 @@ import Testing
         let again = AIBase.inputEdits(result, raw: false)
         #expect(again.baseAsset == output && again.advanced?.aiFeatureKey == "Erase" && again.crop == nil)
     }
+    /// The bug users saw: on screen the photo renders at preview size, but the image under an erase result was read at
+    /// full size, so the frame showed a zoomed-in corner of it. Rendered with the real (modern) renderer at preview size.
+    @Test func eraseResultRendersInPlaceAtPreviewSize() throws {
+        let original = try photo()
+        func floatAsset(_ image: CIImage) throws -> String {
+            let url = try EditStorage.newAsset(extension: "osfloat"); assets.append(url)
+            try FloatImageBridge.write(image, to: url); return url.lastPathComponent
+        }
+        let input = CIImage(cgImage: original), frame = CGRect(x: 0, y: 0, width: 80, height: 60)
+        let patch = CGRect(x: 36, y: 26, width: 8, height: 8)
+        let output = try floatAsset(CIImage(color: .white).cropped(to: patch).composited(over: input).cropped(to: frame))
+        let background = try floatAsset(input)
+        let maskImage = CIImage(color: .white).cropped(to: patch).composited(over: CIImage(color: .black).cropped(to: frame))
+        let mask = try asset(try #require(context.createCGImage(maskImage, from: frame)))
+        var edits = PhotoEdits(); edits.crop = EditRect(CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.5)); edits.exposure = 0.3
+        let result = AIBase.result(edits, output: output, background: background, mask: mask, key: "Erase", raw: false)
+        var plain = edits; plain.baseAsset = output   // the same new base, without the selection blend
+        for size in [40, 80] {
+            let blended = try ModernRenderer.process(input, edits: result, maximumDimension: size)
+            let reference = try ModernRenderer.process(input, edits: plain, maximumDimension: size)
+            #expect(blended.extent.size == reference.extent.size, "\(size)")
+            let a = try #require(context.createCGImage(blended, from: blended.extent, format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!))
+            let b = try #require(context.createCGImage(reference, from: reference.extent, format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!))
+            for (x, y) in [(1, 1), (a.width - 2, 1), (1, a.height - 2), (a.width - 2, a.height - 2), (a.width / 2, a.height / 2)] {
+                #expect(zip(pixel(a, x, y), pixel(b, x, y)).allSatisfy { abs($0 - $1) < 0.04 }, "\(size): \(x),\(y) \(pixel(a, x, y)) vs \(pixel(b, x, y))")
+            }
+        }
+    }
     @Test func rawResultsKeepWhiteBalanceAdjustable() {
         var edits = PhotoEdits(); edits.temperature = 5200; edits.tint = 8; edits.exposure = -0.4
         let input = AIBase.inputEdits(edits, raw: true)
