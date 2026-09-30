@@ -235,5 +235,16 @@
             <sparkle:fullReleaseNotesLink>https://github.com/haon-v2/OpenStill/releases/tag/v0.0.21</sparkle:fullReleaseNotesLink>
             <enclosure url="https://github.com/haon-v2/OpenStill/releases/download/v0.0.21/OpenStill-0.0.21.zip" sparkle:edSignature="Dvh63IZVTp/ymailouDRBWVxTTfiUlRxD+PELgXe/ce/hMFeVlPSzc3IzmlOHfjGx1uadxSQnB+q78YogAVkBQ==" length="52142504" type="application/octet-stream"/>
         </item>
+        <item>
+            <title>OpenStill 0.0.22</title>
+            <description><![CDATA[<h3>What’s new in 0.0.22</h3><ul><li>AI Assistant: the AI now sees where it masks, can check, change and remove mask layers, and compare before and after</li><li>linear masks from the AI are no longer reversed. Click Update in Settings → AI Assistant to get OpenStill MCP 1.1.0</li></ul>]]></description>
+            <pubDate>Wed, 30 Sep 2026 07:15:10 GMT</pubDate>
+            <sparkle:version>38</sparkle:version>
+            <sparkle:shortVersionString>0.0.22</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <sparkle:fullReleaseNotesLink>https://github.com/haon-v2/OpenStill/releases/tag/v0.0.22</sparkle:fullReleaseNotesLink>
+            <enclosure url="https://github.com/haon-v2/OpenStill/releases/download/v0.0.22/OpenStill-0.0.22.zip" sparkle:edSignature="hhcWZuXI11ojS6lBDJ86RymXzCqUn8cudbFrJ6jYzLSRcs17Z7ttggLeHgBZjVebg2HCKUVW18I9R208e+tbCQ==" length="52168922" type="application/octet-stream"/>
+        </item>
     </channel>
 </rss>
