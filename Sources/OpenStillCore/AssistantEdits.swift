@@ -93,6 +93,14 @@ public enum AssistantEdits {
         }
         return .object(m)
     }
+    /// Parts the patch set to null stay removed (filling defaults back in must not undo that).
+    static func removed(_ value: JSONValue, by patch: JSONValue) -> JSONValue {
+        guard case .object(var v) = value, case .object(let p) = patch else { return value }
+        for (key, change) in p {
+            if change == .null { v[key] = nil } else if let present = v[key] { v[key] = removed(present, by: change) }
+        }
+        return .object(v)
+    }
     /// RFC 7386: objects merge, `null` removes, anything else replaces.
     static func merge(_ target: JSONValue, _ patch: JSONValue) -> JSONValue {
         guard case .object(let p) = patch else { return patch }
@@ -141,7 +149,7 @@ public enum AssistantEdits {
         let filled = fill(original, .object(template))
         try checkKeys(.object(p), against: .object(template), path: "")
         var merged = fill(merge(filled, .object(p)), .object(template))
-        merged = unfill(merged, filled: filled, original: original)
+        merged = removed(unfill(merged, filled: filled, original: original), by: .object(p))
         try checkAssets(merged, allowed: Set(assets(in: original)))
         var next: PhotoEdits
         do { next = try JSONDecoder().decode(PhotoEdits.self, from: JSONEncoder().encode(merged)) }
