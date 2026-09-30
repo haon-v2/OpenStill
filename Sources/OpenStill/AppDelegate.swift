@@ -18,6 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Shortcuts.registerKeys()
         viewer.startAutoImport()
         viewer.startAssistant()
+        EraseSelfTest.runIfRequested(viewer)
         buildMenu()
         NSApp.activate(ignoringOtherApps: true)
         updates.checkAtLaunch()
