@@ -202,5 +202,16 @@
             <sparkle:fullReleaseNotesLink>https://github.com/haon-v2/OpenStill/releases/tag/v0.0.18</sparkle:fullReleaseNotesLink>
             <enclosure url="https://github.com/haon-v2/OpenStill/releases/download/v0.0.18/OpenStill-0.0.18.zip" sparkle:edSignature="G3/ZdPs+e3L9BxAIGfCqyU5nybzyuGQzMRnLHWTjHMPC1mInHF8a3vdWSycwpbO/L3PxC0zHU6qvtY/I2/KwDg==" length="32785089" type="application/octet-stream"/>
         </item>
+        <item>
+            <title>OpenStill 0.0.19</title>
+            <description><![CDATA[<h3>What’s new in 0.0.19</h3><ul><li>A free library of 420 LUT looks (film simulations, community looks, OpenStill originals) and 82 presets with an Amount slider and My Presets</li><li>30 skies that replace the sky with on-device AI and relight the scene to match</li><li>new Presets | LUTs | Skies browser with search and favorites</li><li>fixed Temp, Tint and Contrast flipping when a slider is released.</li></ul>]]></description>
+            <pubDate>Wed, 30 Sep 2026 03:23:21 GMT</pubDate>
+            <sparkle:version>35</sparkle:version>
+            <sparkle:shortVersionString>0.0.19</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <sparkle:fullReleaseNotesLink>https://github.com/haon-v2/OpenStill/releases/tag/v0.0.19</sparkle:fullReleaseNotesLink>
+            <enclosure url="https://github.com/haon-v2/OpenStill/releases/download/v0.0.19/OpenStill-0.0.19.zip" sparkle:edSignature="tPvJcj+sTWtIL+8vPv5TBgNTSleR+iHf+SioCJaviUt5X4fR4LUPuJeiaWXUohr0dtz/+P3lSn0Q5QGgYOwcCA==" length="51950619" type="application/octet-stream"/>
+        </item>
     </channel>
 </rss>
