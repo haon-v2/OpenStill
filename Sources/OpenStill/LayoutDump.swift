@@ -14,8 +14,17 @@ enum LayoutDump {
                     print("WB \(title) track left=\(sample(slider, left: true)) right=\(sample(slider, left: false)) value=\(slider.doubleValue) range=\(slider.minValue)…\(slider.maxValue)")
                     crop(slider, to: path + "-\(title)")
                 }
-                print("WB photo before \(mean(viewer.canvas.image))"); fflush(stdout)
-                step(viewer, root, [("Temp", 9500), ("Temp", 3500), ("Temp", 6500), ("Tint", 80), ("Tint", -80), ("Tint", 0)], path: path)
+                let mode = ProcessInfo.processInfo.environment["OPENSTILL_WB_MODE"] ?? "plain"
+                if mode == "legacy" {
+                    // An edit saved before the white balance fix: Temp already moved, direction not yet corrected.
+                    var e = viewer.currentEdits; e.temperature = 7500; e.usesCorrectedWhiteBalance = false
+                    viewer.currentEdits = e; viewer.info.update(e, document: viewer.editDocument, enabled: true); viewer.renderEdits()
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                    print("WB [\(mode)] photo before \(mean(viewer.canvas.image)) temp=\(viewer.currentEdits.temperature) corrected=\(viewer.currentEdits.usesCorrectedWhiteBalance)"); fflush(stdout)
+                    if mode == "mouse" { mouseDrag(viewer, root, path: path) }
+                    else { step(viewer, root, [("Temp", 9500), ("Temp", 3500), ("Temp", 6500), ("Tint", 80), ("Tint", -80), ("Tint", 0)], path: path) }
+                }
             }
         }
     }
@@ -30,6 +39,31 @@ enum LayoutDump {
             print("WB photo after \(title)=\(value): \(mean(viewer.canvas.image)) usesCorrected=\(viewer.currentEdits.usesCorrectedWhiteBalance)"); fflush(stdout)
             step(viewer, root, Array(moves.dropFirst()), path: path)
         }
+    }
+    /// Drags the Temp knob to the right end and back with real mouse events, printing the photo each time.
+    private static func mouseDrag(_ viewer: ViewerController, _ root: NSView, path: String) {
+        guard let slider = find("Temp", in: root), let window = slider.window else { exit(3) }
+        func point(_ fraction: Double) -> NSPoint {
+            let knob = slider.cell.map { ($0 as! NSSliderCell).knobRect(flipped: slider.isFlipped) } ?? .zero
+            let track = slider.bounds.insetBy(dx: knob.width / 2, dy: 0)
+            let x = track.minX + track.width * CGFloat((slider.doubleValue - slider.minValue) / (slider.maxValue - slider.minValue))
+            let target = track.minX + track.width * CGFloat(fraction)
+            return slider.convert(NSPoint(x: fraction < 0 ? x : target, y: slider.bounds.midY), to: nil)
+        }
+        func event(_ type: NSEvent.EventType, _ at: NSPoint) -> NSEvent {
+            NSEvent.mouseEvent(with: type, location: at, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: type == .leftMouseUp ? 0 : 1)!
+        }
+        func drag(to fraction: Double, then: @escaping () -> Void) {
+            let start = point(-1), end = point(fraction)
+            for i in 1...12 { NSApp.postEvent(event(.leftMouseDragged, NSPoint(x: start.x + (end.x - start.x) * CGFloat(i) / 12, y: start.y)), atStart: false) }
+            NSApp.postEvent(event(.leftMouseUp, end), atStart: false)
+            slider.mouseDown(with: event(.leftMouseDown, start))
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                print("WB [mouse] after dragging Temp to \(Int(fraction * 100))% of the track: value=\(Int(slider.doubleValue)) \(mean(viewer.canvas.image)) corrected=\(viewer.currentEdits.usesCorrectedWhiteBalance)"); fflush(stdout)
+                then()
+            }
+        }
+        drag(to: 0.95) { drag(to: 0.05) { drag(to: 0.535) { step(viewer, root, [], path: path) } } }
     }
     private static func find(_ title: String, in root: NSView) -> ContinuousSlider? {
         var found: ContinuousSlider?

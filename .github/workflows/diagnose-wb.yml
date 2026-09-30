@@ -19,15 +19,19 @@ jobs:
           mkdir -p /tmp/photos
           i=0; for f in /System/Library/Desktop\ Pictures/*.heic /Library/Desktop\ Pictures/*.heic; do [ -f "$f" ] || continue; i=$((i+1)); sips -s format jpeg -Z 1600 "$f" --out /tmp/photos/photo$i.jpg >/dev/null 2>&1; [ $i -ge 5 ] && break; done
           ls -la /tmp/photos
+      - name: Display P3 camera-style JPEG
+        run: |
+          f=$(ls /tmp/photos/*.jpg | head -1)
+          mkdir -p /tmp/p3 && sips -m "/System/Library/ColorSync/Profiles/Display P3.icc" "$f" --out /tmp/p3/p3.jpg >/dev/null && sips -g space -g profile /tmp/p3/p3.jpg
       - name: Run and screenshot
         run: |
           set +e
           while IFS='|' read name photos actions; do
             [ -n "$name" ] || continue
             defaults delete org.openstill.viewer OpenStillStudioLayout >/dev/null 2>&1
-            args=""; [ "$photos" = "1" ] && args=/tmp/photos
+            args=""; [ "$photos" = "1" ] && args=/tmp/photos; [ "$photos" = "p3" ] && args=/tmp/p3
             echo "=== $name ($actions)"; defaults delete org.openstill.viewer OpenStill.FavoriteLooks >/dev/null 2>&1
-            env OPENSTILL_DUMP_ACTIONS="$actions" OPENSTILL_LAYOUT_DUMP=/tmp/dump-$name dist/OpenStill.app/Contents/MacOS/OpenStill $args > /tmp/out-$name.log 2>&1 &
+            env OPENSTILL_WB_MODE="$actions" OPENSTILL_DUMP_ACTIONS="$actions" OPENSTILL_LAYOUT_DUMP=/tmp/dump-$name dist/OpenStill.app/Contents/MacOS/OpenStill $args > /tmp/out-$name.log 2>&1 &
             pid=$!
             for s in $(seq 1 90); do sleep 1; kill -0 $pid 2>/dev/null || break; done
             kill $pid 2>/dev/null; wait $pid; grep -E "WB|error|fatal" /tmp/out-$name.log
@@ -37,6 +41,10 @@ jobs:
               echo "BEGIN $f"; base64 -i $f.jpg | tr -d '\n'; echo; echo "END $f"
             done
           done <<'LIST'
-          wb|1|
+          plain|1|plain
+          mouse|1|mouse
+          legacy|1|legacy
+          p3|p3|plain
+          p3mouse|p3|mouse
           LIST
           true
