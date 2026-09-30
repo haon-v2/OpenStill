@@ -117,6 +117,44 @@ extension ViewerController {
             }
         case "import_lut":
             importLUTForAssistant(args, reply: reply)
+        case "edit_reference":
+            reply(.success(.object(["reference": .string(AssistantEdits.referenceText),
+                                    "commands": .array(AssistantCommands.all.map { c in
+                                        .object(["name": .string(c.name), "help": .string(c.help), "argument": c.argument.map(JSONValue.string) ?? .null])
+                                    })])))
+        case "get_edits":
+            withAssistantPhoto(args, open: false, reply: reply) { record, url in
+                do {
+                    let document = url == self.currentSource ? self.editDocument : record.active.document
+                    let edits = url == self.currentSource ? self.currentEdits : document.current
+                    reply(.success(.object(["photo": .object(self.assistantFacts(record.id, url: url)), "edits": try AssistantEdits.view(edits),
+                                            "lut": edits.advanced?.lutName.map(JSONValue.string) ?? .null, "sky": edits.advanced?.sky.map { .string($0.name) } ?? .null,
+                                            "snapshots": .array((document.snapshots ?? []).map { .object(["id": .string($0.id.uuidString), "name": .string($0.name)]) })])))
+                } catch { reply(.failure(error)) }
+            }
+        case "edit":
+            guard let patch = args["patch"] else { fail("Give “patch”: the parts of the edit to change, e.g. {\"advanced\": {\"grain\": {\"amount\": 0.3}}}. See edit_reference."); return }
+            withAssistantPhoto(args, open: true, reply: reply) { _, _ in
+                do {
+                    let result = try AssistantEdits.apply(patch, to: self.currentEdits)
+                    guard !result.changed.isEmpty else {
+                        reply(.success(.object(["changed": .array([]), "adjusted": .array(result.adjusted.map(JSONValue.string)), "note": .string("Nothing changed.")]))); return
+                    }
+                    let sections = Set(result.changed.map { $0.split(separator: ":")[0].split(separator: ".").prefix(2).joined(separator: ".") })
+                    self.changeEdits(result.edits, title: "AI · " + sections.sorted().prefix(3).joined(separator: ", "), commit: true)
+                    reply(.success(.object(["changed": .array(result.changed.prefix(80).map(JSONValue.string)),
+                                            "adjusted": .array(result.adjusted.map(JSONValue.string)),
+                                            "note": .string("One undo step. Check it with preview (compare: true).")])))
+                } catch { reply(.failure(error)) }
+            }
+        case "run_command":
+            runAssistantCommand(args, reply: reply)
+        case "copy_edits":
+            copyAssistantEdits(args, reply: reply)
+        case "list_presets":
+            reply(.success(.object(["presets": .array(info.presetItems.map { .object(["name": .string($0.name), "category": .string($0.category), "description": .string($0.description)]) })])))
+        case "list_skies":
+            reply(.success(.object(["skies": .array(info.skyItems.map { .object(["id": .string($0.entry.id), "name": .string($0.entry.name), "category": .string($0.entry.category)]) })])))
         default:
             fail("OpenStill doesn’t know the tool “\(tool)”. Update OpenStill if the MCP is newer.")
         }
@@ -341,6 +379,92 @@ extension ViewerController {
                 self.changeEdits(edits, title: "AI · " + layer.name, commit: true)
                 self.assistantMaskView(layer.id, size: args["size"]?.int, reply: reply)
             } catch { reply(.failure(error)) }
+        }
+    }
+
+    // MARK: Commands and copying
+    /// Runs a button's action for the AI and answers once it (and any on-device AI it starts) has finished.
+    private func runAssistantCommand(_ args: [String: JSONValue], reply: @escaping AssistantReply) {
+        guard let name = args["name"]?.string, let command = AssistantCommands.named(name) else {
+            reply(.failure(AssistantError.message("Unknown command. Commands: " + AssistantCommands.all.map(\.name).joined(separator: ", ") + ".")));  return
+        }
+        let argument = args["argument"]?.string ?? ""
+        if command.argument != nil && argument.isEmpty { reply(.failure(AssistantError.message("\(name) needs “argument”: \(command.argument!)."))); return }
+        withAssistantPhoto(args, open: true, reply: reply) { _, _ in
+            if command.usesAI && !LocalAI.ready && command.name != "apply_sky" && argument != "camera" && argument != "subject" && argument != "remove" {
+                reply(.failure(AssistantError.message("\(name) uses OpenStill's on-device AI, which isn't set up. Ask the person to choose Set up on-device AI in OpenStill (a one-time download)."))); return
+            }
+            let before = self.currentEdits
+            if command.name == "snapshot" {
+                self.editDocument.addSnapshot(argument); self.saveEdits()
+                self.info.update(self.currentEdits, document: self.editDocument, enabled: true)
+                reply(.success(.object(["snapshot": .string(argument), "snapshots": .array((self.editDocument.snapshots ?? []).map { .object(["id": .string($0.id.uuidString), "name": .string($0.name)]) })])))
+                return
+            }
+            self.editingCommand(command.action.replacingOccurrences(of: "%@", with: argument))
+            self.waitForAssistantCommand(started: Date()) {
+                let changed = self.assistantChanges(from: before)
+                reply(.success(.object(["command": .string(name), "status": .string(self.info.lastStatus), "changed": .array(changed.prefix(60).map(JSONValue.string))])))
+            }
+        }
+    }
+    private func assistantChanges(from before: PhotoEdits) -> [String] {
+        guard let a = try? AssistantEdits.view(before), let b = try? AssistantEdits.view(currentEdits) else { return [] }
+        let x = AssistantEdits.flatten(a), y = AssistantEdits.flatten(b)
+        return Set(x.keys).union(y.keys).sorted().compactMap { key in x[key] == y[key] ? nil : "\(key): \(AssistantEdits.text(x[key])) → \(AssistantEdits.text(y[key]))" }
+    }
+    /// Waits until the command's work (renders, on-device AI) is done, up to ten minutes.
+    private func waitForAssistantCommand(started: Date, _ done: @escaping () -> Void) {
+        let elapsed = Date().timeIntervalSince(started)
+        if elapsed > 600 || (elapsed > 1 && !aiPreparing && !localAI.isRunning) { done(); return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in self?.waitForAssistantCommand(started: started, done) }
+    }
+    /// Copy / Paste Settings: the chosen sections of one photo's edit onto others, as the Copy Settings dialog does.
+    private func copyAssistantEdits(_ args: [String: JSONValue], reply: @escaping AssistantReply) {
+        let targets = (args["to_photo_ids"]?.array ?? []).compactMap { $0.string.flatMap(UUID.init(uuidString:)) }
+        guard !targets.isEmpty, targets.count <= 1000 else { reply(.failure(AssistantError.message("Pass to_photo_ids: 1 to 1000 photo ids from list_photos."))); return }
+        var options = BatchOptions()
+        if let names = args["sections"]?.array {
+            var groups = Set<AdjustmentGroup>()
+            for name in names {
+                guard let group = name.string.flatMap(AdjustmentGroup.init(rawValue:)) else {
+                    reply(.failure(AssistantError.message("Sections: " + AdjustmentGroup.allCases.map(\.rawValue).joined(separator: ", ") + "."))); return
+                }
+                groups.insert(group)
+            }
+            options.groups = groups
+        }
+        options.masks = args["masks"]?.bool ?? false
+        if photoRecord != nil && currentSource != nil { saveEdits() }   // the open photo's latest edit is what gets copied
+        let sourceID = args["from_photo_id"]?.string.flatMap(UUID.init(uuidString:)) ?? photoRecord?.id
+        func item(_ id: UUID) throws -> ShootItem {
+            guard let photo = EditStorage.records.catalog?.photo(id) else { throw AssistantError.message("No photo with id \(id.uuidString).") }
+            let url = URL(fileURLWithPath: photo.path)
+            return ShootItem(url: url, record: try EditStorage.records.record(for: url), captured: Date())
+        }
+        guard let sourceID else { reply(.failure(AssistantError.message("Open a photo or pass from_photo_id."))); return }
+        DispatchQueue.global(qos: .userInitiated).async {
+            let result = Result { () -> BatchTransaction in
+                let source = try item(sourceID)
+                return try BatchEdits.apply(BatchEdits.prepare(source: source, targets: try targets.map(item), options: options))
+            }
+            DispatchQueue.main.async {
+                switch result {
+                case .failure(let error): reply(.failure(error))
+                case .success(let transaction):
+                    // The open photo shows a pasted edit at once, as after the Paste dialog.
+                    if let id = self.photoRecord?.id, targets.contains(id), let latest = try? EditStorage.records.read(id) {
+                        self.photoRecord = latest; self.editDocument = latest.active.document; self.currentEdits = latest.active.document.current
+                        self.info.update(self.currentEdits, document: self.editDocument, enabled: true); self.renderEdits()
+                    }
+                    self.refreshLibrary()
+                    reply(.success(.object(["sections": .array(options.groups.map(\.rawValue).sorted().map(JSONValue.string)), "masks": .bool(options.masks),
+                                            "results": .array(transaction.entries.map { entry in
+                                                .object(["photo_id": .string(entry.photoID.uuidString), "file": .string(URL(fileURLWithPath: entry.sourcePath).lastPathComponent),
+                                                         "result": .string(entry.failure ?? (entry.before == entry.after ? "already matched" : "applied"))])
+                                            })])))
+                }
+            }
         }
     }
 

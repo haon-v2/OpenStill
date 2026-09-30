@@ -20,7 +20,8 @@ public enum JSONValue: Codable, Equatable, Sendable {
         switch self {
         case .null: try c.encodeNil()
         case .bool(let v): try c.encode(v)
-        case .number(let v): try c.encode(v.isFinite ? v : 0)
+        // Whole numbers are written as integers so that integer fields (rotation, counts) read them back.
+        case .number(let v): if v.isFinite, v == v.rounded(), abs(v) < 1e15 { try c.encode(Int64(v)) } else { try c.encode(v.isFinite ? v : 0) }
         case .string(let v): try c.encode(v)
         case .array(let v): try c.encode(v)
         case .object(let v): try c.encode(v)

@@ -220,6 +220,8 @@ final class EditorPanel: ChromePanel {
     func preset(id:String) -> PresetRecipe? { looks.preset(id:id) }
     func preset(named name:String) -> PresetRecipe? { looks.preset(named:name) }
     func sky(id:String) -> SkyItem? { looks.sky(id:id) }
+    var presetItems: [PresetRecipe] { looks.presets.presets }
+    var skyItems: [SkyItem] { looks.skies.items }
     func refreshSkies() { looks.reload(); looks.showSkies() }
     func showSkies() { looks.showSkies() }
     /// After saving or importing a preset: list it and show it as applied.
