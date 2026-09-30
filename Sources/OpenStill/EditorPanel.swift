@@ -213,6 +213,8 @@ final class EditorPanel: ChromePanel {
 
     func refreshLUTs() { looks.reload() }
     func libraryLUT(id:String) -> LUTItem? { looks.item(id:id) }
+    var lutItems: [LUTItem] { looks.luts.items }
+    func lutItem(id: String) -> LUTItem? { looks.item(id: id) }
     func importedLUT(filename:String) -> LUTItem? { looks.imported(filename:filename) }
     var lutLibrary: LUTLibrary { looks.luts }
     func preset(id:String) -> PresetRecipe? { looks.preset(id:id) }
