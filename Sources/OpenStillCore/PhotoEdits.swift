@@ -207,8 +207,17 @@ public enum PhotoEditor {
         var baseImage = baseImage
         if let background = e.advanced?.aiBackgroundAsset, let key = e.advanced?.aiFeatureKey,
            let mask = e.advanced?.masks[key] {
-            let prior = try assetImage(background)
-            baseImage = baseImage.applyingFilter("CIBlendWithMask",parameters:[kCIInputBackgroundImageKey:prior,kCIInputMaskImageKey:try mask.coverage(geometry:EditGeometry(size:sourceSize,edits:PhotoEdits()),lens:LensSettings(),input:prior,modern:modern)])
+            var prior = try assetImage(background)
+            // The image under an AI result is read at its own size; the result may be a smaller preview. Match them,
+            // or the full-size image would fill the frame and the crop would land on a corner of it (a zoomed-in look).
+            let target = baseImage.extent
+            if prior.extent.size != target.size, prior.extent.width > 0, prior.extent.height > 0 {
+                prior = prior.transformed(by: CGAffineTransform(translationX: -prior.extent.minX, y: -prior.extent.minY)
+                    .concatenating(CGAffineTransform(scaleX: target.width / prior.extent.width, y: target.height / prior.extent.height))
+                    .concatenating(CGAffineTransform(translationX: target.minX, y: target.minY)))
+            }
+            prior = prior.cropped(to: target)
+            baseImage = baseImage.applyingFilter("CIBlendWithMask",parameters:[kCIInputBackgroundImageKey:prior,kCIInputMaskImageKey:try mask.coverage(geometry:EditGeometry(size:sourceSize,edits:PhotoEdits()),lens:LensSettings(),input:prior,modern:modern)]).cropped(to: target)
         }
         if !e.eyeFixes.isEmpty { baseImage = EyeFixes.apply(baseImage, fixes: e.eyeFixes) }
         let retouched=modern && !e.retouch.isEmpty ? try Retouch.apply(baseImage,strokes:e.retouch):baseImage
