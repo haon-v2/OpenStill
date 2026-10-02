@@ -283,8 +283,12 @@ public final class PhotoRecordStore {
         // Ambiguous identical copies are not silently merged.
         if matches.count == 1 { try save(matches[0]); return indexed(matches[0]) }
         // A photo Synchronize Folder took out of the library, back at the same place: its edits return.
-        if let entry = RemovedPhotos.load(root: root).last(where: { $0.path == path }), var returning = try? read(entry.id), returning.contentFingerprint == fingerprint {
-            RemovedPhotos.forget(entry.id, root: root)
+        // Its virtual copies were removed with it, at the same path; only the original's record is taken here.
+        if let match = RemovedPhotos.load(root: root).reversed().lazy.compactMap({ entry -> (RemovedPhotos.Entry, PhotoRecord)? in
+               guard entry.path == path, let r = try? self.read(entry.id), r.masterID == nil, r.contentFingerprint == fingerprint else { return nil }
+               return (entry, r) }).first {
+            var returning = match.1
+            RemovedPhotos.forget(match.0.id, root: root)
             returning.sourcePath = path
             try save(returning); return indexed(returning)
         }
