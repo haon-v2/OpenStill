@@ -114,6 +114,9 @@ public struct PhotoRecord: Codable, Identifiable {
     public var metadata: IPTCMetadata?
     /// A location set in OpenStill (map or GPX), used instead of the file's GPS.
     public var location: GeoLocation?
+    /// For a virtual copy: the original photo's record, and the copy's name ("Copy 1").
+    public var masterID: UUID?
+    public var copyName: String?
     public var active: EditVersion { versions.first(where: { $0.id == activeVersionID }) ?? versions[0] }
     public init(source: URL, fingerprint: String, version: EditVersion) {
         sourcePath = source.standardizedFileURL.path; contentFingerprint = fingerprint
@@ -233,7 +236,8 @@ public final class PhotoRecordStore {
         try JSONEncoder().encode(record).write(to: destination, options: .atomic)
         try? catalog?.updateRecord(record)
         let fields = XMPMetadata(record: record)
-        if writesSidecars(), previous.map({ XMPMetadata(record: $0) != fields }) ?? fields.isSet {
+        // One sidecar per file: it carries the original's metadata, never a virtual copy's.
+        if record.masterID == nil, writesSidecars(), previous.map({ XMPMetadata(record: $0) != fields }) ?? fields.isSet {
             try? XMPSidecar.write(record, for: URL(fileURLWithPath: record.sourcePath))
         }
     }
@@ -245,6 +249,8 @@ public final class PhotoRecordStore {
     }
     public func record(for source: URL, legacy: EditDocument? = nil) throws -> PhotoRecord {
         lock.lock(); defer { lock.unlock() }
+        // A virtual copy is listed as the file's URL with its record ID after "#".
+        if let copy = VirtualCopy.id(in: source) { return try read(copy) }
         let path = source.standardizedFileURL.path
         // A missing original (for example on an unplugged drive) keeps its record, so its Smart Preview can be edited.
         if !FileManager.default.fileExists(atPath: path), let id = catalog?.recordID(path: path), let record = try? read(id), record.sourcePath == path { return record }
@@ -276,6 +282,12 @@ public final class PhotoRecordStore {
         }
         // Ambiguous identical copies are not silently merged.
         if matches.count == 1 { try save(matches[0]); return indexed(matches[0]) }
+        // A photo Synchronize Folder took out of the library, back at the same place: its edits return.
+        if let entry = RemovedPhotos.load(root: root).last(where: { $0.path == path }), var returning = try? read(entry.id), returning.contentFingerprint == fingerprint {
+            RemovedPhotos.forget(entry.id, root: root)
+            returning.sourcePath = path
+            try save(returning); return indexed(returning)
+        }
         let mode = RawDecoder.defaultMode(for: source)
         var initial = EditVersion(name: legacy == nil ? "Original" : "Legacy", renderer: legacy == nil ? .linear2020 : .legacy,
                                   sourceMode: legacy == nil ? mode : (source.pathExtension.lowercased() == "rw2" ? .cameraLook : .original),

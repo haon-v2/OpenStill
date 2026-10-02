@@ -583,6 +583,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
             // Re-reads the folder: new photos join the library and the counts are refreshed.
             open([folder]); showLibrary()
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in self?.librarySidebar.reloadFolders() }
+            offerToRemoveDeleted(in: folder)
         default: break
         }
     }
@@ -618,7 +619,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
     }
     @objc func revealPhoto() {
         guard urls.indices.contains(selected) else { return }
-        NSWorkspace.shared.activateFileViewerSelecting([urls[selected]])
+        NSWorkspace.shared.activateFileViewerSelecting([VirtualCopy.file(urls[selected])])
     }
     private var canTrashPhoto: Bool {
         !isLibrary && urls.indices.contains(selected) && selectedURLs.count == 1 && selectedURLs.first == urls[selected] && !trashInProgress && view.window?.attachedSheet == nil
@@ -638,6 +639,8 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
     @objc func trashPhoto() {
         guard canTrashPhoto, let window = view.window else { return }
         let url = urls[selected]
+        // A virtual copy shares the original's file: it's removed from the library, never trashed.
+        if removeVirtualCopies([url]) { return }
         let catalogToken = catalogGeneration
         trashInProgress = true
         let alert = NSAlert()
@@ -665,6 +668,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
                     self.trashInProgress = false
                     switch result {
                     case .success:
+                        self.removeCopies(ofTrashed: [url])
                         self.removeTrashedPhoto(url)
                     case .failure(let error):
                         let failure = NSAlert()

@@ -120,17 +120,73 @@ final class LibrarySidebar: ChromePanel {
         }
         } else {
         section("Collections") { s in
-            for (index, c) in collections.enumerated() {
-                let r = row(c.name, action: #selector(chooseCollection(_:)), tag: index, selected: c.id == collection, symbol: c.isSmart ? "gearshape" : "rectangle.stack")
-                let menu = NSMenu()
-                for (title, action) in [("Rename…", #selector(renameCollection(_:))), ("Delete…", #selector(deleteCollection(_:)))] {
-                    let item = NSMenuItem(title: title, action: action, keyEquivalent: ""); item.target = self; item.tag = index; menu.addItem(item)
+            // Collection sets hold collections, like folders; each shows its collections below it.
+            let catalog = EditStorage.records.catalog
+            let sets = catalog?.collectionSets() ?? [], parents = catalog?.collectionParents() ?? [:]
+            func addCollections(in parent: UUID?, indent: Int) {
+                for set in sets where parents[set.id] == parent {
+                    let r = LRListRow(title: set.name, count: nil, symbol: "folder", selected: false, indent: indent)
+                    r.setAccessibilityLabel("Collection set \(set.name)"); r.toolTip = "Collection set · Control-click for options"
+                    r.menu = setMenu(set, sets: sets); s.add(r)
+                    addCollections(in: set.id, indent: indent + 1)
                 }
-                r.menu = menu; r.toolTip = (c.isSmart ? "Smart collection" : "Collection") + " · Control-click to rename or delete"; s.add(r)
+                for (index, c) in collections.enumerated() where parents[c.id] == parent {
+                    let r = LRListRow(title: c.name, count: nil, symbol: c.isSmart ? "gearshape" : "rectangle.stack", selected: c.id == collection, indent: indent)
+                    r.target = self; r.action = #selector(chooseCollection(_:)); r.tag = index
+                    r.setAccessibilityLabel(c.name)
+                    let menu = NSMenu()
+                    for (title, action) in [("Rename…", #selector(renameCollection(_:))), ("Delete…", #selector(deleteCollection(_:)))] {
+                        let item = NSMenuItem(title: title, action: action, keyEquivalent: ""); item.target = self; item.tag = index; menu.addItem(item)
+                    }
+                    menu.addItem(moveMenu(c.id, sets: sets))
+                    r.menu = menu; r.toolTip = (c.isSmart ? "Smart collection" : "Collection") + " · Control-click to rename, delete or move into a set"; s.add(r)
+                }
             }
+            addCollections(in: nil, indent: 0)
             s.add(row("Create Smart Collection…", action: #selector(createSmartCollection), symbol: "plus"))
+            s.add(row("Create Collection Set…", action: #selector(createCollectionSet), symbol: "folder.badge.plus"))
         }
         section("Publish Services") { s in s.add(row("Set Up Publishing…", action: #selector(publishServices), symbol: "square.and.arrow.up")) }
+        }
+    }
+    // MARK: Collection sets
+    private func moveMenu(_ id: UUID, sets: [PhotoCollection]) -> NSMenuItem {
+        let item = NSMenuItem(title: "Move to Set", action: nil, keyEquivalent: ""); let menu = NSMenu()
+        menu.addItem(ActionMenuItem("Top Level") { [weak self] in try? EditStorage.records.catalog?.move(collection: id, into: nil); self?.reloadCollections() })
+        if !sets.isEmpty { menu.addItem(.separator()) }
+        for set in sets where set.id != id {
+            menu.addItem(ActionMenuItem(set.name) { [weak self] in try? EditStorage.records.catalog?.move(collection: id, into: set.id); self?.reloadCollections() })
+        }
+        item.submenu = menu; return item
+    }
+    private func setMenu(_ set: PhotoCollection, sets: [PhotoCollection]) -> NSMenu {
+        let menu = NSMenu()
+        menu.addItem(ActionMenuItem("Create Collection Set Inside…") { [weak self] in self?.askForSetName(parent: set.id) })
+        menu.addItem(ActionMenuItem("Rename…") { [weak self] in self?.renameSet(set) })
+        menu.addItem(moveMenu(set.id, sets: sets))
+        menu.addItem(.separator())
+        menu.addItem(ActionMenuItem("Delete Set") { [weak self] in try? EditStorage.records.catalog?.deleteCollectionSet(set.id); self?.reloadCollections() })
+        return menu
+    }
+    @objc private func createCollectionSet() { askForSetName(parent: nil) }
+    private func askForSetName(parent: UUID?) {
+        guard let window else { return }
+        let alert = NSAlert(); alert.messageText = "New collection set"; alert.informativeText = "Sets hold collections and other sets, like folders."
+        let field = NSTextField(string: ""); field.placeholderString = "Name"; field.frame = NSRect(x: 0, y: 0, width: 260, height: 24); alert.accessoryView = field
+        alert.addButton(withTitle: "Create"); alert.addButton(withTitle: "Cancel")
+        alert.beginSheetModal(for: window) { [weak self] response in
+            guard response == .alertFirstButtonReturn else { return }
+            _ = try? EditStorage.records.catalog?.createCollectionSet(name: field.stringValue, parent: parent); self?.reloadCollections()
+        }
+    }
+    private func renameSet(_ set: PhotoCollection) {
+        guard let window else { return }
+        let alert = NSAlert(); alert.messageText = "Rename collection set"
+        let field = NSTextField(string: set.name); field.frame = NSRect(x: 0, y: 0, width: 260, height: 24); alert.accessoryView = field
+        alert.addButton(withTitle: "Rename"); alert.addButton(withTitle: "Cancel")
+        alert.beginSheetModal(for: window) { [weak self] response in
+            guard response == .alertFirstButtonReturn, !field.stringValue.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+            try? EditStorage.records.catalog?.renameCollection(set.id, to: field.stringValue); self?.reloadCollections()
         }
     }
     // MARK: Folders tree

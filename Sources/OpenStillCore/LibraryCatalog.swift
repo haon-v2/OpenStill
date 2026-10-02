@@ -125,6 +125,8 @@ public struct CatalogPhoto: Equatable, Sendable {
     public var edited = false
     public var title = "", caption = ""
     public var keywords: [String] = []
+    /// For a virtual copy, the photo it's a copy of.
+    public var masterID: UUID?
     public var filename: String { (path as NSString).lastPathComponent }
     public init(id: UUID, path: String) { self.id = id; self.path = path }
 
@@ -158,6 +160,7 @@ public struct CatalogPhoto: Equatable, Sendable {
         id = record.id; fingerprint = record.contentFingerprint; rating = record.rating; flag = record.flag; label = record.colorLabel
         edited = record.isEdited; let m = record.iptc; title = m.title; caption = m.caption; keywords = m.keywordPaths
         if let g = record.geotag { latitude = g.latitude; longitude = g.longitude }
+        masterID = record.masterID
     }
     /// True when free text matches the filename, title, caption, keywords, camera or lens.
     public func matches(text: String) -> Bool {
@@ -315,6 +318,7 @@ public final class LibraryCatalog {
         try prepareFaces()
         try prepareStacks()
         try prepareLocations()
+        try prepareCopiesAndSets()
     }
     deinit { sqlite3_close(db) }
 
@@ -372,12 +376,12 @@ public final class LibraryCatalog {
     /// The record ID for a file whose path, size and modification time are unchanged since it was indexed.
     public func recordID(path: String, size: Int64, modified: Double) -> UUID? {
         var id: UUID?
-        _ = try? run("SELECT id FROM photos WHERE path = ? AND size = ? AND abs(modified - ?) < 0.001 LIMIT 1", [.text(path), .int(size), .real(modified)]) { id = UUID(uuidString: Self.text($0, 0)) }
+        _ = try? run("SELECT id FROM photos WHERE path = ? AND size = ? AND abs(modified - ?) < 0.001 AND master_id IS NULL LIMIT 1", [.text(path), .int(size), .real(modified)]) { id = UUID(uuidString: Self.text($0, 0)) }
         return id
     }
     public func recordIDs(fingerprint: String) -> [UUID] {
         var ids: [UUID] = []
-        _ = try? run("SELECT id FROM photos WHERE fingerprint = ?", [.text(fingerprint)]) { if let id = UUID(uuidString: Self.text($0, 0)) { ids.append(id) } }
+        _ = try? run("SELECT id FROM photos WHERE fingerprint = ? AND master_id IS NULL", [.text(fingerprint)]) { if let id = UUID(uuidString: Self.text($0, 0)) { ids.append(id) } }
         return ids
     }
     /// Content hashes of indexed photos with exactly this file size, to spot files that were imported before.
@@ -389,7 +393,7 @@ public final class LibraryCatalog {
     /// Photos whose contents are byte-for-byte identical to another indexed photo, grouped by content hash.
     public func exactDuplicates() -> [[CatalogPhoto]] {
         var hashes: [String] = []
-        _ = try? run("SELECT fingerprint FROM photos WHERE fingerprint <> '' GROUP BY fingerprint HAVING count(*) > 1") { hashes.append(Self.text($0, 0)) }
+        _ = try? run("SELECT fingerprint FROM photos WHERE fingerprint <> '' AND master_id IS NULL GROUP BY fingerprint HAVING count(*) > 1") { hashes.append(Self.text($0, 0)) }
         guard !hashes.isEmpty else { return [] }
         let ids = Set(hashes.flatMap { recordIDs(fingerprint: $0) })
         return Dictionary(grouping: photos(ids: ids), by: \.fingerprint).values.map { $0.sorted { $0.path < $1.path } }.filter { $0.count > 1 }.sorted { $0[0].path < $1[0].path }
@@ -418,7 +422,7 @@ public final class LibraryCatalog {
                   .text(p.camera), .text(p.lens), optional(p.iso), optional(p.focalLength), optional(p.aperture), .int(Int64(p.width)), .int(Int64(p.height)),
                   optional(p.latitude), optional(p.longitude), .int(Int64(p.rating)), .text(p.flag.rawValue), .text(p.label.rawValue), .int(p.edited ? 1 : 0), .text(p.title), .text(p.caption)])
             try replaceKeywords(p.id, p.keywords)
-            try recordLocation(p.id, path: p.path)
+            if let master = p.masterID { try markCopy(p.id, of: master) } else { try recordLocation(p.id, path: p.path) }
         } }
     }
     /// Mirrors a saved record (rating, flag, label, metadata, edited state) into an existing row.
@@ -440,7 +444,7 @@ public final class LibraryCatalog {
 
     public func photos(ids: Set<UUID>? = nil) -> [CatalogPhoto] {
         var byID: [UUID: CatalogPhoto] = [:], order: [UUID] = []
-        let columns = "SELECT id, path, size, modified, fingerprint, captured, camera, lens, iso, focal, aperture, width, height, latitude, longitude, rating, flag, label, edited, title, caption FROM photos"
+        let columns = "SELECT id, path, size, modified, fingerprint, captured, camera, lens, iso, focal, aperture, width, height, latitude, longitude, rating, flag, label, edited, title, caption, master_id FROM photos"
         // Specific photos are fetched by ID in chunks; everything else in one pass.
         let chunks: [[UUID]] = ids.map { set in let all = Array(set); return stride(from: 0, to: all.count, by: 400).map { Array(all[$0..<min(all.count, $0 + 400)]) } } ?? [[]]
         for chunk in chunks {
@@ -456,6 +460,7 @@ public final class LibraryCatalog {
             p.latitude = Self.real(s, 13); p.longitude = Self.real(s, 14); p.rating = Int(sqlite3_column_int64(s, 15))
             p.flag = PhotoFlag(rawValue: Self.text(s, 16)) ?? .none; p.label = ColorLabel(rawValue: Self.text(s, 17)) ?? .none
             p.edited = sqlite3_column_int64(s, 18) != 0; p.title = Self.text(s, 19); p.caption = Self.text(s, 20)
+            p.masterID = UUID(uuidString: Self.text(s, 21))
             byID[id] = p; order.append(id)
             }
             let keywordFilter = ids == nil ? "" : " WHERE photo_id IN (" + chunk.map { _ in "?" }.joined(separator: ",") + ")"
@@ -469,7 +474,7 @@ public final class LibraryCatalog {
     /// Every photo's path, for the Folders panel.
     public func photoPaths() -> [String] {
         var out: [String] = []
-        _ = try? run("SELECT path FROM photos") { out.append(Self.text($0, 0)) }
+        _ = try? run("SELECT path FROM photos WHERE master_id IS NULL") { out.append(Self.text($0, 0)) }
         return out
     }
     /// Every keyword in use and how many photos carry it.
@@ -482,7 +487,7 @@ public final class LibraryCatalog {
     // MARK: Collections
     public func collections() -> [PhotoCollection] {
         var out: [PhotoCollection] = []
-        _ = try? run("SELECT id, name, rules FROM collections ORDER BY name COLLATE NOCASE") { s in
+        _ = try? run("SELECT id, name, rules FROM collections WHERE COALESCE(is_set, 0) = 0 ORDER BY name COLLATE NOCASE") { s in
             guard let id = UUID(uuidString: Self.text(s, 0)) else { return }
             let rules = sqlite3_column_type(s, 2) == SQLITE_NULL ? nil : try? JSONDecoder().decode(SmartRules.self, from: Data(Self.text(s, 2).utf8))
             out.append(PhotoCollection(id: id, name: Self.text(s, 1), smart: rules))

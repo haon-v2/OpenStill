@@ -38,7 +38,7 @@ final class FilmstripItem: NSCollectionViewItem {
     }
     func configure(_ url: URL, store: PhotoStore) {
         self.url = url
-        caption.stringValue = url.lastPathComponent
+        caption.stringValue = VirtualCopy.isCopy(url) ? ViewerController.displayName(url, record: try? EditStorage.record(url)) : url.lastPathComponent
         view.toolTip = url.lastPathComponent
         view.setAccessibilityLabel(url.lastPathComponent)
         preview.imageScaling = .scaleProportionallyDown

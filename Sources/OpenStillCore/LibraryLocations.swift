@@ -100,7 +100,7 @@ extension LibraryCatalog {
     }
     public func locations(ids: Set<UUID>? = nil) -> [PhotoLocation] {
         var out: [PhotoLocation] = []
-        _ = try? run("SELECT id, path, size, volume_uuid, volume_name, relative FROM photos") { s in
+        _ = try? run("SELECT id, path, size, volume_uuid, volume_name, relative FROM photos WHERE master_id IS NULL") { s in
             guard let id = UUID(uuidString: Self.text(s, 0)), ids?.contains(id) ?? true else { return }
             func optional(_ i: Int32) -> String? { sqlite3_column_type(s, i) == SQLITE_NULL ? nil : Self.text(s, i) }
             var location = PhotoLocation(id: id, path: Self.text(s, 1), size: sqlite3_column_int64(s, 2), volumeUUID: optional(3), volumeName: optional(4), relative: optional(5))
@@ -118,7 +118,7 @@ extension LibraryCatalog {
         let prefix = folder.hasSuffix("/") ? folder : folder + "/"
         var out: [String] = []
         // Paths are compared with substr rather than LIKE so "_" and "%" in folder names aren't wildcards.
-        _ = try? run("SELECT path FROM photos WHERE substr(path, 1, ?) = ?", [.int(Int64(prefix.count)), .text(prefix)]) { out.append(Self.text($0, 0)) }
+        _ = try? run("SELECT path FROM photos WHERE master_id IS NULL AND substr(path, 1, ?) = ?", [.int(Int64(prefix.count)), .text(prefix)]) { out.append(Self.text($0, 0)) }
         return out
     }
 
@@ -206,6 +206,9 @@ public enum LibraryRelocator {
             let values = try? URL(fileURLWithPath: move.to).resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
             try? catalog.movePhoto(move.id, to: move.to, size: Int64(values?.fileSize ?? 0), modified: values?.contentModificationDate?.timeIntervalSince1970 ?? 0)
             try? catalog.recordLocation(move.id, path: move.to)
+            // Virtual copies follow their original.
+            for copy in catalog.virtualCopies(of: move.id) { try? store.relocate(copy, to: move.to) }
+            try? catalog.moveCopies(of: move.id, to: move.to)
             moved += 1
         }
         return moved

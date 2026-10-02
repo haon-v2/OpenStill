@@ -29,7 +29,7 @@ extension ViewerController {
         if let defaultApp, let i = offered.firstIndex(of: defaultApp) { offered.insert(offered.remove(at: i), at: 0) }
         for app in offered.prefix(20) {
             let name = FileManager.default.displayName(atPath: app.path).replacingOccurrences(of: ".app", with: "")
-            let item = ActionMenuItem(app == defaultApp ? name + " (default)" : name) { Self.open(urls, with: app) }
+            let item = ActionMenuItem(app == defaultApp ? name + " (default)" : name) { Self.open(urls.map(VirtualCopy.file), with: app) }
             item.image = NSWorkspace.shared.icon(forFile: app.path); item.image?.size = NSSize(width: 16, height: 16)
             apps.addItem(item)
         }
@@ -46,8 +46,10 @@ extension ViewerController {
         editors.addItem(ActionMenuItem("Choose App…") { [weak self] in self?.editInOtherApp() })
         editIn.submenu = editors; menu.addItem(editIn)
 
+        menu.addItem(ActionMenuItem(many ? "Create Virtual Copies" : "Create Virtual Copy", symbol: "plus.square.on.square") { [weak self] in self?.createVirtualCopy() })
         menu.addItem(.separator())
-        menu.addItem(ActionMenuItem("Show in Finder", symbol: "folder") { NSWorkspace.shared.activateFileViewerSelecting(urls) })
+        let files = urls.map(VirtualCopy.file)
+        menu.addItem(ActionMenuItem("Show in Finder", symbol: "folder") { NSWorkspace.shared.activateFileViewerSelecting(files) })
         let folder = first.deletingLastPathComponent()
         menu.addItem(ActionMenuItem("Show in Folder “\(folder.lastPathComponent)”", symbol: "folder.badge.gearshape") { [weak self] in self?.showFolder(of: first) })
 
@@ -64,7 +66,8 @@ extension ViewerController {
 
         menu.addItem(.separator())
         menu.addItem(ActionMenuItem(many ? "Share \(urls.count) Photos…" : "Share Photo…", symbol: "square.and.arrow.up") { [weak self] in self?.sharePhoto() })
-        menu.addItem(ActionMenuItem(many ? "Move \(urls.count) Photos to Trash…" : "Move to Trash…", symbol: "trash") { [weak self] in
+        let allCopies = urls.allSatisfy(VirtualCopy.isCopy)
+        menu.addItem(ActionMenuItem(allCopies ? (many ? "Remove \(urls.count) Virtual Copies…" : "Remove Virtual Copy…") : many ? "Move \(urls.count) Photos to Trash…" : "Move to Trash…", symbol: "trash") { [weak self] in
             guard let self else { return }
             if self.isLibrary, let items = self.libraryBrowser?.selectedItems { self.trashLibraryPhotos(items) } else { self.trashPhoto() }
         })
