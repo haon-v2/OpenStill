@@ -31,13 +31,13 @@ enum CopySelfTest {
                         _ = try? catalog?.createCollection(name: "Portfolio")
                         viewer.showLibrary(); viewer.studio.libraryTab = 1; viewer.layoutStudio(); viewer.librarySidebar.page = 1; viewer.librarySidebar.reloadCollections()
                         after(6) {
-                            say("library items \(viewer.libraryBrowser?.visibleURLs.count ?? -1)")
+                            say("library items \(viewer.libraryBrowser?.visibleURLs.count ?? -1) of \(viewer.urls.count)")
                             capture("library")
                             viewer.showEditor()
                             after(4) {
                                 let copyURL = viewer.urls[viewer.selected]
                                 say("deleting \(copyURL.lastPathComponent) isCopy=\(VirtualCopy.isCopy(copyURL))")
-                                viewer.trashPhoto()
+                                _ = viewer.removeVirtualCopies([copyURL])
                                 after(2) {
                                     let sheet = window?.attachedSheet
                                     let texts = sheet.map { allText(in: $0.contentView) } ?? []
