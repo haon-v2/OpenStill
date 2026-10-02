@@ -91,6 +91,8 @@ extension ViewerController {
     // MARK: Library: Delete moves the selected photos to the Trash
     func trashLibraryPhotos(_ items: [ShootItem]) {
         guard !items.isEmpty, let window = view.window, window.attachedSheet == nil else { return }
+        // Virtual copies are removed from the library, never trashed (they share the original's file).
+        if removeVirtualCopies(items.map(\.url)) { return }
         let alert = NSAlert(); alert.alertStyle = .warning
         alert.messageText = items.count == 1 ? "Move “\(items[0].url.lastPathComponent)” to Trash?" : "Move \(items.count) photos to Trash?"
         alert.informativeText = "The original files move to your Mac’s Trash, where you can recover them. Sidecar and paired files stay in place."
@@ -104,6 +106,7 @@ extension ViewerController {
                 // The system Trash only; never a permanent delete.
                 for url in urls { if (try? FileManager.default.trashItem(at: url, resultingItemURL: nil)) != nil { moved.append(url) } else { failed += 1 } }
                 DispatchQueue.main.async {
+                    self.removeCopies(ofTrashed: moved)
                     let gone = Set(moved)
                     self.urls.removeAll { gone.contains($0) }; self.shootCatalog.removeAll { gone.contains($0) }; self.libraryURLs = []
                     self.selected = min(self.selected, max(0, self.urls.count - 1))

@@ -142,6 +142,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         add(library, "Move to Top of Stack (Shift-S)", #selector(ViewerController.moveToStackTop), target: viewer)
         add(library, "Auto-Stack by Capture Time…", #selector(ViewerController.autoStackPhotos), target: viewer)
         library.addItem(.separator())
+        add(library, "Create Virtual Copy", #selector(ViewerController.createVirtualCopy), "'", target: viewer, modifiers: [.command])
+        library.addItem(.separator())
         add(library, "Rename Photos…", #selector(ViewerController.renamePhotos), String(UnicodeScalar(NSF2FunctionKey)!), target: viewer, modifiers: [])
         add(library, "Undo Rename", #selector(ViewerController.undoRename), target: viewer)
         library.addItem(.separator())

@@ -102,7 +102,7 @@ private final class ShootCell:NSCollectionViewItem {
     }
     override var isSelected:Bool{didSet{view.layer?.borderWidth=isSelected ? 1.5:0;view.layer?.borderColor=Appearance.accent.cgColor;view.layer?.backgroundColor=isSelected ? Appearance.accent.withAlphaComponent(0.12).cgColor:NSColor.clear.cgColor}}
     func configure(_ item:ShootItem){
-        caption.stringValue=item.url.lastPathComponent
+        caption.stringValue=ViewerController.displayName(item.url,record:item.record)
         stars.rating=item.record.rating
         rating.stringValue=item.record.flag == .pick ? "Pick":item.record.flag == .reject ? "Reject":""
         let label=item.record.colorLabel

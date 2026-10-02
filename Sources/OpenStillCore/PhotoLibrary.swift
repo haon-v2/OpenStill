@@ -60,7 +60,9 @@ public struct PhotoCatalog {
             let order = $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent)
             return order == .orderedSame ? $0.path < $1.path : order == .orderedAscending
         }
-        return PhotoCatalog(urls: urls, selectedIndex: urls.firstIndex(of: first) ?? 0,
+        // Virtual copies sit beside their originals.
+        let listed = inputs.count == 1 ? VirtualCopy.expand(urls) : urls
+        return PhotoCatalog(urls: listed, selectedIndex: listed.firstIndex(of: first) ?? 0,
                             folder: inputs.count == 1 ? directory : nil)
     }
 }
@@ -72,7 +74,8 @@ extension PhotoCatalog {
         // Photos the catalog knows stay listed while their drive isn't connected; they show their cached look.
         let catalog = EditStorage.records.catalog
         let urls = inputs.map(\.standardizedFileURL).filter { supports($0) && (FileManager.default.fileExists(atPath: $0.path) || catalog?.recordID(path: $0.path) != nil) }
-        let ordered = sorted ? urls.sorted { let o = $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent); return o == .orderedSame ? $0.path < $1.path : o == .orderedAscending } : urls
+        // Same name: by folder, then the original before its virtual copies.
+        let ordered = sorted ? urls.sorted { let o = $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent); return o == .orderedSame ? ($0.path == $1.path ? $0.absoluteString < $1.absoluteString : $0.path < $1.path) : o == .orderedAscending } : urls
         return PhotoCatalog(urls: ordered, selectedIndex: 0, folder: nil)
     }
 }

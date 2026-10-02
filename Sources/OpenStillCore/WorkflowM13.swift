@@ -127,7 +127,7 @@ extension LibraryCatalog {
     /// The photo last seen at this path, whatever its size or date.
     public func recordID(path: String) -> UUID? {
         var id: UUID?
-        _ = try? run("SELECT id FROM photos WHERE path = ? LIMIT 1", [.text(path)]) { id = UUID(uuidString: Self.text($0, 0)) }
+        _ = try? run("SELECT id FROM photos WHERE path = ? AND master_id IS NULL LIMIT 1", [.text(path)]) { id = UUID(uuidString: Self.text($0, 0)) }
         return id
     }
     /// A consistent copy of the catalog database, even while it's in use.
