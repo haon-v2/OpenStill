@@ -140,7 +140,10 @@ extension LibraryCatalog {
 
 /// What to do with the photos of a drive that was just connected.
 public struct RelinkPlan: Equatable, Sendable {
-    public struct Move: Equatable, Sendable { public var id: UUID; public var from: String; public var to: String }
+    public struct Move: Equatable, Sendable {
+        public var id: UUID; public var from: String; public var to: String
+        public init(id: UUID, from: String, to: String) { self.id = id; self.from = from; self.to = to }
+    }
     /// The same drive (same identity, or same name with the same files): relinked without asking.
     public var automatic: [Move] = []
     /// Another drive holding the same files at the same places (a card copied, or reformatted and refilled): asks first.

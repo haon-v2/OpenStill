@@ -164,7 +164,9 @@ extension ViewerController {
         DispatchQueue.global(qos: .utility).async { [weak self] in
             guard let catalog = EditStorage.records.catalog else { return }
             let volumes = MountedVolume.all().filter { roots?.contains($0.root) ?? true }
-            let locations = catalog.locations()
+            // Only photos whose file is missing can move; checking once keeps this quick on large catalogs.
+            let locations = catalog.locations().filter { !FileManager.default.fileExists(atPath: $0.path) }
+            guard !locations.isEmpty else { DispatchQueue.main.async { self?.librarySidebar.reloadFolders() }; return }
             var automatic: [RelinkPlan.Move] = [], questions: [(MountedVolume, RelinkPlan)] = []
             for volume in volumes {
                 let plan = LibraryRelocator.plan(for: volume, locations: locations)

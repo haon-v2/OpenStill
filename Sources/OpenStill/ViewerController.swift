@@ -365,6 +365,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         welcome.isHidden = true
         canvas.image = nil
         canvas.message = "Reading photos…"
+        hideMissingBanner()
         spinner.startAnimation(nil)
         let subfolders = LibrarySidebar.includeSubfolders
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in

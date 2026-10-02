@@ -267,6 +267,7 @@ public struct PhotoCollection: Identifiable, Equatable, Sendable {
     public var id: UUID, name: String
     public var smart: SmartRules?
     public var isSmart: Bool { smart != nil }
+    public init(id: UUID, name: String, smart: SmartRules?) { self.id = id; self.name = name; self.smart = smart }
 }
 
 // MARK: - The SQLite catalog
