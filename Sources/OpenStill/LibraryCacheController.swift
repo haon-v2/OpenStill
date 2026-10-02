@@ -206,6 +206,7 @@ extension ViewerController {
         func moved(_ url: URL) -> URL { map[url.standardizedFileURL] ?? url }
         let wasShowing = currentSource.map { map[$0.standardizedFileURL] != nil } ?? false
         urls = urls.map(moved); shootCatalog = shootCatalog.map(moved)
+        photoTabs.rename(Dictionary(moves.map { ($0.from, $0.to) }, uniquingKeysWith: { a, _ in a })); photoTabs.save(root: EditStorage.root); tabStrip.show(photoTabs)
         if folderURL.map({ !FileManager.default.fileExists(atPath: $0.path) }) ?? false, let first = moves.first {
             folderURL = URL(fileURLWithPath: first.to).deletingLastPathComponent()
         }

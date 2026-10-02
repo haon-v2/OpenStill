@@ -49,7 +49,7 @@ enum CacheSelfTest {
                     func poll() {
                         if let source = viewer.currentSource, FileManager.default.fileExists(atPath: source.path) {
                             after(6) {
-                                say("RELINKED \(viewer.currentSource?.path ?? "?") banner hidden=\(viewer.missingBanner?.isHidden ?? true) record=\(viewer.photoRecord?.sourcePath ?? "?")")
+                                say("RELINKED \(viewer.currentSource?.path ?? "?") banner hidden=\(viewer.missingBanner?.isHidden ?? true) record=\(viewer.photoRecord?.sourcePath ?? "?") tabs=\(viewer.photoTabs.paths.map { ($0 as NSString).lastPathComponent })")
                                 capture("relinked"); exit(0)
                             }
                             return
