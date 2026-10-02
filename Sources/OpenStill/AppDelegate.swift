@@ -19,7 +19,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         viewer.startAutoImport()
         viewer.startAssistant()
         viewer.startWatchingVolumes()
-        CacheSelfTest.runIfRequested(window: window)
         buildMenu()
         NSApp.activate(ignoringOtherApps: true)
         updates.checkAtLaunch()
