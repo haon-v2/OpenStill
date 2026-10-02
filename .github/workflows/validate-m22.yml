@@ -31,7 +31,7 @@ jobs:
           set +e
           export OPENSTILL_STORAGE_ROOT=/tmp/os-catalog; mkdir -p $OPENSTILL_STORAGE_ROOT
           hdiutil create -size 64m -fs APFS -volname TESTCARD /tmp/card.dmg >/dev/null
-          hdiutil attach /tmp/card.dmg -nobrowse > attach1.txt; cat attach1.txt
+          hdiutil attach /tmp/card.dmg > attach1.txt; cat attach1.txt
           mkdir -p /Volumes/TESTCARD/DCIM/100TEST
           n=0; for f in /System/Library/Desktop\ Pictures/*.heic; do n=$((n+1)); sips -s format jpeg -Z 1600 "$f" --out /Volumes/TESTCARD/DCIM/100TEST/IMG_000$n.jpg >/dev/null 2>&1; [ $n -ge 2 ] && break; done
           ls -la /Volumes/TESTCARD/DCIM/100TEST
@@ -45,7 +45,7 @@ jobs:
           for s in $(seq 1 120); do sleep 1; grep -q READY_FOR_MOUNT away.log && break; kill -0 $pid 2>/dev/null || break; done
           # The card comes back under another name.
           sudo mkdir -p "/Volumes/TESTCARD 1"
-          sudo hdiutil attach /tmp/card.dmg -nobrowse -mountpoint "/Volumes/TESTCARD 1"; ls "/Volumes/TESTCARD 1/DCIM/100TEST"
+          sudo hdiutil attach /tmp/card.dmg -mountpoint "/Volumes/TESTCARD 1"; ls "/Volumes/TESTCARD 1/DCIM/100TEST"
           for s in $(seq 1 150); do sleep 1; kill -0 $pid 2>/dev/null || break; done; kill $pid 2>/dev/null
           grep "^CACHE" away.log || tail -60 away.log
           for f in /tmp/cache-*.png; do
