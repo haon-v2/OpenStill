@@ -237,6 +237,12 @@ public final class PhotoRecordStore {
             try? XMPSidecar.write(record, for: URL(fileURLWithPath: record.sourcePath))
         }
     }
+    /// Writes a record in place, without a recovery copy or sidecar (for path-only changes).
+    func writeWithoutRecovery(_ record: PhotoRecord) throws {
+        lock.lock(); defer { lock.unlock() }
+        guard record.isValid else { throw WorkflowError.invalidDocument }
+        try JSONEncoder().encode(record).write(to: url(record.id), options: .atomic)
+    }
     public func record(for source: URL, legacy: EditDocument? = nil) throws -> PhotoRecord {
         lock.lock(); defer { lock.unlock() }
         let path = source.standardizedFileURL.path

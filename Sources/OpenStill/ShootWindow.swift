@@ -66,6 +66,8 @@ final class StarRating:NSView {
 }
 private final class ShootCell:NSCollectionViewItem {
     let preview=NSImageView(),caption=NSTextField(labelWithString:""),rating=NSTextField(labelWithString:""),labelStrip=NSView(),badge=NSTextField(labelWithString:"")
+    /// "!" when the original can't be found (Lightroom's missing-file badge).
+    let missing=NSImageView(image:NSImage(systemSymbolName:"exclamationmark.circle.fill",accessibilityDescription:"Original not found") ?? NSImage())
     let stars=StarRating()
     var requestKey:String?
     private var previewHeight:NSLayoutConstraint?
@@ -78,7 +80,9 @@ private final class ShootCell:NSCollectionViewItem {
         rating.font = .systemFont(ofSize:11);rating.textColor = .secondaryLabelColor;rating.alignment = .center
         labelStrip.wantsLayer=true;labelStrip.layer?.cornerRadius=2
         badge.font = .systemFont(ofSize:10,weight:.semibold);badge.textColor = .white;badge.drawsBackground=true;badge.backgroundColor=NSColor.black.withAlphaComponent(0.6);badge.isHidden=true
-        for child in [preview,caption,stars,rating,labelStrip,badge]{child.translatesAutoresizingMaskIntoConstraints=false;view.addSubview(child)}
+        missing.contentTintColor = .systemOrange;missing.isHidden=true;missing.toolTip="The original can’t be found. Showing its cached preview."
+        for child in [preview,caption,stars,rating,labelStrip,badge,missing]{child.translatesAutoresizingMaskIntoConstraints=false;view.addSubview(child)}
+        NSLayoutConstraint.activate([missing.topAnchor.constraint(equalTo:view.topAnchor,constant:8),missing.trailingAnchor.constraint(equalTo:view.trailingAnchor,constant:-8),missing.widthAnchor.constraint(equalToConstant:16),missing.heightAnchor.constraint(equalToConstant:16)])
         NSLayoutConstraint.activate([badge.topAnchor.constraint(equalTo:view.topAnchor,constant:8),badge.leadingAnchor.constraint(equalTo:view.leadingAnchor,constant:8)])
         NSLayoutConstraint.activate([labelStrip.topAnchor.constraint(equalTo:view.topAnchor,constant:2),labelStrip.leadingAnchor.constraint(equalTo:view.leadingAnchor,constant:10),labelStrip.trailingAnchor.constraint(equalTo:view.trailingAnchor,constant:-10),labelStrip.heightAnchor.constraint(equalToConstant:3)])
         NSLayoutConstraint.activate([preview.topAnchor.constraint(equalTo:view.topAnchor,constant:6),preview.leadingAnchor.constraint(equalTo:view.leadingAnchor,constant:6),preview.trailingAnchor.constraint(equalTo:view.trailingAnchor,constant:-6),caption.topAnchor.constraint(equalTo:preview.bottomAnchor,constant:7),caption.leadingAnchor.constraint(equalTo:view.leadingAnchor,constant:5),caption.trailingAnchor.constraint(equalTo:view.trailingAnchor,constant:-5),stars.topAnchor.constraint(equalTo:caption.bottomAnchor,constant:3),stars.centerXAnchor.constraint(equalTo:view.centerXAnchor),rating.centerYAnchor.constraint(equalTo:stars.centerYAnchor),rating.leadingAnchor.constraint(equalTo:stars.trailingAnchor,constant:4)])
@@ -105,7 +109,9 @@ private final class ShootCell:NSCollectionViewItem {
         labelStrip.isHidden=label == .none;labelStrip.layer?.backgroundColor=ShootCell.color(label).cgColor
         var help=caption.stringValue;let meta=item.record.iptc
         if !meta.title.isEmpty{help+="\n"+meta.title};if !meta.keywords.isEmpty{help+="\nKeywords: "+meta.keywords.joined(separator:", ")}
-        view.setAccessibilityLabel(caption.stringValue+", \(item.record.rating) stars, "+item.record.flag.rawValue+(label == .none ? "":", \(label.title) label"));view.toolTip=help
+        let gone = !FileManager.default.fileExists(atPath:item.url.path);missing.isHidden = !gone
+        if gone{help+="\nOriginal not found: "+item.url.deletingLastPathComponent().path}
+        view.setAccessibilityLabel(caption.stringValue+", \(item.record.rating) stars, "+item.record.flag.rawValue+(label == .none ? "":", \(label.title) label")+(gone ? ", original not found":""));view.toolTip=help
         preview.imageScaling = .scaleProportionallyDown;preview.image=Appearance.symbol("photo",size:28)
     }
 }
@@ -489,7 +495,9 @@ final class ShootWindow:NSWindowController,NSCollectionViewDataSource,NSCollecti
             guard operation?.isCancelled==false else{return}
             // Previews saved on disk skip rendering; they're keyed by the edit revision, so edits make a new one.
             var result=PreviewCache.read(request)
-            if result==nil{
+            // Original not found: the library cache's last look, unless a Smart Preview can render it.
+            if result==nil,!FileManager.default.fileExists(atPath:item.url.path),SmartPreviews.stand(in:item.url)==nil{result=LibraryCache.image(for:item.id,maximum:420)}
+            else if result==nil{
                 result=try? autoreleasepool{try ModernRenderer.thumbnail(source:item.url,recipe:item.record.active.recipe,edge:420)}
                 if let rendered=result{PreviewCache.write(rendered,for:request)}
             }

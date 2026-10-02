@@ -313,6 +313,7 @@ public final class LibraryCatalog {
         try execute("INSERT OR IGNORE INTO meta(key, value) VALUES('schema', '\(Self.schemaVersion)')")
         try prepareFaces()
         try prepareStacks()
+        try prepareLocations()
     }
     deinit { sqlite3_close(db) }
 
@@ -416,6 +417,7 @@ public final class LibraryCatalog {
                   .text(p.camera), .text(p.lens), optional(p.iso), optional(p.focalLength), optional(p.aperture), .int(Int64(p.width)), .int(Int64(p.height)),
                   optional(p.latitude), optional(p.longitude), .int(Int64(p.rating)), .text(p.flag.rawValue), .text(p.label.rawValue), .int(p.edited ? 1 : 0), .text(p.title), .text(p.caption)])
             try replaceKeywords(p.id, p.keywords)
+            try recordLocation(p.id, path: p.path)
         } }
     }
     /// Mirrors a saved record (rating, flag, label, metadata, edited state) into an existing row.

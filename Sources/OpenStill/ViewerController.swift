@@ -48,6 +48,9 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
     var autoSync = false
     var workspaceKeyMonitor: Any?
     var libraryURLs: [URL] = []
+    /// The notice shown over a photo whose original can't be found, and the drive watchers (LibraryCacheController).
+    var missingBanner: MissingOriginalBanner?
+    var volumeObservers: [NSObjectProtocol] = []
     var folderURL: URL?
     /// The collection the library shows, when opened from the sidebar's Collections.
     var openCollection: PhotoCollection?
@@ -118,6 +121,8 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         configureEditing()
         librarySidebar.browse = { [weak self] in self?.openPanel() }
         librarySidebar.open = { [weak self] url in self?.open([url]) }
+        librarySidebar.openOffline = { [weak self] url in self?.openOfflineFolder(url) }
+        librarySidebar.openRecent = { [weak self] in self?.openRecentPhotos() }
         librarySidebar.folderCommand = { [weak self] id, url in self?.folderCommand(id, url) }
         librarySidebar.filter = { [weak self] index in self?.showLibrary(); self?.libraryBrowser?.setFlagFilter(index) }
         librarySidebar.subfoldersChanged = { [weak self] _ in if let self, let folder = self.folderURL, self.openCollection == nil { self.open([folder]) } }
@@ -338,7 +343,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         open(files, collection: collection)
         showLibrary()
     }
-    func open(_ inputs: [URL], collection libraryCollection: PhotoCollection? = nil) {
+    func open(_ inputs: [URL], collection libraryCollection: PhotoCollection? = nil, keepOrder: Bool = false) {
         _ = view
         let token = UUID()
         catalogGeneration = token
@@ -363,7 +368,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         spinner.startAnimation(nil)
         let subfolders = LibrarySidebar.includeSubfolders
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            let result = Result { try libraryCollection == nil ? PhotoCatalog.open(inputs, includeSubfolders: subfolders) : PhotoCatalog.files(inputs) }
+            let result = Result { try libraryCollection == nil ? PhotoCatalog.open(inputs, includeSubfolders: subfolders) : PhotoCatalog.files(inputs, sorted: !keepOrder) }
             DispatchQueue.main.async {
                 guard let self, self.catalogGeneration == token else { return }
                 self.spinner.stopAnimation(nil)
@@ -423,6 +428,12 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
             view.window?.makeFirstResponder(canvas)
         }
         store.cancelImageRequests()
+        hideMissingBanner(); noteRecent()
+        if isUnavailable(url) {
+            // The drive or card isn't connected and there's no Smart Preview: show the cached look, view only.
+            spinner.stopAnimation(nil); showMissingOriginal(url); updateControls(); return
+        }
+        if !FileManager.default.fileExists(atPath: url.path) { showMissingBanner(for: url, cached: false, smartPreview: true) }
         store.load(url, version: photoRecord?.active) { [weak self] result in
             guard let self, self.generation == token else { return }
             self.spinner.stopAnimation(nil)
@@ -566,6 +577,7 @@ final class ViewerController: NSViewController, NSCollectionViewDataSource, NSCo
         switch id {
         case "finder": NSWorkspace.shared.activateFileViewerSelecting([folder])
         case "import": importPhotosInto(folder)
+        case "locate": findMissingFolder(folder)
         case "sync":
             // Re-reads the folder: new photos join the library and the counts are refreshed.
             open([folder]); showLibrary()

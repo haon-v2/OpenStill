@@ -48,7 +48,12 @@ final class FilmstripItem: NSCollectionViewItem {
             guard let self, self.url == url else { return }
             switch result {
             case .success(let photo): self.preview.imageScaling = .scaleProportionallyUpOrDown; self.preview.image = NSImage(cgImage: photo.image, size: .zero)
-            case .failure: self.preview.image = Appearance.symbol("exclamationmark.triangle", size: 26, description: "Unreadable image")
+            case .failure:
+                // A photo whose drive isn't connected shows its cached look.
+                if !FileManager.default.fileExists(atPath: url.path), let id = EditStorage.records.catalog?.recordID(path: url.standardizedFileURL.path), let cached = LibraryCache.image(for: id, maximum: 240) {
+                    self.preview.imageScaling = .scaleProportionallyUpOrDown; self.preview.image = NSImage(cgImage: cached, size: .zero)
+                    self.view.toolTip = url.lastPathComponent + " · Original not found"
+                } else { self.preview.image = Appearance.symbol("exclamationmark.triangle", size: 26, description: "Unreadable image") }
             }
         }
     }
