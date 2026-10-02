@@ -26,3 +26,18 @@ jobs:
           tail -15 full.log; exit $code
       - name: App bundle
         run: bash scripts/build-app.sh > app.log 2>&1 || { grep -E "error:" app.log | sort -u | head -40; tail -40 app.log; exit 1; }
+      - name: Virtual copies in the real app
+        run: |
+          set +e
+          export OPENSTILL_STORAGE_ROOT=/tmp/os-catalog; mkdir -p $OPENSTILL_STORAGE_ROOT /tmp/photos
+          n=0; for f in /System/Library/Desktop\ Pictures/*.heic; do n=$((n+1)); sips -s format jpeg -Z 1600 "$f" --out /tmp/photos/IMG_000$n.jpg >/dev/null 2>&1; [ $n -ge 2 ] && break; done
+          env OPENSTILL_COPY_SELFTEST=/tmp/copy dist/OpenStill.app/Contents/MacOS/OpenStill /tmp/photos > copy.log 2>&1 &
+          pid=$!; for s in $(seq 1 150); do sleep 1; kill -0 $pid 2>/dev/null || break; done; kill $pid 2>/dev/null
+          grep "^COPY" copy.log || tail -60 copy.log
+          ls /tmp/photos
+          for f in /tmp/copy-*.png; do
+            [ -f "$f" ] || continue
+            sips -Z 900 -s format jpeg -s formatOptions 60 "$f" --out "$f.jpg" >/dev/null
+            echo "BEGIN $f"; base64 -i "$f.jpg" | tr -d '\n'; echo; echo "END $f"
+          done
+          grep -q "^COPY file still there true" copy.log
