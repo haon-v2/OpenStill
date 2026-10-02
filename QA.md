@@ -616,3 +616,11 @@ Automated fixtures are generated and contain no user photographs. The real S9 fi
 - Settings → Library & Catalog → Library cache: change the number of photos kept, Clear.
 - AI erase / noise / detail: a result that would move the frame or change the whole photo is refused with "didn't line up" and the photo stays as it was.
 
+## Virtual copies, collection sets, Synchronize Folder (M22b)
+
+- Select a photo, Library → Create Virtual Copy (⌘'): a copy named "Copy 1" appears beside it, stacked with it. Edit the copy: the original keeps its look. Rate or flag the copy: the original's rating stays.
+- Delete on a copy asks "Remove “Copy 1 of …”?" and keeps the file. Moving an original to the Trash removes its copies too.
+- XMP sidecars only ever carry the original's metadata.
+- Collections tab → Create Collection Set…; right-click a collection → Move to Set; right-click a set → Create Collection Set Inside…, Rename…, Delete Set (its contents move up a level).
+- Delete a photo in Finder, then right-click its folder → Synchronize Folder: OpenStill lists it and asks. Put the file back and open the folder again: its edits and rating return.
+

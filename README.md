@@ -133,12 +133,12 @@ What OpenStill's catalog has, checked against the code, and what's still to come
 | Import: Copy / Move / Add | Yes. Copy as DNG isn't offered |
 | Collections and smart collections | Yes |
 | Stacks | Yes (Library → Group into Stack, ⌘G) |
-| Virtual copies | Versions: named alternatives of one photo's edits, but not separate thumbnails in the grid |
+| Virtual copies | Yes: **Library → Create Virtual Copy** (⌘'). Each copy is its own thumbnail, stacked with the original, with its own edits, rating, flag, label and metadata |
 | Missing-file badges ("!" on photos whose file moved) | Yes: an orange "!" in the grid, and a notice over the photo in Develop with **Locate…** |
 | Previews of photos whose drive isn't connected | Yes: **Library cache** (below) |
-| Synchronize Folder removing photos deleted outside the app | Not yet: it adds new photos and refreshes counts |
+| Synchronize Folder removing photos deleted outside the app | Yes: it lists them and asks first; their edits stay saved and come back if the file does |
 | Find missing folder / Update folder location | Yes: right-click a missing folder → **Find Missing Folder…**. Drives and cards relink by themselves when plugged back in |
-| Collection sets (folders of collections) | Not yet |
+| Collection sets (folders of collections) | Yes: **Create Collection Set…**, nest sets, and right-click a collection → **Move to Set** |
 
 
 ### Library cache and missing photos
