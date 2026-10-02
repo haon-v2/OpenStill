@@ -605,3 +605,14 @@ Automated fixtures are generated and contain no user photographs. The real S9 fi
 - **Checked on CI in the built app** with a stand-in AI worker (the real pipeline otherwise): a JPEG and a Nikon RAW with crop, straighten, exposure, contrast and saturation, erased twice; before and after keep the same frame and tone, only the erased spot changes. Before the fix the JPEG showed the zoomed-in patch users saw.
 - **Test (AIBaseTests.eraseResultRendersInPlaceAtPreviewSize):** an erase result rendered through the modern renderer at preview and full size matches the same edit without the blend outside the erased spot.
 - **Existing photos:** a step made with the bug renders correctly after updating (nothing is baked in); no need to undo it.
+
+## Library cache and relinking (M22)
+
+- Open a few photos from an SD card (or a disk image), then eject it. Catalog → Recent still shows them with an orange "!", and Develop shows the last look with the "original isn't available" notice and Locate…. Sliders are off.
+- Plug the card back in (it may mount as "NAME 1"): the status line says it reconnected, the "!" badges go, and the photo on screen opens for editing.
+- Copy a card's DCIM folder to another drive, eject the card, and mount the drive: OpenStill asks before relinking to the copy.
+- Right-click a missing folder → Find Missing Folder… → choose its new place: photos relink.
+- Locate… with a different photo is refused ("That's a different photo").
+- Settings → Library & Catalog → Library cache: change the number of photos kept, Clear.
+- AI erase / noise / detail: a result that would move the frame or change the whole photo is refused with "didn't line up" and the photo stays as it was.
+
