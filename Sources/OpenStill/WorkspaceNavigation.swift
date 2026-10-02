@@ -4,6 +4,10 @@ import OpenStillCore
 private final class LibraryStack: NSStackView { override var isFlipped: Bool { true } }
 final class LibrarySidebar: ChromePanel {
     var open: ((URL) -> Void)?
+    /// A folder on a drive that isn't connected: its photos come from the catalog.
+    var openOffline: ((URL) -> Void)?
+    /// Catalog → Recent.
+    var openRecent: (() -> Void)?
     var browse: (() -> Void)?
     var filter: ((Int) -> Void)?
     var subfoldersChanged: ((Bool) -> Void)?
@@ -47,6 +51,7 @@ final class LibrarySidebar: ChromePanel {
         buildLightroom(collection: collection)
     }
     @objc private func openFolder() { browse?() }
+    @objc private func showRecent() { openRecent?() }
     @objc private func reveal() { if let folder { NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: folder.path) } }
     @objc private func filterPhotos(_ sender: NSButton) { filter?(sender.tag) }
     @objc private func toggleSubfolders(_ sender: NSButton) { UserDefaults.standard.set(sender.state == .on, forKey: Self.subfoldersKey); subfoldersChanged?(sender.state == .on) }
@@ -87,6 +92,9 @@ final class LibrarySidebar: ChromePanel {
             s.add(row("All Photographs", count: count, action: #selector(filterPhotos(_:)), tag: 0))
             s.add(row("Picks", action: #selector(filterPhotos(_:)), tag: 1))
             s.add(row("Rejected", action: #selector(filterPhotos(_:)), tag: 2))
+            let recent = row("Recent", action: #selector(showRecent), selected: collection == ViewerController.recentCollectionID, symbol: "clock")
+            recent.toolTip = "Photos you worked on lately, newest first. They show their last look even while their drive or card isn’t connected."
+            s.add(recent)
         }
         section("Folders") { s in
             if volumes.isEmpty {
@@ -158,7 +166,7 @@ final class LibrarySidebar: ChromePanel {
         let open = expanded(node.path, default: false)
         let r = folderRow(node.name, path: node.path, count: node.count, indent: indent, hasChildren: !node.children.isEmpty, symbol: open && !node.children.isEmpty ? "folder" : "folder.fill",
                           dimmed: !online, selected: collection == nil && folder?.standardizedFileURL.path == node.path, in: s)
-        r.toolTip = node.path
+        if online { r.toolTip = node.path }
         if open { for child in node.children { addFolder(child, indent: indent + 1, online: online, collection: collection, in: s) } }
     }
     @discardableResult private func folderRow(_ title: String, path: String, count: Int, indent: Int, hasChildren: Bool, symbol: String, dimmed: Bool, selected: Bool, in s: LRSection) -> LRListRow {
@@ -167,12 +175,17 @@ final class LibrarySidebar: ChromePanel {
         let r = LRListRow(title: title, count: count, symbol: symbol, selected: selected, indent: indent, disclosure: hasChildren ? open : nil, dimmed: dimmed)
         r.target = self; r.action = #selector(chooseFolder(_:)); r.identifier = .init(path)
         r.setAccessibilityLabel("\(title), \(count) photos" + (dimmed ? ", not connected" : ""))
+        if dimmed { r.toolTip = path + " · Not connected. Click to see its photos from the library cache; right-click to find it." }
         r.toggled = { [weak self] in self?.setExpanded(path, !open, default: isVolume) }
         let menu = NSMenu(), url = URL(fileURLWithPath: path, isDirectory: true)
         let items: [(String, String)] = [("Show in Finder", "finder"), ("Import to This Folder…", "import"), ("Synchronize Folder", "sync")]
         for (title, id) in items {
             let item = ActionMenuItem(title) { [weak self] in self?.folderCommand?(id, url) }
             item.isEnabled = !dimmed; menu.addItem(item)
+        }
+        if dimmed || !FileManager.default.fileExists(atPath: path) {
+            menu.addItem(.separator())
+            menu.addItem(ActionMenuItem("Find Missing Folder…") { [weak self] in self?.folderCommand?("locate", url) })
         }
         if hasChildren {
             menu.addItem(.separator())
@@ -185,8 +198,10 @@ final class LibrarySidebar: ChromePanel {
     }
     @objc private func chooseFolder(_ sender: NSButton) {
         guard let path = sender.identifier?.rawValue else { return }
-        guard FileManager.default.fileExists(atPath: path) else { NSSound.beep(); return }
-        open?(URL(fileURLWithPath: path, isDirectory: true))
+        let url = URL(fileURLWithPath: path, isDirectory: true)
+        // A drive or card that isn't connected still shows its photos, from the library cache.
+        guard FileManager.default.fileExists(atPath: path) else { openOffline?(url); return }
+        open?(url)
     }
 
     /// A flat Lightroom list row: icon, name, and a count on the right.

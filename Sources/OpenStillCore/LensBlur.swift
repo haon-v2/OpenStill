@@ -133,3 +133,28 @@ public enum AIBase {
     }
 }
 
+
+extension AIBase {
+    /// Whether an AI result lines up with the photo: rendered small, the edit after the AI step has the same frame as before,
+    /// and most of it looks the same (the step changes only what it was asked to). A result that moved the frame or the
+    /// tone everywhere (a base image in the wrong geometry) fails, so it is never applied.
+    public static func linesUp(before: CGImage, after: CGImage, tolerance: Double = 0.08) -> Bool {
+        guard abs(before.width - after.width) <= 1, abs(before.height - after.height) <= 1 else { return false }
+        func pixels(_ image: CGImage) -> [UInt8]? {
+            var data = [UInt8](repeating: 0, count: 64 * 64 * 4)
+            guard let ctx = CGContext(data: &data, width: 64, height: 64, bitsPerComponent: 8, bytesPerRow: 256, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+            ctx.interpolationQuality = .medium
+            ctx.draw(image, in: CGRect(x: 0, y: 0, width: 64, height: 64))
+            return data
+        }
+        guard let a = pixels(before), let b = pixels(after) else { return false }
+        var differences: [Double] = []
+        differences.reserveCapacity(64 * 64)
+        for i in stride(from: 0, to: a.count, by: 4) {
+            differences.append((0..<3).map { abs(Double(a[i + $0]) - Double(b[i + $0])) }.reduce(0, +) / (3 * 255))
+        }
+        differences.sort()
+        return differences[differences.count / 2] <= tolerance
+    }
+}

@@ -332,6 +332,9 @@ private final class LibrarySettings: SettingsPage {
     private let lastBackup = NSTextField(labelWithString: "")
     private lazy var backUpNow = button("Back Up Now", #selector(backUp))
     private var backup = CatalogBackup.load()
+    private let cacheCount = NSPopUpButton(), cacheUsed = NSTextField(labelWithString: "")
+    private lazy var clearLooks = button("Clear", #selector(clearLibraryCache))
+    private static let cacheCounts = [200, 500, 1000, 2500, 5000]
     init() { super.init(title: SettingsSection.library.title) }
     required init?(coder: NSCoder) { fatalError() }
 
@@ -352,6 +355,13 @@ private final class LibrarySettings: SettingsPage {
             row("Keep", [keepLabel, keep]),
             row("Last backup", [lastBackup, backUpNow]),
         ], note: "Backups are zipped copies of the catalog in \((CatalogBackup.defaultFolder().path as NSString).abbreviatingWithTildeInPath).")
+        cacheCount.addItems(withTitles: Self.cacheCounts.map { "\($0) photos" }); cacheCount.target = self; cacheCount.action = #selector(cacheCountChanged)
+        cacheCount.setAccessibilityLabel("Recent photos to keep previews of")
+        cacheUsed.font = .monospacedDigitSystemFont(ofSize: 12, weight: .regular); cacheUsed.textColor = Studio.secondary
+        group("Library cache", [
+            row("Keep previews of", [cacheCount], detail: "The photos you worked on most recently, at 2560 pixels."),
+            row("Space used", [cacheUsed, clearLooks]),
+        ], note: "Recent photos stay visible in the Library and Develop while their card or drive isn’t connected, with a notice that the original can’t be found. When you plug the card or drive back in, OpenStill finds the photos again by themselves, even if it mounts under another name. To edit while it’s away, build Smart Previews (Develop menu).")
     }
     override func refresh() {
         guard isViewLoaded else { return }
@@ -362,6 +372,27 @@ private final class LibrarySettings: SettingsPage {
         frequency.selectItem(at: BackupFrequency.allCases.firstIndex(of: backup.frequency) ?? 0)
         keep.integerValue = backup.keep; keepLabel.stringValue = "\(backup.keep) backup\(backup.keep == 1 ? "" : "s")"
         lastBackup.stringValue = backup.last.map { $0.formatted(.relative(presentation: .named)) } ?? "Never"
+        cacheCount.selectItem(at: Self.cacheCounts.firstIndex { $0 >= LibraryCache.limit } ?? Self.cacheCounts.count - 1)
+        cacheUsed.stringValue = "Measuring…"
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            let used = LibraryCache.diskUsage()
+            DispatchQueue.main.async { self?.cacheUsed.stringValue = used == 0 ? "Empty" : ByteCountFormatter.string(fromByteCount: used, countStyle: .binary) }
+        }
+    }
+    @objc private func cacheCountChanged() {
+        LibraryCache.limit = Self.cacheCounts[max(0, cacheCount.indexOfSelectedItem)]
+        let keep = LibraryCache.limit
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            if let catalog = EditStorage.records.catalog { LibraryCache.prune(keeping: catalog.recent(limit: keep), keep: keep) }
+            DispatchQueue.main.async { self?.refresh() }
+        }
+    }
+    @objc private func clearLibraryCache() {
+        clearLooks.isEnabled = false
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            LibraryCache.clear()
+            DispatchQueue.main.async { self?.clearLooks.isEnabled = true; self?.refresh() }
+        }
     }
     @objc private func toggleXMP() { UserDefaults.standard.set(writeXMP.state == .on, forKey: XMPSidecar.autoWriteKey) }
     @objc private func backupChanged() {

@@ -129,6 +129,7 @@ extension ViewerController {
             renderQueued = false
             if comparing { canvas.maskOverlay = nil } else { refreshMaskOverlay() }
             canvas.replaceRenderedImage(photo.preview, pixelSize:photo.pixelSize); updateHistogram(photo.preview); refreshCompareExtras(photo.preview, interactive:false)
+            if !comparing { cacheLook(photo.preview) }
             info.status(comparing ? "Showing original. Click Compare again to return to your edit." : "Edits are saved on this Mac. Originals stay untouched.")
             return
         }
@@ -212,6 +213,7 @@ extension ViewerController {
                 self.refreshMaskOverlay()
                 self.info.setLUTPhoto(original.preview, edits:edits, source:original.sourceImage, url:source, recipe:self.photoRecord?.active.recipe)
                 self.info.status("Edited · \(Int(logicalSize.width)) × \(Int(logicalSize.height)) px · Original preserved")
+                self.cacheLook(image)
             }
         }
     }
@@ -532,10 +534,29 @@ extension ViewerController {
                                 self.info.status("Created the version “Super resolution 2×” at twice the size. The previous version is unchanged.")
                                 return
                             }
-                            let next = AIBase.result(self.currentEdits, output:output.lastPathComponent, background:input.lastPathComponent, mask:maskURL?.lastPathComponent, key:key, raw:isRaw)
-                            if next.advanced?.aiBackgroundAsset == nil { try? FileManager.default.removeItem(at:input) }
+                            let before = self.currentEdits
+                            let next = AIBase.result(before, output:output.lastPathComponent, background:input.lastPathComponent, mask:maskURL?.lastPathComponent, key:key, raw:isRaw)
                             let names = ["erase":"AI object removal", "denoise":"AI noise removal", "detail":"AI detail restoration"]
-                            self.maskVisible = false; self.canvas.clearTool(); self.changeEdits(next,title:names[tool] ?? "AI edit",commit:true); self.select(self.selected, preservingSelection:true)
+                            // Safety check: the photo must keep its frame and look outside what the tool changed.
+                            let recipe = self.photoRecord?.active.recipe
+                            self.info.status("Checking the AI result…", busy:true)
+                            DispatchQueue.global(qos:.userInitiated).async { [weak self] in
+                                var fits = true
+                                if let recipe {
+                                    func small(_ e:PhotoEdits) -> CGImage? { try? ModernRenderer.display(ModernRenderer.render(source:source, recipe:RenderRecipe(renderer:recipe.renderer, sourceMode:recipe.sourceMode, raw:recipe.raw, edits:e), maximumDimension:256, keepSource:false)) }
+                                    if let a = small(before), let b = small(next) { fits = AIBase.linesUp(before:a, after:b) }
+                                }
+                                DispatchQueue.main.async {
+                                    guard let self, self.currentSource == source, self.editToken == token else { return }
+                                    guard fits else {
+                                        for file in [input,output,maskURL].compactMap({$0}) { try? FileManager.default.removeItem(at:file) }
+                                        self.info.status("The AI result didn’t line up with your photo, so it wasn’t applied. Your photo is unchanged.")
+                                        return
+                                    }
+                                    if next.advanced?.aiBackgroundAsset == nil { try? FileManager.default.removeItem(at:input) }
+                                    self.maskVisible = false; self.canvas.clearTool(); self.changeEdits(next,title:names[tool] ?? "AI edit",commit:true); self.select(self.selected, preservingSelection:true)
+                                }
+                            }
                         case .failure(let error):
                             for file in [input,output,maskURL].compactMap({$0}) { try? FileManager.default.removeItem(at:file) }
                             self.info.status(error.localizedDescription)

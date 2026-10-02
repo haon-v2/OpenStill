@@ -27,7 +27,9 @@ extension ViewerController {
             self.saveTabs(); self.openTab(path)
         }
         photoTabs = OpenPhotoTabs.load(root: EditStorage.root)
-        photoTabs.prune { FileManager.default.fileExists(atPath: $0) }
+        // Tabs of photos on a card or drive that isn't connected stay; they show the cached look.
+        let catalog = EditStorage.records.catalog
+        photoTabs.prune { FileManager.default.fileExists(atPath: $0) || catalog?.recordID(path: $0) != nil }
         tabStrip.show(photoTabs)
         info.statusChanged = { [weak self] text, busy in self?.statusBar.show(text, busy: busy) }
         canvas.backdrop = Studio.canvas

@@ -67,10 +67,13 @@ public struct PhotoCatalog {
 
 extension PhotoCatalog {
     /// Exactly these files (for a collection), skipping ones that are missing or unsupported.
-    public static func files(_ inputs: [URL]) -> PhotoCatalog {
-        let urls = inputs.map(\.standardizedFileURL).filter { supports($0) && FileManager.default.fileExists(atPath: $0.path) }
-            .sorted { let o = $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent); return o == .orderedSame ? $0.path < $1.path : o == .orderedAscending }
-        return PhotoCatalog(urls: urls, selectedIndex: 0, folder: nil)
+    /// `sorted` false keeps the given order (Recent lists newest first).
+    public static func files(_ inputs: [URL], sorted: Bool = true) -> PhotoCatalog {
+        // Photos the catalog knows stay listed while their drive isn't connected; they show their cached look.
+        let catalog = EditStorage.records.catalog
+        let urls = inputs.map(\.standardizedFileURL).filter { supports($0) && (FileManager.default.fileExists(atPath: $0.path) || catalog?.recordID(path: $0.path) != nil) }
+        let ordered = sorted ? urls.sorted { let o = $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent); return o == .orderedSame ? $0.path < $1.path : o == .orderedAscending } : urls
+        return PhotoCatalog(urls: ordered, selectedIndex: 0, folder: nil)
     }
 }
 

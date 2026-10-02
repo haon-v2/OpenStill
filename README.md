@@ -134,11 +134,20 @@ What OpenStill's catalog has, checked against the code, and what's still to come
 | Collections and smart collections | Yes |
 | Stacks | Yes (Library → Group into Stack, ⌘G) |
 | Virtual copies | Versions: named alternatives of one photo's edits, but not separate thumbnails in the grid |
-| Missing-file badges ("!" on photos whose file moved) | Not yet: drives that aren't connected are dimmed in Folders, and Lightroom catalog imports can be relinked |
+| Missing-file badges ("!" on photos whose file moved) | Yes: an orange "!" in the grid, and a notice over the photo in Develop with **Locate…** |
+| Previews of photos whose drive isn't connected | Yes: **Library cache** (below) |
 | Synchronize Folder removing photos deleted outside the app | Not yet: it adds new photos and refreshes counts |
-| Find missing folder / Update folder location | Not yet |
+| Find missing folder / Update folder location | Yes: right-click a missing folder → **Find Missing Folder…**. Drives and cards relink by themselves when plugged back in |
 | Collection sets (folders of collections) | Not yet |
 
+
+### Library cache and missing photos
+
+- **Recent photos stay visible.** OpenStill keeps the last look of the photos you worked on most recently, at 2560 pixels, in the catalog folder (**Settings → Library & Catalog → Library cache**: 200–5000 photos, 1000 by default). While a card or drive is unplugged, those photos still show in the Library, the filmstrip and Develop.
+- **A notice when the original can't be found.** The grid shows an orange "!" on the photo. Develop shows its cached look with a notice saying where the original was, and **Locate…**. Choosing the file checks it's the same photo (by its contents), and other missing photos from the same folder found next to it are relinked with it. Editing needs the original, or a Smart Preview (**Develop → Build Smart Previews**).
+- **Catalog → Recent** lists the photos you worked on, newest first, including ones that aren't connected. A folder on a drive that isn't connected opens from the catalog, with its cached looks.
+- **Plugging the card or drive back in relinks it.** OpenStill remembers each drive by its identity, not where it was mounted, so a card that comes back as "EOS_DIGITAL 1", or a renamed drive, is found by itself, and the photos open from the new place with their edits. A card with the same name but a new identity (reformatted) relinks only where the same files are at the same places, with the same sizes. When the same files turn up on a different drive (a copy), OpenStill asks before relinking them.
+- **Find Missing Folder…** (right-click a folder that's missing) points a folder to where it is now; photos relink by name and size.
 
 ## Duplicates
 
